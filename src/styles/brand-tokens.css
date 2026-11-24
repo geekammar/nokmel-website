@@ -1,0 +1,39 @@
+/* NOKMEL — Deep Sapphire Navy & Frost | approved direction 2026-11-24 */
+:root {
+  --brand-primary: #192B50;
+  --brand-highlight: #A9BCE5;
+  --action-primary-bg: #192B50;
+  --action-primary-fg: #FFFFFF;
+  --action-secondary: #526CB5;
+  --color-background: #F5F7FB;
+  --color-surface: #FFFFFF;
+  --color-text-primary: #1C2940;
+  --color-text-secondary: #606D80;
+  --color-border-subtle: #DCE3EE;
+  --color-border-input: #9CAEC9;
+  --color-focus-ring: #526CB5;
+  --color-success: #16734C;
+  --color-warning: #9A6200;
+  --color-error: #B43D42;
+  --color-info: #245DB0;
+  --font-ar: "IBM Plex Sans Arabic", sans-serif;
+  --font-en: "Geist", sans-serif;
+  --corner-card: 16px;
+  --corner-control: 12px;
+  --control-min-height: 44px;
+}
+[data-theme="dark"] {
+  --color-background: #111B2D;
+  --color-surface: #202D44;
+  --color-text-primary: #F1F4FB;
+  --color-text-secondary: #B7C6DC;
+  --color-border-subtle: #344665;
+  --color-border-input: #7188AE;
+  --action-primary-bg: #A9BCE5;
+  --action-primary-fg: #192B50;
+  --color-focus-ring: #A9BCE5;
+}
+[lang="ar"], [dir="rtl"] { font-family: var(--font-ar); }
+[lang="en"], [dir="ltr"] { font-family: var(--font-en); }
+/* Keep Payment / Order / Fulfillment states independent, explicit and labeled.
+ * Do NOT use Frost highlight for tiny text on white backgrounds. */

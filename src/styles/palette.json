@@ -1,0 +1,23 @@
+{
+  "brand_primary": "#192B50",
+  "primary_action": "#192B50",
+  "secondary_interactive": "#526CB5",
+  "logo_highlight": "#A9BCE5",
+  "background": "#F5F7FB",
+  "surface": "#FFFFFF",
+  "text_primary": "#1C2940",
+  "text_secondary": "#606D80",
+  "border_subtle": "#DCE3EE",
+  "border_input": "#9CAEC9",
+  "focus_ring": "#526CB5",
+  "dark_background": "#111B2D",
+  "dark_surface": "#202D44",
+  "dark_text_primary": "#F1F4FB",
+  "dark_text_secondary": "#B7C6DC",
+  "dark_primary_action": "#A9BCE5",
+  "dark_primary_action_text": "#192B50",
+  "success": "#16734C",
+  "warning": "#9A6200",
+  "error": "#B43D42",
+  "info": "#245DB0"
+}
