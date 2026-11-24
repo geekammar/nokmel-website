@@ -26,4 +26,4 @@ A simple, professional, mobile-first SaaS marketing website with a lightweight o
 
 ## Status
 
-W0 (Project Context & Repository Setup) is documentation-complete in the working copy. GitHub delivery is currently blocked — see `docs/CURRENT_STATE.md`.
+W0 (Project Context & Repository Setup) is delivered: repository `geekammar/nokmel-website` is verified and active, and the documentation ships on branch `vibe/w0-project-context-65bf39` via draft [PR #1](https://github.com/geekammar/nokmel-website/pull/1) targeting `main`. See `docs/CURRENT_STATE.md`.

@@ -1,24 +1,26 @@
 # ARCHITECTURE.md — Nokmel Website
 
-Status: **[PROPOSAL]** for the technical stack — report meaningful concerns before changing it.
+Status: technical direction **[APPROVED]** by the external technical lead (2026-11-24).
 
-## Proposed stack [PROPOSAL]
+## Approved stack [APPROVED]
 
-- Next.js + TypeScript
+- Next.js App Router + TypeScript
 - Tailwind CSS
 - Independent Neon PostgreSQL database (separate from the Nokmel platform database)
 - Drizzle ORM
-- Secure owner-only authentication (single owner account; no public registration, no multiple roles)
-- Vercel deployment (future; account `ammarjaberd`)
+- Zod validation
+- Secure owner-only authentication (single owner account; no public registration, no multiple roles). The exact authentication library remains **[OPEN]** until the auth implementation phase.
+- Lightweight custom CMS using predefined sections (no generic page builder)
+- External analytics provider for website traffic and conversion events. The exact provider remains **[OPEN]** until the analytics implementation phase.
+- Vercel deployment (account `ammarjaberd`)
 - GitHub Actions for CI
-- Lightweight external analytics
 
 ## Principles
 
 - Avoid premature abstractions and unnecessary infrastructure.
 - Documentation-only in W0: no scaffolding, no infrastructure provisioning, no database creation, no credentials, no deployment, no DNS changes.
 
-## High-level structure [PROPOSAL]
+## High-level structure
 
 ```
 app/
@@ -26,18 +28,22 @@ app/
   (admin)/         # Overview, Content & SEO, Plans & Pricing, Requests, Settings
   api/             # join-request intake, owner-authenticated admin APIs
 drizzle/           # schema + migrations (independent Neon DB)
-lib/               # db client, auth, analytics, content loaders
+lib/               # db client, auth, content loaders
 content/           # predefined CMS sections (editable via admin, stored in DB)
 ```
 
-## Data model (marketing-only) [PROPOSAL]
+## Data model
+
+This website's own database stores site content, marketing plans, join requests, and settings only:
 
 - `content_sections` — predefined homepage/page sections (key, locale, JSON body, visibility)
 - `faq_items` — question/answer pairs per locale
-- `plans` — marketing plan name, description, price, currency, features, order, visibility, CTA config. **Marketing data only; never authoritative for billing/entitlements.**
-- `join_requests` — name, contact, selected plan, status, notes, timestamps
-- `site_settings` — website, contact, social, CTA, notification, owner account settings
-- `analytics_events` — lightweight first-party event log feeding the Overview section (plus optional external analytics)
+- `plans` — marketing plan name, description, monthly price and optional yearly price, currency, features, order, visibility, CTA config. **Marketing data only; never authoritative for billing/entitlements.**
+- `join_requests` — name, contact, selected plan, status (`new` / `contacted` / `closed`), notes, timestamps
+- `site_settings` — website, contact, social, CTA, notification settings
+- `owner_account` — owner authentication data, stored separately from general website settings
+
+**Analytics:** website traffic and conversion events (including join-request conversion metrics) come from the external analytics provider. Do not design or implement a custom analytics pipeline; there is no first-party analytics_events table.
 
 ## Security and authorization (mandatory) [APPROVED requirement]
 
@@ -50,6 +56,6 @@ content/           # predefined CMS sections (editable via admin, stored in DB)
 
 Website-managed plans are marketing data only. They must not control subscriptions, entitlements, or merchant permissions. Authoritative pricing/entitlements remain with the Nokmel platform until commercial activation. No billing/payment integration in this phase.
 
-## Deployment [PROPOSAL, future]
+## Deployment [APPROVED, future]
 
-Vercel project linked to `geekammar/nokmel-website`; CI via GitHub Actions (lint, typecheck, build, tests on PRs). No deployment performed in W0.
+Vercel project under account `ammarjaberd`, linked to `geekammar/nokmel-website`; CI via GitHub Actions (lint, typecheck, build, tests on PRs). No deployment performed in W0; production deployment requires explicit approval.

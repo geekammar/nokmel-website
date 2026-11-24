@@ -15,5 +15,5 @@ Workstreams W0–W6. Each workstream ends with an external review gate before th
 ## Standing rules
 
 - Never push to `main`; feature branch + draft PR per workstream; never merge without owner approval.
-- No deployment, DB provisioning, credentials, or DNS changes except at W6 with explicit approval.
+- Infrastructure policy: infrastructure changes may occur only within the approved phase scope and with explicit owner authorization. Development and testing resources may be provisioned when required by their phase. Production deployment, production credentials, and DNS changes require explicit approval. No infrastructure provisioning in W0.
 - Pricing on the website is marketing data only (see PRODUCT_SPEC §5).

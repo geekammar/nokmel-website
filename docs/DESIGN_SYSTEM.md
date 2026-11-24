@@ -4,7 +4,7 @@
 
 The only accepted brand reference is **`Nokmel_Deep_Brand_Kit_v2.0.zip`**.
 
-- **Status: NOT INSPECTED.** The archive was not present in the execution environment during W0 (not in the sandbox filesystem; not found via GitHub code search on 2026-11-24). Per project rules, its contents are **not guessed**: no colors, typography, logos, or design tokens are asserted here until the actual files are inspected.
+- **Status: NOT INSPECTED — BLOCKED.** The archive has not been supplied to the execution environment (not in the sandbox filesystem; not found via GitHub code search as of 2026-11-24). Per project rules, its contents are **not guessed**: no colors, typography, logos, or design tokens are asserted here until the actual files are inspected. Brand verification is a **mandatory W1 prerequisite**; the external reviewer supplies the approved v2.0 assets.
 - Brand Kit v1.0 must not be used.
 - Do not recreate the logo, substitute arbitrary fonts, or invent brand tokens. Use only the supplied design tokens and SVG assets from v2.0.
 

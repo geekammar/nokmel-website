@@ -8,7 +8,7 @@ Build a simple, professional, mobile-first SaaS marketing website with a lightwe
 
 ## 2. Repository and environment [APPROVED]
 
-- Repository: `geekammar/nokmel-website`, default branch `main`. **[UNVERIFIED — see CURRENT_STATE.md: repo returned 404 on 2026-11-24; existence/access must be confirmed by the owner]**
+- Repository: `geekammar/nokmel-website` (id 1470006851), default branch `main`. **[VERIFIED 2026-11-24]** — delivered via branch `vibe/w0-project-context-65bf39` and draft PR #1.
 - Target domain: `nokmel.tech`
 - Future hosting: Vercel, account `ammarjaberd`
 - Separate marketing website; the Nokmel commerce platform repository must not be accessed or modified.
@@ -31,10 +31,10 @@ Pages:
 
 Exactly five primary sections:
 1. **Overview** — essential visitor analytics, traffic sources, pricing-page interest, join requests, conversion metrics.
-2. **Content & SEO** — editable page content, images, predefined sections, FAQ, titles, descriptions, social sharing metadata.
-3. **Plans & Pricing** — editable marketing plan names, descriptions, prices, currencies, features, display order, visibility, CTA configuration.
-4. **Requests** — join-request list: contact details, selected plan, status, optional notes.
-5. **Settings** — website, contact, social, CTA, notification, and owner account settings.
+2. **Content & SEO** — editable page content, images, predefined sections, FAQ, and page-level editable SEO metadata (titles, descriptions, social sharing metadata per page).
+3. **Plans & Pricing** — editable marketing plan names, descriptions, features, display order, visibility, and CTA configuration; marketing prices are monthly, with optional yearly prices.
+4. **Requests** — join-request list: contact details, selected plan, status (`new` / `contacted` / `closed`), optional notes.
+5. **Settings** — website, contact, social, CTA, notification, and owner account settings. Owner authentication data is stored separately from general website settings.
 
 Lightweight CMS with predefined components only. No generic website builder.
 
@@ -44,6 +44,7 @@ Lightweight CMS with predefined components only. No generic website builder.
 - They must not control actual subscriptions, commerce entitlements, or merchant permissions.
 - Before commercial subscription activation, authoritative pricing and entitlement ownership belong to the Nokmel platform.
 - No billing or payment processing in this phase. No invented or approved commercial prices.
+- Commercial purchasing must not be enabled until the authoritative platform pricing and subscription flow are ready.
 
 ## 6. Brand identity [APPROVED reference / BLOCKED artifact]
 
@@ -72,7 +73,6 @@ Live demo, demo management, media library dashboard, security & activity dashboa
 
 ## 10. Open questions [OPEN]
 
-- Existence/access of `geekammar/nokmel-website` (404 at inspection time).
-- Location/delivery of `Nokmel_Deep_Brand_Kit_v2.0.zip`.
+- Delivery of `Nokmel_Deep_Brand_Kit_v2.0.zip` (brand verification BLOCKED until supplied; mandatory W1 prerequisite).
 - Final approval of headline/tagline copy.
-- Choice of lightweight external analytics provider.
+- Choice of authentication library (decided at the auth implementation phase) and external analytics provider (decided at the analytics phase).
