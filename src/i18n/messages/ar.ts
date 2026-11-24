@@ -1,0 +1,67 @@
+export const ar = {
+  nav: {
+    primary: 'التنقل الرئيسي',
+    tokens: 'رموز التصميم',
+    typography: 'الخطوط',
+    components: 'المكوّنات',
+    home: 'نكمّل — الصفحة الرئيسية',
+  },
+  hero: {
+    eyebrow: 'Nokmel — نكمّل',
+    headline: 'متجرك في المحداثة. وبزنسك في مكان واحد.',
+    tagline: 'خلي بزنسك يكمل.',
+    cta: 'اطلب الانضمام',
+    secondary: 'تعرّف على رموز التصميم',
+  },
+  brandSection: {
+    title: 'هوية Deep Sapphire Navy & Frost',
+    body: 'أسطح فاتحة مع أقسام داكنة مختارة، وزر رئيسي واضح في كل واجهة.',
+    cta: 'اطلب الانضمام',
+  },
+  tokensSection: {
+    title: 'رموز التصميم',
+    body: 'كل الألوان المعروضة هنا مستخرجة من الملف الأساسي للـ Brand Kit v2.0.',
+    light: 'الوضع الفاتح',
+    dark: 'الوضع الداكن',
+  },
+  typographySection: {
+    title: 'الخطوط',
+    body: 'واجهة عربية أولاً بخط IBM Plex Sans Arabic، والإنجليزية بخط Geist. الشعار النصي مؤقت (Alexandria / Geist) حتى اعتماد الخط المخصص النهائي.',
+    heading1: 'عنوان رئيسي من الدرجة الأولى',
+    heading2: 'عنوان من الدرجة الثانية',
+    heading3: 'عنوان من الدرجة الثالثة',
+    bodySample: 'نص عادي لقراءة التفاصيل.',
+    muted: 'نص ثانوي.',
+    link: 'رابط ثانوي',
+  },
+  componentsSection: {
+    title: 'المكوّنات الأساسية',
+    body: 'مجموعة صغيرة قابلة لإعادة الاستخدام مبنية على الرموز الدلالية.',
+    buttons: 'الأزرار',
+    primary: 'زر رئيسي',
+    secondary: 'زر ثانوي',
+    disabled: 'زر معطّل',
+    link: 'رابط',
+    cardTitle: 'بطاقة',
+    cardBody: 'محتوى البطاقة — يستخدم رمز السطح والحد.',
+    inputLabel: 'الاسم',
+    inputPlaceholder: 'اكتب اسمك',
+    textareaLabel: 'رسالتك',
+    textareaPlaceholder: 'اكتب رسالتك هنا',
+  },
+  joinPreview: {
+    title: 'معاينة غير إنتاجية لنموذج الانضمام',
+    note: 'هذه معاينة فقط — لن يتم إرسال أي بيانات.',
+    name: 'الاسم الكامل',
+    contact: 'البريد الإلكتروني أو رقم الهاتف',
+    message: 'رسالتك (اختياري)',
+    submit: 'اطلب الانضمام',
+  },
+  footer: {
+    tagline: 'خلي بزنسك يكمل.',
+    wordmarkNote: 'الشعار النصي مؤقت بانتظار الاعتماد النهائي للخط المخصص.',
+    rights: '© 2026 Nokmel — نكمّل. جميع الحقوق محفوظة.',
+  },
+} as const;
+
+export type Messages = typeof ar;

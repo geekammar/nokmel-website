@@ -46,9 +46,9 @@ Lightweight CMS with predefined components only. No generic website builder.
 - No billing or payment processing in this phase. No invented or approved commercial prices.
 - Commercial purchasing must not be enabled until the authoritative platform pricing and subscription flow are ready.
 
-## 6. Brand identity [APPROVED reference / BLOCKED artifact]
+## 6. Brand identity [APPROVED reference / VERIFIED artifact]
 
-- Only accepted reference: `Nokmel_Deep_Brand_Kit_v2.0.zip`. **[BLOCKED — artifact not present in the execution environment as of W0; see DESIGN_SYSTEM.md and CURRENT_STATE.md]**
+- Only accepted reference: `Nokmel_Deep_Brand_Kit_v2.0.zip`. **[VERIFIED 2026-11-24 in the execution environment — archive SHA-256 `7c04840fc335daff52048f27b13ff3ac1e0159a3dc0d9299fbe8bf55b6931ff9`, independently confirmed by the external reviewer; see DESIGN_SYSTEM.md]**
 - Do not use Brand Kit v1.0; do not recreate the logo, substitute fonts, or invent tokens.
 - Working marketing headline (subject to owner approval) [PROPOSAL]: متجرك في المحادثة. وبزنسك في مكان واحد.
 - Working brand tagline [PROPOSAL]: خلي بزنسك يكمل.
@@ -73,6 +73,6 @@ Live demo, demo management, media library dashboard, security & activity dashboa
 
 ## 10. Open questions [OPEN]
 
-- Delivery of `Nokmel_Deep_Brand_Kit_v2.0.zip` (brand verification BLOCKED until supplied; mandatory W1 prerequisite).
+- ~~Delivery of `Nokmel_Deep_Brand_Kit_v2.0.zip`~~ — **RESOLVED 2026-11-24**: supplied and verified (SHA-256 match); W1 prerequisite met.
 - Final approval of headline/tagline copy.
 - Choice of authentication library (decided at the auth implementation phase) and external analytics provider (decided at the analytics phase).

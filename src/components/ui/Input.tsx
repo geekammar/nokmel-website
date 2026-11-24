@@ -1,0 +1,40 @@
+import { forwardRef, useId } from 'react';
+import type { InputHTMLAttributes } from 'react';
+
+type InputProps = InputHTMLAttributes<HTMLInputElement> & {
+  label: string;
+  error?: string;
+};
+
+export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
+  { label, error, id, className = '', ...rest },
+  ref,
+) {
+  const generatedId = useId();
+  const inputId = id ?? rest.name ?? generatedId;
+  const { 'aria-describedby': callerDescribedBy, 'aria-invalid': callerInvalid, ...inputRest } =
+    rest;
+  const describedBy =
+    [callerDescribedBy, error ? `${inputId}-error` : undefined].filter(Boolean).join(' ') ||
+    undefined;
+  return (
+    <div className={`flex flex-col gap-2 ${className}`}>
+      <label htmlFor={inputId} className="text-sm font-semibold text-text-primary">
+        {label}
+      </label>
+      <input
+        ref={ref}
+        id={inputId}
+        aria-invalid={error ? true : callerInvalid}
+        aria-describedby={describedBy}
+        className="min-h-control w-full rounded-control border border-border-interactive bg-surface px-4 text-base text-text-primary placeholder:text-text-secondary disabled:cursor-not-allowed disabled:opacity-60"
+        {...inputRest}
+      />
+      {error ? (
+        <p id={`${inputId}-error`} role="alert" className="text-sm text-status-error">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+});
