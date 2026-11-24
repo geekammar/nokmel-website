@@ -1,0 +1,5 @@
+# Pre-launch indexing barrier (intentional, not permanent).
+# At launch approval: flip PRE_LAUNCH to false in src/lib/seo.ts and replace
+# this file with the launch indexing rules.
+User-agent: *
+Disallow: /

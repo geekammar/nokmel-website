@@ -49,7 +49,7 @@ Rules honored in the implementation:
 
 - **Interactive input/button boundary (light theme):** the canonical `--color-border-input` `#9CAEC9` measures **2.26:1** against white, failing WCAG 1.4.11 (3:1 for component boundaries). Per the approved rule, interactive boundaries use `--color-border-interactive`, bound in `globals.css` to `--color-text-secondary` (`#606D80`, **5.26:1** on white) in light mode. In dark mode `--color-border-interactive` keeps the canonical `--color-border-input` `#7188AE` (**3.84:1** on `#202D44`, passes). The canonical token itself is unchanged in `brand-tokens.css` and remains available for decorative borders. Verified by `src/lib/__tests__/contrast.test.ts`.
 - **Derived interaction states (implementation defaults, not brand tokens):** `--action-primary-bg-hover` / `-active` are `color-mix` derivatives of the primary action color, defined in `globals.css`.
-- **Container width `72rem`** and vertical section rhythm are implementation defaults (`max-w-container`), not brand tokens.
+- **Container width `72rem`** and vertical section rhythm are implementation defaults (`max-w-container`), not brand tokens. W2 section rhythm: `Section` uses a coherent responsive cadence (`normal`: py-12/16/20, `compact`: py-10/12/14) to remove the excessive vertical gaps found on physical Android screenshots; dark sections scope foreground tokens through their own `data-theme="dark"` wrapper and are verified by computed-contrast e2e.
 
 All other contrast pairs used by the UI pass WCAG AA 4.5:1 for text and 3:1 for focus indicators (asserted in tests: primary/muted text on background and surface, Sapphire links, both CTA combinations, focus rings in both themes, all four status colors on white).
 
@@ -70,13 +70,13 @@ All other contrast pairs used by the UI pass WCAG AA 4.5:1 for text and 3:1 for 
 ## Component contracts (W1 repair)
 
 - `Button`: native `<button disabled>` cannot activate (native semantics). Link-style buttons (`href`) intentionally do **not** support `disabled` — it is rejected at the type level (`disabled?: never`) and throws at runtime, so a disabled link can never navigate or activate by pointer or keyboard.
-- `Input` / `Textarea`: every control gets a stable unique id (`id` prop → `name` → React `useId()` fallback), `<label htmlFor>` always points at it, and validation errors render `role="alert"` with `id="<controlId>-error"` referenced via `aria-describedby`. Caller-provided `aria-describedby` / `aria-invalid` are merged with (never replaced by) the error association.
+- `Input` / `Textarea`: every control gets a stable unique id from the explicit `id` prop or React `useId()` — **`name` is never used to derive the id** (W2 correction: multiple controls may legitimately share a `name`; regression-tested). `<label htmlFor>` always points at the control, and validation errors render `role="alert"` with `id="<controlId>-error"` referenced via `aria-describedby`. Caller-provided `aria-describedby` / `aria-invalid` are merged with (never replaced by) the error association.
 - Sticky header offset: `html { scroll-padding-top: 5.5rem }` keeps anchor targets (`#join-preview`, section anchors) clear of the sticky header; verified at 320px in e2e.
 - Regression coverage: unit tests (`src/components/__tests__/components.test.tsx`) + Playwright e2e (header offset, disabled preview controls, noindex meta).
 
-## Temporary page indexing
+## Pre-launch indexing (W2)
 
-The W1 foundation page carries page-level `robots: { index: false, follow: false }` (`src/app/page.tsx`) because it is a temporary design-system demonstration, not the public marketing website. This is **page-scoped only** — the root layout sets no robots restriction, so it does not establish a permanent noindex policy. Public marketing indexing and page-level SEO metadata will be introduced in the public-website phase (W2+).
+All public pages are served with `noindex, nofollow` while pre-launch, enforced centrally by `PRE_LAUNCH = true` in `src/lib/seo.ts` (`pageMetadata()` helper used by every public page) plus `public/robots.txt` with a full `Disallow: /`. This is an **intentional, centralized launch gate — not a permanent noindex rule**: public indexing is switched on only with explicit launch approval (W6) by flipping `PRE_LAUNCH` to `false` and replacing `robots.txt`. Canonical URLs always resolve against the approved target domain `nokmel.tech`, never the protected deployment domain.
 
 ## Temporary wordmark status [IMPORTANT]
 

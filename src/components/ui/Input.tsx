@@ -11,7 +11,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   ref,
 ) {
   const generatedId = useId();
-  const inputId = id ?? rest.name ?? generatedId;
+  const inputId = id ?? generatedId;
   const { 'aria-describedby': callerDescribedBy, 'aria-invalid': callerInvalid, ...inputRest } =
     rest;
   const describedBy =
