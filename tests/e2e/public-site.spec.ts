@@ -186,7 +186,8 @@ test.describe('join form (W2: disabled preview state)', () => {
       ids.push(id as string);
       await expect(page.locator(`label[for="${id}"]`)).toBeVisible();
     }
-    inputCount > 0 && expect(new Set(ids).size).toBe(ids.length);
+    expect(ids.length).toBe(inputCount);
+    expect(new Set(ids).size).toBe(ids.length);
     expect(page.getByTestId('join-form').locator('label')).toHaveCount(inputCount);
   });
 });
