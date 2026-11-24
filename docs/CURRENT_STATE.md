@@ -26,6 +26,7 @@ Last updated: W2 (public marketing website), 2026-11-24. Keep concise.
 
 ## Blockers / pending approvals
 
+- Deployed-preview acceptance by authorized Vercel access: local packaged-runtime smoke is green (7 routes + 8 plan variations = 200; zero runtime errors), but protected-preview content and Vercel runtime logs could not be inspected from this environment (302 → SSO; no credentials) — external authorized smoke still required.
 - Headline/tagline and all marketing copy remain working proposals pending owner approval.
 - Legal texts are labeled drafts requiring legal review before adoption.
 - No contact details published (not yet determined by the owner).
