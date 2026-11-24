@@ -7,7 +7,7 @@ import { Header } from '@/components/layout/Header';
 import { defaultLocale, dirByLocale } from '@/i18n/config';
 import { ar } from '@/i18n/messages/ar';
 import { home } from '@/content/ar/home';
-import { readTokens } from '@/lib/brand-tokens';
+import { THEME_COLOR_LIGHT } from '@/lib/viewport-theme';
 import { site, siteUrl } from '@/lib/site';
 
 const plexSansArabic = localFont({
@@ -56,7 +56,7 @@ const alexandria = localFont({
   display: 'swap',
 });
 
-const tokens = readTokens();
+
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -85,7 +85,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: tokens.light['--brand-primary'],
+  themeColor: THEME_COLOR_LIGHT,
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

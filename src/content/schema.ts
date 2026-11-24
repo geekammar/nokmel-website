@@ -30,8 +30,11 @@ export const textItemSchema = z.object({
 });
 export type TextItem = z.infer<typeof textItemSchema>;
 
-export const capabilityItemSchema = textItemSchema.extend({
+export const capabilityItemSchema = z.object({
+  title: z.string().min(1),
+  body: z.string().min(1),
   status: capabilityStatusSchema,
+  groupTitle: z.string().min(1),
 });
 export type CapabilityItem = z.infer<typeof capabilityItemSchema>;
 

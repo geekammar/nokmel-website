@@ -15,6 +15,9 @@ const pricingContentSchema = z.object({
     title: z.string().min(1),
     body: z.string().min(1),
   }),
+  noPurchase: z.object({
+    warning: z.string().min(1),
+  }),
   cta: z.object({
     title: z.string().min(1),
     body: z.string().min(1),
@@ -43,6 +46,10 @@ export const pricing: PricingContent = pricingContentSchema.parse({
   transparency: {
     title: 'شفافية قبل التسعير',
     body: 'قبل إطلاق أي اشتراك مدفوع، سننشر على هذه الصفحة أسماء خطط واضحة وأسعارها وما يشمله كل اشتراك. لن يُفعّل الشراء إلا بعد نشر هذه المعلومات — لن تُطلب منك مبالك دون معرفتها مسبقاً.',
+  },
+  noPurchase: {
+    warning:
+      'لا توجد أي أسعار أو خطط في هذه المرحلة. لن نطلب أي بيانات دفع، ولن يُفعّل الشراء إلا بعد إعلان التسعير الرسمي.',
   },
   cta: {
     title: 'مهتم بالانضمام المبكر؟',

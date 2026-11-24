@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { contrastRatio, WCAG } from '@/lib/contrast';
-import { readTokens } from '@/lib/brand-tokens';
+import { readTokens } from './brand-tokens.testing';
 
 const { light, dark } = readTokens();
 

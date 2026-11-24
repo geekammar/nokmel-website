@@ -2,14 +2,31 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --font-ar: var(--font-plex-ar), sans-serif;
-  --font-en: var(--font-geist), sans-serif;
-  --font-wordmark-ar: var(--font-alexandria), sans-serif;
-  --font-wordmark-en: var(--font-geist), sans-serif;
+/* Doubled :root raises specificity above the canonical brand-tokens :root
+ * block regardless of stylesheet order, so the next/font hashed families
+ * always win over the literal font names (which have no local @font-face). */
+:root:root {
+  --font-ar: var(--font-plex-ar), "IBM Plex Sans Arabic", sans-serif;
+  --font-en: var(--font-geist), "Geist", sans-serif;
+  --font-wordmark-ar: var(--font-alexandria), "Alexandria", sans-serif;
+  --font-wordmark-en: var(--font-geist), "Geist", sans-serif;
   --action-primary-bg-hover: color-mix(in srgb, var(--action-primary-bg) 88%, black);
   --action-primary-bg-active: color-mix(in srgb, var(--action-primary-bg) 80%, black);
   --color-border-interactive: var(--color-text-secondary);
+}
+
+/* Conceptual illustration panels inside dark sections reset the swapped
+ * tokens to their canonical light values so text and statuses keep AA contrast. */
+[data-theme='dark'] [data-theme='light-panel'] {
+  --color-background: #F5F7FB;
+  --color-surface: #FFFFFF;
+  --color-text-primary: #1C2940;
+  --color-text-secondary: #606D80;
+  --color-border-subtle: #DCE3EE;
+  --color-border-input: #9CAEC9;
+  --action-primary-bg: #192B50;
+  --action-primary-fg: #FFFFFF;
+  --color-focus-ring: #526CB5;
 }
 
 [data-theme='dark'] {

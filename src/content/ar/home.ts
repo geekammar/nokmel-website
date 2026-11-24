@@ -3,6 +3,7 @@ import { capabilityItemSchema, ctaLinkSchema, faqItemSchema, textItemSchema } fr
 
 const homeContentSchema = z.object({
   hero: z.object({
+    title: z.string().min(1),
     eyebrow: z.string().min(1),
     headline: z.string().min(1),
     tagline: z.string().min(1),
@@ -11,10 +12,16 @@ const homeContentSchema = z.object({
     secondaryCta: ctaLinkSchema,
   }),
   showcase: z.object({
-    badge: z.string().min(1),
     title: z.string().min(1),
     body: z.string().min(1),
+    steps: z.array(
+      z.object({
+        title: z.string().min(1),
+        body: z.string().min(1),
+      }),
+    ).length(3),
     caption: z.string().min(1),
+    primaryCta: ctaLinkSchema,
   }),
   problems: z.object({
     title: z.string().min(1),
@@ -24,7 +31,7 @@ const homeContentSchema = z.object({
   capabilities: z.object({
     title: z.string().min(1),
     lead: z.string().min(1),
-    items: z.array(capabilityItemSchema).min(1),
+    items: z.array(capabilityItemSchema).min(2),
   }),
   steps: z.object({
     title: z.string().min(1),
@@ -51,25 +58,43 @@ const homeContentSchema = z.object({
 
 export type HomeContent = z.infer<typeof homeContentSchema>;
 
+const currentTitle = 'ضمن الاتجاه الحالي — تيليجرام أولاً';
+const plannedTitle = 'مخطط لمراحل لاحقة';
+
 export const home: HomeContent = homeContentSchema.parse({
   hero: {
+    title: 'نكمّل',
     eyebrow: 'منصة التجارة عبر المحادثة',
     headline: 'متجرك في المحادثة. وبزنسك في مكان واحد.',
     tagline: 'خلي بزنسك يكمل.',
     subheadline:
-      'نكمّل منصة تجارة تساعد أصحاب المتاجر على إدارة متاجرهم وعملياتهم التجارية من خلال قنوات المحادثة. الاتجاه الحالي هو دعم تيليجرام أولاً، مع التوسع إلى قنوات أخرى مخطط له في مراحل لاحقة.',
+      'نكمّل منصة تجارة تساعد أصحاب المتاجر على إدارة متاجرهم وعملياتهم التجارية من خلال قنوات المحادثة، بدايةً من تيليجرام.',
     primaryCta: { label: 'اطلب الانضمام', href: '/join' },
     secondaryCta: { label: 'شوف كيف يعمل', href: '#how-it-works' },
   },
   showcase: {
-    badge: 'رسم توضيحي — اتجاه المنتج، وليس واجهة نهائية',
     title: 'الطلبات من المحادثة، والمتابعة من مكان واحد.',
-    body: 'الهدف الذي نعمل عليه: أن توصلك طلبات متجرك منظّمة بدل ما تكون مبعثرة بين الرسائل، وتتابع منتجاتك وعملياتك من مكان واحد.',
-    caption: 'رسم توضيحي مفاهيمي يعبّر عن فكرة المنتج — لا يمثل واجهة مكتملة ولا بيانات حقيقية.',
+    body: 'هكذا نتخيل استخدام نكمّل في يومك التجاري: الطلب يبدأ في محادثة تيليجرام، يتحول إلى طلب منظّم، وتتابع كل طلباتك من مكان واحد.',
+    steps: [
+      {
+        title: 'الطلب في تيليجرام',
+        body: 'العميل يرسل طلبه في المحادثة بشكل طبيعي.',
+      },
+      {
+        title: 'طلب منظّم',
+        body: 'تفاصيل الطلب تتجمع في مكان واحد بدل رسائل مبعثرة.',
+      },
+      {
+        title: 'متابعة من مكان واحد',
+        body: 'تأكيد وتحديث الطلبات لعملائك من نفس المكان.',
+      },
+    ],
+    caption: 'تصوّر مفاهيمي لاتجاه المنتج — ليس واجهة نهائية',
+    primaryCta: { label: 'اطلب الانضمام', href: '/join' },
   },
   problems: {
-    title: 'تحديات نستهدف حلّها',
-    lead: 'تحديات مألوفة لأصحاب المتاجر التي تدير بيعها من خلال المحادثات — نكمّل تُصمم لتخفيفها.',
+    title: 'قبل نكمّل، كيف يبدو العمل اليوم؟',
+    lead: 'تحديات مألوفة لأصحاب المتاجر التي يدير بيعها من خلال المحادثات.',
     items: [
       {
         title: 'طلبات تضيع بين الرسائل',
@@ -95,33 +120,39 @@ export const home: HomeContent = homeContentSchema.parse({
     items: [
       {
         status: 'direction',
-        title: 'كتالوج منتجات منظّم',
-        body: 'تنظيم منتجات متجرك وأسعارها في مكان واحد، لتكون جاهزة للمشاركة مع العميل داخل المحادثة.',
+        groupTitle: currentTitle,
+        title: 'استقبال الطلبات',
+        body: 'الطلب يصل منظّم من محادثة تيليجرام.',
       },
       {
         status: 'direction',
-        title: 'الطلبات داخل تيليجرام',
-        body: 'استقبال وتنظيم طلبات عملائك من محادثات تيليجرام بدلاً من تتبّعها يدوياً بين الرسائل.',
+        groupTitle: currentTitle,
+        title: 'إدارة المنتجات والأسعار',
+        body: 'منتجات متجرك وأسعارها في كتالوج واحد يسهّل مشاركتها مع العملاء داخل المحادثة.',
       },
       {
         status: 'direction',
+        groupTitle: currentTitle,
         title: 'متابعة ما بعد الطلب',
-        body: 'تأكيد الطلب وتحديث حالته للعميل من نفس المسار، لتقليل الأخطاء والمراسلات اليدوية المكررة.',
+        body: 'تأكيد الطلب وتحديث حالته للعميل من نفس المسار.',
       },
       {
         status: 'direction',
-        title: 'صورة واضحة عن متجرك',
-        body: 'عرض مركّز لحالة الطلبات والمنتجات دون تبديل بين تطبيقات وملاحظات مبعثرة.',
+        groupTitle: currentTitle,
+        title: 'صورة واضحة عن وضع المتجر',
+        body: 'نظرة مركزة على الطلبات المفتوحة والمنتجات دون تبديل بين أدوات.',
       },
       {
         status: 'planned',
+        groupTitle: plannedTitle,
         title: 'قنوات محادثة إضافية',
-        body: 'توسيع الدعم إلى قنوات أخرى إلى جانب تيليجرام — مخطط له في مراحل لاحقة بعد اكتمال تجربة تيليجرام أولاً.',
+        body: 'توسيع الدعم إلى قنوات أخرى إلى جانب تيليجرام.',
       },
       {
         status: 'planned',
+        groupTitle: plannedTitle,
         title: 'تقارير ولوحات متابعة',
-        body: 'رؤى عن أداء متجرك وحركة طلباته — مخططة لمراحل قادمة.',
+        body: 'رؤى عن أداء متجرك وحركة طلباته.',
       },
     ],
   },

@@ -66,7 +66,7 @@ describe('structured content', () => {
   it('features page distinguishes direction from planned and available is empty', () => {
     expect(features.workflows.items.every((item) => item.status === 'direction')).toBe(true);
     expect(features.planned.items.length).toBeGreaterThan(0);
-    expect(features.availableNote.body).toContain('لا توجد أي ميزة مدرجة');
+    expect(features.planned.items.every((item) => item.status === 'planned')).toBe(true);
   });
 
   it('pricing page does not invent commercial prices or plan names', () => {

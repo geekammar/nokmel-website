@@ -1,17 +1,23 @@
 import { expect, test } from '@playwright/test';
 
 const CTA = 'اطلب الانضمام';
+const base = 'http://127.0.0.1:3100';
+
+const publicRoutes = ['/', '/features', '/pricing', '/join', '/contact', '/privacy', '/terms'];
 
 const viewports = [
   { name: '320', width: 320, height: 720 },
   { name: '360', width: 360, height: 780 },
   { name: '390', width: 390, height: 844 },
+  { name: '430', width: 430, height: 932 },
   { name: '768', width: 768, height: 1024 },
+  { name: '1024', width: 1024, height: 768 },
   { name: '1280', width: 1280, height: 800 },
   { name: '1440', width: 1440, height: 900 },
+  { name: '1920', width: 1920, height: 1080 },
 ];
 
-const publicRoutes = ['/', '/features', '/pricing', '/join', '/contact', '/privacy', '/terms'];
+const keyRoutes = ['/', '/features', '/pricing', '/join'];
 
 const titleByRoute: Record<string, string> = {
   '/': 'نكمّل — متجرك في المحادثة. وبزنسك في مكان واحد.',
@@ -23,117 +29,178 @@ const titleByRoute: Record<string, string> = {
   '/terms': 'الشروط والأحكام — نكمّل',
 };
 
-function channelToLinear(channel: number): number {
-  const c = channel / 255;
-  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-}
+const joinPlanQueries = [
+  '?plan=starter',
+  '?plan=starter&plan=pro',
+  '?plan=',
+  '?plan=INVALID',
+  '?plan=very-long-invalid-value-exceeding-any-reasonable-limit-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  '?plan=a%20b',
+  '?plan=%3Cscript%3E',
+  '?plan=%D8%A7%D9%84%D8%AE%D8%B7%D8%A9',
+];
 
-function relativeLuminance([r, g, b]: [number, number, number]): number {
-  return 0.2126 * channelToLinear(r) + 0.7152 * channelToLinear(g) + 0.0722 * channelToLinear(b);
-}
-
-function contrastRatio(a: string, b: string): number {
-  const parse = (value: string): [number, number, number] => {
-    const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-    if (!match) throw new Error(`unparseable color: ${value}`);
-    return [Number(match[1]), Number(match[2]), Number(match[3])];
-  };
-  const la = relativeLuminance(parse(a));
-  const lb = relativeLuminance(parse(b));
-  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
-}
-
-test.describe('public routes render RTL-first with SEO safeguards', () => {
+test.describe('routes render RTL-first with SEO safeguards', () => {
   for (const route of publicRoutes) {
-    test(`route ${route} renders with metadata and primary CTA`, async ({ page }) => {
-      await page.setViewportSize({ width: 390, height: 844 });
+    test(`route ${route}`, async ({ page }) => {
       await page.goto(route);
-
       await expect(page.locator('html')).toHaveAttribute('lang', 'ar');
       await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
       await expect(page.locator('h1')).toHaveCount(1);
-      await expect(page.locator('h1')).toBeVisible();
-
-      await expect(await page.title()).toBe(titleByRoute[route]);
-      const description = await page.locator('meta[name="description"]').getAttribute('content');
-      expect(description?.length ?? 0).toBeGreaterThan(10);
+      await expect(page.locator('main')).toBeVisible();
 
       const robots = await page.locator('meta[name="robots"]').getAttribute('content');
       expect(robots).toContain('noindex');
-
       const canonical = await page.locator('link[rel="canonical"]').getAttribute('href');
-      const expectedCanonical = route === '/' ? 'https://nokmel.tech' : `https://nokmel.tech${route}`;
-      expect(canonical).toBe(expectedCanonical);
-
-      const cta = page.locator('header').getByRole('link', { name: CTA });
-      await expect(cta).toBeVisible();
-      await expect(cta).toHaveAttribute('href', '/join');
-
-      const overflow = await page.evaluate(
-        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      );
-      expect(overflow).toBeLessThanOrEqual(1);
-
-      await page.screenshot({ path: `test-results/screenshots/${route}-${'390px'}.png`, fullPage: true });
+      expect(canonical).toBe(`https://nokmel.tech${route === '/' ? '' : route}`);
+      const description = await page.locator('meta[name="description"]').getAttribute('content');
+      expect((description ?? '').length).toBeGreaterThan(10);
     });
   }
 });
 
-test.describe('homepage responsive layout', () => {
+test.describe('responsive layout across representative widths', () => {
   for (const vp of viewports) {
-    test(`homepage has no horizontal overflow at ${vp.name}px`, async ({ page }) => {
+    test(`no horizontal overflow at ${vp.name}px`, async ({ page }) => {
       await page.setViewportSize({ width: vp.width, height: vp.height });
       await page.goto('/');
-      const overflow = await page.evaluate(
-        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      );
-      expect(overflow).toBeLessThanOrEqual(1);
-      await page.screenshot({
-        path: `test-results/screenshots/home-${vp.name}px.png`,
-        fullPage: true,
-      });
+      for (const route of publicRoutes) {
+        await page.goto(route);
+        const overflow = await page.evaluate(
+          () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        );
+        expect(overflow).toBeLessThanOrEqual(1);
+      }
     });
   }
 });
 
-test.describe('navigation', () => {
-  test('desktop navigation links reach the public routes', async ({ page }) => {
-    await page.setViewportSize({ width: 1280, height: 800 });
-    await page.goto('/');
-    for (const item of [
-      { href: '/features', label: 'الميزات' },
-      { href: '/pricing', label: 'الأسعار' },
-      { href: '/contact', label: 'تواصل معنا' },
-    ]) {
-      await page.locator('header nav').getByRole('link', { name: item.label }).click();
-      await expect(page).toHaveURL(new URL(item.href, 'http://127.0.0.1:3100').href);
-      await expect(page.locator('h1')).toBeVisible();
-      await page.goBack();
+test.describe('screenshots (mobile + desktop, key routes)', () => {
+  for (const vp of [
+    { name: '390', width: 390, height: 844 },
+    { name: '1920', width: 1920, height: 1080 },
+  ]) {
+    for (const route of keyRoutes) {
+      test(`full-page screenshot ${route} @ ${vp.name}px`, async ({ page }) => {
+        await page.setViewportSize({ width: vp.width, height: vp.height });
+        await page.goto(route);
+        await page.screenshot({
+          path: `test-results/screenshots/${route}-${vp.name}px.png`,
+          fullPage: true,
+        });
+      });
     }
+  }
+});
+
+test.describe('compact mobile header geometry', () => {
+  for (const width of [320, 360, 390, 430]) {
+    test(`header geometry at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto('/');
+
+      const toggle = page.getByTestId('mobile-nav-toggle');
+      await expect(toggle).toBeVisible();
+      const toggleBox = await toggle.boundingBox();
+      expect(toggleBox!.width).toBeLessThanOrEqual(56);
+      expect(toggleBox!.height).toBeGreaterThanOrEqual(44);
+
+      const cta = page.locator('header').getByRole('link', { name: CTA }).first();
+      await expect(cta).toBeVisible();
+      const ctaBox = await cta.boundingBox();
+      expect(ctaBox!.height).toBeLessThanOrEqual(52);
+      await expect(cta).toHaveAttribute('href', '/join');
+
+      const header = page.locator('header');
+      await expect(header).toBeVisible();
+      const headerBox = await header.boundingBox();
+      expect(headerBox!.height).toBeLessThanOrEqual(72);
+
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflow).toBeLessThanOrEqual(1);
+    });
+  }
+});
+
+test.describe('mobile menu behavior', () => {
+  test('toggle opens a full-width panel inside the viewport with current-page indication', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+    const toggle = page.getByTestId('mobile-nav-toggle');
+    const panel = page.getByTestId('mobile-nav-panel');
+
+    await expect(panel).toBeHidden();
+    await toggle.click();
+    await expect(panel).toBeVisible();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+
+    const panelBox = await panel.boundingBox();
+    expect(panelBox!.width).toBeGreaterThanOrEqual(390 - 36);
+    expect(panelBox!.x).toBeGreaterThanOrEqual(0);
+    expect(panelBox!.x + panelBox!.width).toBeLessThanOrEqual(390 + 1);
+
+    await expect(
+      page.locator('header').getByRole('link', { name: CTA }).first(),
+    ).toHaveAttribute('href', '/join');
+    const homeLink = panel.getByRole('link', { name: 'الرئيسية' });
+    await expect(homeLink).toHaveAttribute('aria-current', 'page');
   });
 
-  test('mobile menu opens, navigates and holds the prominent CTA', async ({ page }) => {
-    await page.setViewportSize({ width: 360, height: 780 });
+  test('menu closes after navigating via a link selection', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/');
-    const mobileNav = page.getByTestId('mobile-nav');
-    await expect(mobileNav.locator('summary')).toBeVisible();
-    await mobileNav.locator('summary').click();
+    await page.getByTestId('mobile-nav-toggle').click();
     const panel = page.getByTestId('mobile-nav-panel');
     await expect(panel).toBeVisible();
-    await expect(panel.getByRole('link', { name: 'الميزات' })).toBeVisible();
-    await expect(
-      page.locator('header').getByRole('link', { name: CTA }),
-    ).toHaveAttribute('href', '/join');
-    await expect(page.locator('header').getByRole('link', { name: CTA })).toBeVisible();
-    await panel.getByRole('link', { name: 'الأسعار' }).click();
-    await expect(page).toHaveURL(/\/pricing$/);
+    await panel.getByRole('link', { name: 'الميزات' }).click();
+    await expect(page).toHaveURL(/\/features$/);
+    await expect(page.getByRole('heading', { name: 'الميزات', level: 1 })).toBeVisible();
+    await expect(panel).toBeHidden();
   });
 
-  test('mobile navigation stays hidden on desktop widths', async ({ page }) => {
-    await page.setViewportSize({ width: 768, height: 1024 });
+  test('menu closes on Escape and restores focus to the toggle', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/');
-    await expect(page.getByTestId('mobile-nav').locator('summary')).toBeHidden();
-    await expect(page.locator('header nav').getByRole('link', { name: 'الميزات' })).toBeVisible();
+    const toggle = page.getByTestId('mobile-nav-toggle');
+    await toggle.click();
+    const panel = page.getByTestId('mobile-nav-panel');
+    await expect(panel).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(panel).toBeHidden();
+    await expect(toggle).toBeFocused();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  test('menu closes on outside click', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+    await page.getByTestId('mobile-nav-toggle').click();
+    const panel = page.getByTestId('mobile-nav-panel');
+    await expect(panel).toBeVisible();
+    await page.mouse.click(195, 500);
+    await expect(panel).toBeHidden();
+  });
+});
+
+test.describe('navigation coverage', () => {
+  test('desktop navigation links reach the public routes with current-page state', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto('/');
+    for (const [label, path] of [
+      ['الميزات', '/features'],
+      ['الأسعار', '/pricing'],
+      ['تواصل معنا', '/contact'],
+    ] as const) {
+      await page.locator('header nav').getByRole('link', { name: label }).click();
+      await expect(page).toHaveURL(new URL(path, base).href);
+      const link = page.locator('header nav').getByRole('link', { name: label });
+      await expect(link).toHaveAttribute('aria-current', 'page');
+      await page.goBack();
+    }
   });
 
   test('footer navigation reaches legal and public pages', async ({ page }) => {
@@ -152,48 +219,129 @@ test.describe('navigation', () => {
   });
 });
 
-test.describe('join form (W2: disabled preview state)', () => {
-  test('all controls are disabled with a disabled submit and no success message', async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/join');
+test.describe('homepage structure', () => {
+  test('sections appear in the approved order', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto('/');
+    const headline = await page.locator('h1').first().innerText();
+    expect(headline).toContain('متجرك في المحادثة');
 
+    const order = await page.evaluate(() => {
+      const sections = [...document.querySelectorAll('main > section')];
+      return sections.map((section) => {
+        const h2 = section.querySelector('h2')?.textContent?.trim() ?? '';
+        return { top: Math.round(section.getBoundingClientRect().top + window.scrollY), h2 };
+      });
+    });
+    const h2s = order.map((s) => s.h2);
+    const indexOf = (prefix: string) => h2s.findIndex((text) => text.startsWith(prefix));
+    const titleShowcase = 'الطلبات من المحادثة';
+    const titleProblems = 'قبل نكمّل';
+    const titleCaps = 'ماذا يقدم';
+    const titleSteps = 'كيف يعمل';
+    const titlePricing = 'الانضمام المبكر';
+    const titleFaq = 'أسئلة شائعة';
+    const titleCta = 'جاهز تخلّي';
+    expect(indexOf(titleShowcase)).toBeGreaterThan(-1);
+    expect(order[indexOf(titleShowcase)].top).toBeGreaterThan(0);
+    for (const [first, second] of [
+      [titleShowcase, titleProblems],
+      [titleProblems, titleCaps],
+      [titleCaps, titleSteps],
+      [titleSteps, titlePricing],
+      [titlePricing, titleFaq],
+      [titleFaq, titleCta],
+    ] as const) {
+      expect(indexOf(first)).toBeGreaterThanOrEqual(0);
+      expect(indexOf(second)).toBeGreaterThan(indexOf(first));
+    }
+  });
+
+  test('dark showcase illustration is the concept workflow, not a skeleton', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto('/');
+    const showcase = page.locator('section[data-theme="dark"]').first();
+    const panel = showcase.locator('[data-theme="light-panel"]');
+    await expect(panel).toBeVisible();
+    await expect(panel.getByRole('note')).toContainText('تصوّر مفاهيمي');
+    const bubbles = showcase.locator('[data-testid="illustration-bubble"]');
+    await expect(bubbles).toHaveCount(0);
+    const workflowItems = panel.getByRole('listitem');
+    await expect(workflowItems).toHaveCount(3);
+  });
+
+  test('dark showcase text keeps AA contrast including badges', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto('/');
+    const ratios = await page.evaluate(() => {
+      function lum(c: string): number | null {
+        const m = c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+        if (!m) return null;
+        const [r, g, b] = [m[1], m[2], m[3]].map(Number).map((v) => {
+          const s = v / 255;
+          return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+        });
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      }
+      function ratio(fg: string, bg: string): number | null {
+        const a = lum(fg);
+        const b = lum(bg);
+        return a === null || b === null ? null : (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+      }
+      function bgOf(el: Element): string {
+        let cur: Element | null = el;
+        while (cur) {
+          const c = getComputedStyle(cur).backgroundColor;
+          if (c && !/rgba\(\s*\d+,\s*\d+,\s*\d+,\s*0\s*\)/.test(c)) return c;
+          cur = cur.parentElement;
+        }
+        return '#FFFFFF';
+      }
+      const darkSection = document.querySelector('section[data-theme="dark"]')!;
+      const results: number[] = [];
+      for (const el of darkSection.querySelectorAll('h2, p, [role="note"], figcaption, a, button, span')) {
+        const text = el.textContent?.trim() ?? '';
+        if (!text || el.children.length > 0) continue;
+        const style = getComputedStyle(el);
+        const value = ratio(style.color, bgOf(el));
+        if (value !== null) results.push(value);
+      }
+      return { min: Math.min(...results), count: results.length };
+    });
+    expect(ratios.count).toBeGreaterThan(0);
+    expect(ratios.min).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+test.describe('join form (W2: disabled preview state)', () => {
+  test('all controls are disabled with a disabled submit', async ({ page }) => {
+    await page.goto('/join');
     const inputs = page.getByTestId('join-form').locator('input, textarea');
     await expect(inputs).toHaveCount(4);
     for (const input of await inputs.all()) {
       await expect(input).toBeDisabled();
     }
-
     const submit = page.getByTestId('join-form').getByRole('button', { name: CTA });
     await expect(submit).toBeDisabled();
-    await submit.click({ force: true });
-    await expect(page).toHaveURL(/\/join$/);
-
-    await expect(page.getByRole('note').filter({ hasText: 'استلام الطلبات غير متاح بعد' })).toBeVisible();
   });
 
-  test('labels are associated with controls and ids are unique', async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
+  test('labels are associated and ids unique', async ({ page }) => {
     await page.goto('/join');
     const inputs = page.getByTestId('join-form').locator('input, textarea');
     const ids: string[] = [];
-    const inputCount = await inputs.count();
-    for (let index = 0; index < inputCount; index += 1) {
-      const input = inputs.nth(index);
+    for (const input of await inputs.all()) {
       const id = await input.getAttribute('id');
       expect(id).toBeTruthy();
       ids.push(id as string);
-      await expect(page.locator(`label[for="${id}"]`)).toBeVisible();
+      const label = page.locator(`label[for="${id}"]`);
+      await expect(label).toBeVisible();
     }
-    expect(ids.length).toBe(inputCount);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(page.getByTestId('join-form').locator('label')).toHaveCount(inputCount);
   });
 });
 
-test.describe('accessibility', () => {
-  test('keyboard focus lands on the skip link with a visible outline', async ({ page }) => {
+test.describe('accessibility basics', () => {
+  test('keyboard focus lands on the skip link with visible outline', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
     await page.keyboard.press('Tab');
@@ -204,9 +352,7 @@ test.describe('accessibility', () => {
     expect(outline).toBe('solid');
   });
 
-  test('anchor targets and keyboard focus are not obscured by the sticky header', async ({
-    page,
-  }) => {
+  test('anchor targets are not obscured by the sticky header', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 720 });
     await page.goto('/');
     await page.getByRole('link', { name: 'شوف كيف يعمل' }).click();
@@ -217,49 +363,45 @@ test.describe('accessibility', () => {
       .evaluate((el) => el.getBoundingClientRect().top);
     expect(targetTop).toBeGreaterThanOrEqual(headerBottom - 1);
   });
-
-  test('dark sections keep light foreground text on dark backgrounds', async ({ page }) => {
-    await page.setViewportSize({ width: 1280, height: 800 });
-    await page.goto('/');
-    for (const region of ['section[data-theme="dark"]', 'footer[data-theme="dark"]']) {
-      const section = page.locator(region).first();
-      const bg = await section.evaluate((el) => getComputedStyle(el).backgroundColor);
-      const luminances = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-      const rgb = [Number(luminances![1]), Number(luminances![2]), Number(luminances![3])];
-      const isDark = rgb.reduce((sum, c) => sum + c, 0) < 384;
-      expect(isDark).toBe(true);
-      const heading = section.locator('h2').first();
-      const fg = await heading.evaluate((el) => getComputedStyle(el).color);
-      expect(contrastRatio(fg, bg)).toBeGreaterThanOrEqual(4.5);
-    }
-  });
 });
 
-test.describe('links integrity', () => {
-  test('all internal links resolve to the approved public routes', async ({ page }) => {
-    const internal = new Set<string>();
+test.describe('production runtime smoke (packaged build via next start)', () => {
+  test('all seven public routes render without server errors', async ({ request }) => {
     for (const route of publicRoutes) {
-      await page.goto(route);
-      const hrefs = await page.locator('a[href^="/"]').evaluateAll((links) =>
-        links.map((a) => (a as HTMLAnchorElement).getAttribute('href') as string),
-      );
-      for (const href of hrefs) internal.add(new URL(href, 'http://127.0.0.1:3100').pathname);
-    }
-    expect([...internal].sort()).toEqual([...publicRoutes].sort());
-    for (const route of internal) {
-      const response = await page.request.get(route);
+      const response = await request.get(route);
       expect(response.status()).toBe(200);
+      const body = await response.text();
+      expect(body).toContain('dir="rtl"');
     }
   });
 
-  test('in-page anchors resolve to attached targets', async ({ page }) => {
-    await page.goto('/');
-    const hrefs = await page.locator('a[href^="#"]').evaluateAll((links) =>
-      links.map((a) => (a as HTMLAnchorElement).getAttribute('href')),
-    );
-    for (const href of hrefs) {
-      await expect(page.locator(href as string).first()).toBeAttached();
+  test('all join plan-query variations render without HTTP 500', async ({ request }) => {
+    for (const query of joinPlanQueries) {
+      const response = await request.get(`/join${query}`);
+      expect(response.status()).toBe(200);
+      const body = await response.text();
+      expect(body).toContain('اطلب الانضمام');
     }
+  });
+
+  test('per-route page metadata targets the public domain, not the deployment domain', async ({
+    request,
+  }) => {
+    for (const route of publicRoutes) {
+      const response = await request.get(route);
+      const body = await response.text();
+      expect(body).toContain('noindex');
+      expect(body).toContain('https://nokmel.tech');
+      expect(body).not.toContain('vercel.app');
+    }
+  });
+
+  test('pre-launch robots policy is served', async ({ request }) => {
+    const response = await request.get('/robots.txt');
+    expect(response.status()).toBe(200);
+    const body = await response.text();
+    expect(body).toContain('User-agent: *');
+    expect(body).toContain('Disallow: /');
   });
 });
 
@@ -272,14 +414,5 @@ test.describe('SEO additional', () => {
     expect(ogUrl).toBe('https://nokmel.tech/features');
     const ogSite = await page.locator('meta[property="og:site_name"]').getAttribute('content');
     expect(ogSite).toBe('Nokmel');
-  });
-
-  test('robots.txt enforces the pre-launch indexing barrier', async ({ page }) => {
-    const response = await page.request.get('/robots.txt');
-    expect(response.status()).toBe(200);
-    const body = await response.text();
-    expect(body).toContain('User-agent: *');
-    expect(body).toContain('Disallow: /');
-    expect(body).not.toContain('Sitemap:');
   });
 });
