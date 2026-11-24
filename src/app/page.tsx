@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { Logo } from '@/components/brand/Logo';
 import { Wordmark } from '@/components/brand/Wordmark';
 import { Button } from '@/components/ui/Button';
@@ -59,6 +60,11 @@ function Swatch({ name, value }: { name: string; value: string }) {
     </figure>
   );
 }
+
+export const metadata: Metadata = {
+  title: 'نكمّل — صفحة التأسيس (مؤقتة)',
+  robots: { index: false, follow: false },
+};
 
 export default function FoundationPage() {
   const tokens = readTokens();

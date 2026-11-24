@@ -72,6 +72,38 @@ test('self-hosted brand fonts are loaded', async ({ page }) => {
   expect(families.some((f) => f.toLowerCase().includes('alexandria'))).toBe(true);
 });
 
+test('anchor targets are not obscured by the sticky header at narrow viewport', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 720 });
+  await page.goto('/');
+  await page.getByRole('link', { name: 'اطلب الانضمام' }).first().click();
+  await expect(page.locator('#join-preview')).toBeVisible();
+  const headerBottom = await page.locator('header').evaluate((el) => el.getBoundingClientRect().bottom);
+  const targetTop = await page
+    .locator('#join-preview')
+    .evaluate((el) => el.getBoundingClientRect().top);
+  expect(targetTop).toBeGreaterThanOrEqual(headerBottom - 1);
+});
+
+test('disabled preview controls cannot activate or navigate', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/#join-preview');
+  const submit = page.locator('#join-preview').getByRole('button', { name: 'اطلب الانضمام' });
+  await expect(submit).toBeDisabled();
+  const inputs = page.locator('#join-preview').locator('input, textarea');
+  for (const input of await inputs.all()) {
+    await expect(input).toBeDisabled();
+  }
+  await expect(page).toHaveURL(/\/#join-preview$/);
+});
+
+test('temporary foundation page is noindexed', async ({ page }) => {
+  await page.goto('/');
+  const robots = await page.locator('meta[name="robots"]').getAttribute('content');
+  expect(robots).toContain('noindex');
+});
+
 test('all navigation links resolve to existing on-page anchors', async ({ page }) => {
   await page.goto('/');
   const hrefs = await page.locator('a[href^="#"]').evaluateAll((links) =>

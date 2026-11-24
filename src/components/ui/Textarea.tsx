@@ -1,4 +1,4 @@
-import { forwardRef } from 'react';
+import { forwardRef, useId } from 'react';
 import type { TextareaHTMLAttributes } from 'react';
 
 type TextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
@@ -10,7 +10,13 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
   { label, error, id, className = '', ...rest },
   ref,
 ) {
-  const textareaId = id ?? rest.name;
+  const generatedId = useId();
+  const textareaId = id ?? rest.name ?? generatedId;
+  const { 'aria-describedby': callerDescribedBy, 'aria-invalid': callerInvalid, ...textareaRest } =
+    rest;
+  const describedBy =
+    [callerDescribedBy, error ? `${textareaId}-error` : undefined].filter(Boolean).join(' ') ||
+    undefined;
   return (
     <div className={`flex flex-col gap-2 ${className}`}>
       <label htmlFor={textareaId} className="text-sm font-semibold text-text-primary">
@@ -20,10 +26,10 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
         ref={ref}
         id={textareaId}
         rows={4}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error ? `${textareaId}-error` : undefined}
+        aria-invalid={error ? true : callerInvalid}
+        aria-describedby={describedBy}
         className="w-full rounded-control border border-border-interactive bg-surface px-4 py-3 text-base text-text-primary placeholder:text-text-secondary disabled:cursor-not-allowed disabled:opacity-60"
-        {...rest}
+        {...textareaRest}
       />
       {error ? (
         <p id={`${textareaId}-error`} role="alert" className="text-sm text-status-error">

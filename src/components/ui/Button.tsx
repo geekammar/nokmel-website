@@ -34,6 +34,7 @@ type ButtonAsButton = CommonProps &
 type ButtonAsLink = CommonProps &
   Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'className' | 'children'> & {
     href: string;
+    disabled?: never;
   };
 
 export type ButtonProps = ButtonAsButton | ButtonAsLink;
@@ -43,7 +44,12 @@ export const Button = forwardRef<HTMLButtonElement | HTMLAnchorElement, ButtonPr
     const { variant = 'primary', size = 'md', className = '', children, ...rest } = props;
     const classes = `${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`;
     if ('href' in rest && rest.href !== undefined) {
-      const { href, ...linkRest } = rest as ButtonAsLink;
+      const { href, ...linkRest } = rest as ButtonAsLink & { disabled?: unknown };
+      if (linkRest.disabled !== undefined) {
+        throw new Error(
+          'Button: disabled link-style buttons are not supported; use a native <button disabled> instead.',
+        );
+      }
       return (
         <a ref={ref as React.Ref<HTMLAnchorElement>} href={href} className={classes} {...linkRest}>
           {children}

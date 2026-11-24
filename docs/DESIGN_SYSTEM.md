@@ -67,6 +67,17 @@ All other contrast pairs used by the UI pass WCAG AA 4.5:1 for text and 3:1 for 
 - Temporary wordmark fonts: Arabic **Alexandria** (bold) via `@fontsource-variable/alexandria@5.3.0`, English **Geist** semibold — bound to `--font-wordmark-ar` / `--font-wordmark-en`. License **OFL-1.1**, notice at `licenses/fonts/OFL-alexandria.txt`.
 - Fonts are npm-pinned and installed from the committed lockfile, so builds are reproducible and no runtime external font service is used. Verified in e2e that all three families actually load in the browser.
 
+## Component contracts (W1 repair)
+
+- `Button`: native `<button disabled>` cannot activate (native semantics). Link-style buttons (`href`) intentionally do **not** support `disabled` — it is rejected at the type level (`disabled?: never`) and throws at runtime, so a disabled link can never navigate or activate by pointer or keyboard.
+- `Input` / `Textarea`: every control gets a stable unique id (`id` prop → `name` → React `useId()` fallback), `<label htmlFor>` always points at it, and validation errors render `role="alert"` with `id="<controlId>-error"` referenced via `aria-describedby`. Caller-provided `aria-describedby` / `aria-invalid` are merged with (never replaced by) the error association.
+- Sticky header offset: `html { scroll-padding-top: 5.5rem }` keeps anchor targets (`#join-preview`, section anchors) clear of the sticky header; verified at 320px in e2e.
+- Regression coverage: unit tests (`src/components/__tests__/components.test.tsx`) + Playwright e2e (header offset, disabled preview controls, noindex meta).
+
+## Temporary page indexing
+
+The W1 foundation page carries page-level `robots: { index: false, follow: false }` (`src/app/page.tsx`) because it is a temporary design-system demonstration, not the public marketing website. This is **page-scoped only** — the root layout sets no robots restriction, so it does not establish a permanent noindex policy. Public marketing indexing and page-level SEO metadata will be introduced in the public-website phase (W2+).
+
 ## Temporary wordmark status [IMPORTANT]
 
 The kit's editable-text wordmark SVGs are templates, not final outlined custom lettering. W1 renders the supplied **symbol** plus a **temporary text wordmark** (`نكمّل` in Alexandria Bold / `Nokmel` in Geist Semibold), marked `data-wordmark="temporary"` in the DOM and documented here. It is **not** represented as the final custom wordmark. The symbol and wordmark assets still require final visual approval before production launch.

@@ -19,13 +19,28 @@ describe('design system components', () => {
     expect(html).toContain('rounded-control');
   });
 
-  it('Button renders an <a> when href is provided and supports disabled state', () => {
+  it('Button renders an <a> when href is provided and supports disabled state on native buttons', () => {
     const link = renderToStaticMarkup(<Button href="#join-preview">Join</Button>);
     expect(link).toContain('<a');
     expect(link).toContain('href="#join-preview"');
+    expect(link).not.toContain('disabled=""');
     const disabled = renderToStaticMarkup(<Button disabled>Off</Button>);
-    expect(disabled).toContain('disabled');
+    expect(disabled).toContain('<button');
+    expect(disabled).toContain('disabled=""');
     expect(disabled).toContain('disabled:opacity-60');
+  });
+
+  it('Button rejects disabled link-style buttons at runtime and at the type level', () => {
+    expect(() =>
+      renderToStaticMarkup(
+        <Button href="#x" {...({ disabled: true } as Record<string, unknown>)}>
+          x
+        </Button>,
+      ),
+    ).toThrow(/disabled link-style buttons are not supported/);
+    // @ts-expect-error disabled is not a valid prop on the link variant
+    const invalid = <Button href="#x" disabled>x</Button>;
+    expect(invalid).toBeTruthy();
   });
 
   it('Button secondary variant uses the interactive border token', () => {
@@ -39,8 +54,46 @@ describe('design system components', () => {
     expect(html).toContain('for="name"');
     expect(html).toContain('id="name"');
     expect(html).toContain('aria-invalid="true"');
+    expect(html).toContain('aria-describedby="name-error"');
+    expect(html).toContain('id="name-error"');
     expect(html).toContain('role="alert"');
     expect(html).toContain('border-border-interactive');
+  });
+
+  it('Input generates stable unique ids when neither id nor name is provided', () => {
+    const html = renderToStaticMarkup(
+      <>
+        <Input label="A" />
+        <Input label="B" />
+      </>,
+    );
+    const ids = [...html.matchAll(/<input[^>]*id="([^"]+)"/g)].map((m) => m[1]);
+    const fors = [...html.matchAll(/<label[^>]*for="([^"]+)"/g)].map((m) => m[1]);
+    expect(ids).toHaveLength(2);
+    expect(new Set(ids).size).toBe(2);
+    expect(fors).toEqual(ids);
+  });
+
+  it('Input keeps caller-provided aria-describedby alongside the error association', () => {
+    const html = renderToStaticMarkup(
+      <Input label="Name" name="name" error="Required" aria-describedby="hint" />,
+    );
+    expect(html).toContain('aria-describedby="hint name-error"');
+    expect(html).toContain('aria-invalid="true"');
+  });
+
+  it('Textarea generates stable unique ids and merges caller aria attributes with errors', () => {
+    const html = renderToStaticMarkup(
+      <>
+        <Textarea label="A" />
+        <Textarea label="B" error="Bad" aria-describedby="hint" />
+      </>,
+    );
+    const ids = [...html.matchAll(/<textarea[^>]*id="([^"]+)"/g)].map((m) => m[1]);
+    expect(ids).toHaveLength(2);
+    expect(new Set(ids).size).toBe(2);
+    expect(html).toMatch(/aria-describedby="hint [^"]*-error"/);
+    expect(html).toContain('aria-invalid="true"');
   });
 
   it('Textarea associates its label with the control', () => {
