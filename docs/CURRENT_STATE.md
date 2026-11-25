@@ -1,6 +1,6 @@
 # CURRENT_STATE.md — Nokmel Website
 
-Last updated: W3.2 implementation, 2026-11-25. Keep concise.
+Last updated: W3.2 focused published-content consistency closure, 2026-11-25. Keep concise.
 
 ## Status: W3.2 — lightweight CMS implemented on `feature/w32-content-management` (draft PR, not merged; no production claim)
 
@@ -18,10 +18,17 @@ Last updated: W3.2 implementation, 2026-11-25. Keep concise.
 - Compact mobile admin navigation: closed-by-default disclosure panel, 44px controls, active section, Escape/focus restoration, outside-click and navigation close; desktop sidebar preserved. Overview remains a simple honest empty state. Future sections remain non-interactive with concise labels.
 - Additive migration `drizzle/0002_w32-content-cms.sql` (`content_sections`, `faq_items`, indexes/checks). It upgrades a W3.1 schema with existing synthetic auth records unchanged; no sequences, no changes to old migrations.
 
+### W3.2 focused consistency closure (2026-11-25)
+
+- Public homepage, owner editor and protected preview now perform their related section+FAQ reads in one short read-only PostgreSQL `REPEATABLE READ` transaction. A publication/draft save committing between the two statements cannot produce mixed content or mixed revision/FAQ state. No write/advisory lock, session state, long transaction or cache service is used.
+- Public reads use published-only projections: sections select only `section_key`/`published_payload`; FAQ selects only published question/answer/order/visibility, ordered by published order. Draft payloads/revisions/answers/visibility/order are never selected by public paths. Full draft rows remain restricted to editor/preview/mutations.
+- Existing fallback/invalid-data behavior is unchanged. No schema change was needed; `0002_w32-content-cms` is unchanged and no new migration was added.
+- Deterministic integration tests commit a publication or draft save between the two logical reads via a test-only synchronization seam (no sleeps), and a temporary column-privilege role proves public reads work without access to draft columns.
+
 ### Verification (local)
 
 - Unit tests: 113/113 passing (101 existing + 12 CMS registry/rendering/fallback).
-- PostgreSQL integration: 73/73 passing on disposable PostgreSQL 18 (auth 50 + CMS 23: migration upgrade preserving auth data, draft/privacy, atomic publication, failed-publication rollback, discard, stale write/publication/discard, concurrent writers, FAQ lifecycle, fallback safety, runtime-role DML/DDL refusal).
+- PostgreSQL integration: 78/78 passing on disposable PostgreSQL 18 (auth 50 + CMS 28: migration upgrade preserving auth data, draft/privacy, atomic publication, failed-publication rollback, discard, stale write/publication/discard, concurrent writers, FAQ lifecycle, consistent-snapshot interleaving for public/editor/preview, published-only column projection, fallback safety, runtime-role DML/DDL refusal).
 - Playwright: 84/84 passing with synthetic owner + disposable DB (existing public/auth/login suites + W3.2 navigation, homepage draft/preview/publish/discard, FAQ, per-page editing, 320–1440 responsiveness, field validation, anonymous/non-owner protection).
 - `pnpm db:check`, lint (0 errors; 3 pre-existing warnings), typecheck and production build pass. Exact remote CI URL and Preview identity are recorded in the draft PR/handoff; they must be checked on the exact final HEAD.
 

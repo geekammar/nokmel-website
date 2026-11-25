@@ -225,7 +225,7 @@ The CMS edits only the existing seven predefined public pages and the homepage F
 | `/privacy` | `legal` | Page title/intro, six predefined legal section headings/bodies | Draft-status banner, pre-launch legal policy, section count, no invented claims |
 | `/terms` | `legal` | Page title/intro, six predefined legal section headings/bodies | Draft-status banner, pre-launch legal policy, section count, no invented claims |
 
-Images: no existing public component has a meaningful owner-editable image field. W3.2 therefore provides no image selector/uploads/media library; brand logo assets remain code-controlled. This is an intentional limitation.
+Images: no existing public component has a meaningful owner-editable image field. W3.2 therefore provides no image selector/uploads/media library; brand logo assets remain code-controlled. This is an intentional limitation. W3.2 also intentionally does not support hiding arbitrary predefined page sections; FAQ item visibility is supported.
 
 ### Persistence model
 
@@ -253,6 +253,23 @@ Images: no existing public component has a meaningful owner-editable image field
 ### Public loading and caching
 
 Public routes keep their paths, header/footer, and visual layout. `src/app/(public)/layout.tsx` sets `dynamic = 'force-dynamic'`: each public request reads published sections (one query) and, for home, published FAQ (one query). There is no cross-request content cache, so publication is visible on the next request without a deployment and database-failure fallbacks are never cached indefinitely. Admin/preview content is never shared through public caches. `revalidatePath` is still called after publication for route-cache hygiene. This deliberately simple strategy avoids a bespoke invalidation service; a bounded shared cache can be added later if traffic warrants it.
+
+### Consistent reads and published-only projection
+
+Related multi-query reads run in a short **read-only `REPEATABLE READ` transaction**, so section and FAQ data always come from one committed snapshot:
+
+- public homepage reads (sections + FAQ);
+- owner editor loads (section revision + FAQ draft state);
+- protected draft preview reads.
+
+This prevents a publication or draft save committing between the two statements from producing mixed old/new content or mixed revision/FAQ data. The transaction contains only the two SELECTs, takes no write or advisory lock, and uses no session state, so it remains compatible with Neon's transaction-pooling endpoint. (Hosted pooler verification remains a W6 live check.)
+
+Public queries use explicit published-only projections:
+
+- `content_sections`: `section_key`, `published_payload` (filtered by page/locale);
+- `faq_items`: `published_question`, `published_answer`, `published_sort_order`, `published_visible` (filtered by locale/non-null published question, ordered by published order).
+
+Draft payloads, draft FAQ answers/visibility/order and draft revisions are never selected on public paths and do not influence public ordering. Full draft rows remain restricted to the owner editor/preview and write transactions. Existing stored-payload validation and safe defaults/fallback are unchanged. Deterministic integration tests use a test-only synchronization seam (no sleeps) to commit a publication/draft between the two reads, and a temporary column-privilege probe role proves public reads succeed without SELECT access to any draft columns.
 
 ### Authorization and mobile admin navigation
 

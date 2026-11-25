@@ -166,6 +166,13 @@ privileges are required. `nokmel_migrator` owns tables created by its migration
 run (so future `ALTER`s remain possible); do not transfer ownership to the
 runtime role.
 
+The public loader uses a published-only column projection but still runs with
+the same table-level runtime DML grants above; no column-level or additional
+hosted grants are required. The focused consistency integration test creates a
+temporary synthetic role with only published-column privileges to prove public
+queries never select draft columns; that probe role is disposable test tooling
+and not part of hosted provisioning.
+
 Public-site fallback before the migration: if the CMS tables are absent, public
 pages render the approved content defaults; the admin editor reports that CMS
 tables are not migrated and refuses writes. No explicit seed/initialization is

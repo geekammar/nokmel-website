@@ -1078,7 +1078,9 @@ export const cmsFaqItemsInputSchema = z
 
 export type CmsFaqItemInput = z.infer<typeof cmsFaqItemInputSchema>;
 
-export function assertFaqRenderable(items: readonly CmsFaqItem[]): void {
+export function assertFaqRenderable(
+  items: readonly { id?: string; question: string; answer: string; visible: boolean }[],
+): void {
   const visible = items.filter((item) => item.visible);
   if (visible.length === 0) {
     throw new CmsValidationError('يلزم سؤال ظاهر واحد على الأقل قبل النشر.');

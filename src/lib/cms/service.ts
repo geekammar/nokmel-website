@@ -44,7 +44,16 @@ import {
  * stale tab cannot overwrite or publish a newer draft.
  */
 
-type CmsServiceOptions = { db?: Db };
+export type CmsReadTestHooks = {
+  /**
+   * Test-only synchronization seam. Runs after the first statement of a
+   * related multi-query read transaction, while the reader still holds its
+   * snapshot. Application code never supplies this hook.
+   */
+  afterSectionRead?: () => void | Promise<void>;
+};
+
+type CmsServiceOptions = { db?: Db; testHooks?: CmsReadTestHooks };
 
 export type CmsStorageStatus =
   | 'ok'
@@ -96,6 +105,26 @@ type SectionRow = typeof contentSections.$inferSelect;
 type FaqRow = typeof faqItems.$inferSelect;
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 type QueryDb = Db | Tx;
+type PublishedSectionRow = {
+  sectionKey: string;
+  publishedPayload: Record<string, unknown> | null;
+};
+type PublishedFaqRow = {
+  question: string | null;
+  answer: string | null;
+  sortOrder: number | null;
+  visible: boolean | null;
+};
+type SectionPayloadSource = {
+  sectionKey: string;
+  draftPayload?: Record<string, unknown> | null;
+  publishedPayload: Record<string, unknown> | null;
+};
+type RenderablePublishedFaq = {
+  question: string;
+  answer: string;
+  visible: boolean;
+};
 
 function resolveDb(options: CmsServiceOptions): Db {
   return options.db ?? getDb().db;
@@ -174,26 +203,29 @@ function draftFaqItems(rows: FaqRow[]): CmsFaqItem[] {
     }));
 }
 
-function publishedFaqItems(rows: FaqRow[]): CmsFaqItem[] {
-  return rows
-    .filter((row) => row.publishedQuestion !== null)
-    .sort((a, b) => (a.publishedSortOrder ?? 0) - (b.publishedSortOrder ?? 0))
-    .map((row) => ({
-      id: row.id,
-      question: row.publishedQuestion ?? '',
-      answer: row.publishedAnswer ?? '',
-      visible: row.publishedVisible ?? false,
-    }));
+function publishedFaqItems(rows: PublishedFaqRow[]): RenderablePublishedFaq[] {
+  return rows.map((row) => {
+    if (
+      row.question === null ||
+      row.answer === null ||
+      row.sortOrder === null ||
+      row.visible === null
+    ) {
+      throw new CmsValidationError('بيانات أسئلة منشورة غير صالحة.');
+    }
+    return { question: row.question, answer: row.answer, visible: row.visible };
+  });
 }
 
 function effectiveSectionPayloads(
-  rows: SectionRow[],
+  rows: readonly SectionPayloadSource[],
   mode: 'draft' | 'published',
 ): Record<string, Record<string, unknown>> {
   const result: Record<string, Record<string, unknown>> = {};
   for (const row of rows) {
-    const value = mode === 'draft' ? (row.draftPayload ?? row.publishedPayload) : row.publishedPayload;
-    if (value === null) continue;
+    const value =
+      mode === 'draft' ? (row.draftPayload ?? row.publishedPayload) : row.publishedPayload;
+    if (value === null || value === undefined) continue;
     if (typeof value !== 'object' || Array.isArray(value)) {
       throw new CmsValidationError('محتوى محفوظ غير صالح.');
     }
@@ -223,11 +255,15 @@ function defaultPageContent<K extends CmsPageKey>(pageKey: K): CmsPageContent[K]
   ) as unknown as CmsPageContent[K];
 }
 
-async function readFaqRows(db: QueryDb, locale: CmsLocale, publishedOnly = false): Promise<FaqRow[]> {
-  const where = publishedOnly
-    ? and(eq(faqItems.locale, locale), isNotNull(faqItems.publishedQuestion))
-    : eq(faqItems.locale, locale);
-  return db.select().from(faqItems).where(where).orderBy(asc(faqItems.draftSortOrder));
+/**
+ * Owner editor/preview reads: full rows are restricted to these paths.
+ */
+async function readFaqRows(db: QueryDb, locale: CmsLocale): Promise<FaqRow[]> {
+  return db
+    .select()
+    .from(faqItems)
+    .where(eq(faqItems.locale, locale))
+    .orderBy(asc(faqItems.draftSortOrder));
 }
 
 async function readSectionRows(
@@ -239,6 +275,40 @@ async function readSectionRows(
     .select()
     .from(contentSections)
     .where(and(eq(contentSections.pageKey, pageKey), eq(contentSections.locale, locale)));
+}
+
+/**
+ * Public reads: published-only projection. Draft payloads, answers, ordering,
+ * visibility and revisions are never selected.
+ */
+async function readPublishedSectionRows(
+  db: QueryDb,
+  pageKey: CmsPageKey,
+  locale: CmsLocale,
+): Promise<PublishedSectionRow[]> {
+  return db
+    .select({
+      sectionKey: contentSections.sectionKey,
+      publishedPayload: contentSections.publishedPayload,
+    })
+    .from(contentSections)
+    .where(and(eq(contentSections.pageKey, pageKey), eq(contentSections.locale, locale)));
+}
+
+async function readPublishedFaqRows(
+  db: QueryDb,
+  locale: CmsLocale,
+): Promise<PublishedFaqRow[]> {
+  return db
+    .select({
+      question: faqItems.publishedQuestion,
+      answer: faqItems.publishedAnswer,
+      sortOrder: faqItems.publishedSortOrder,
+      visible: faqItems.publishedVisible,
+    })
+    .from(faqItems)
+    .where(and(eq(faqItems.locale, locale), isNotNull(faqItems.publishedQuestion)))
+    .orderBy(asc(faqItems.publishedSortOrder));
 }
 
 export async function getEditorPageData(
@@ -272,10 +342,20 @@ export async function getEditorPageData(
   let rows: SectionRow[];
   let faqRows: FaqRow[] = [];
   try {
-    rows = await readSectionRows(db, pageKey, locale);
-    if (pageKey === 'home') {
-      faqRows = await readFaqRows(db, locale);
-    }
+    const snapshot = await db.transaction(
+      async (tx) => {
+        const sectionRows = await readSectionRows(tx, pageKey, locale);
+        if (pageKey !== 'home') {
+          return { sectionRows, faqRows: [] as FaqRow[] };
+        }
+        await options.testHooks?.afterSectionRead?.();
+        const faq = await readFaqRows(tx, locale);
+        return { sectionRows, faqRows: faq };
+      },
+      { isolationLevel: 'repeatable read', accessMode: 'read only' },
+    );
+    rows = snapshot.sectionRows;
+    faqRows = snapshot.faqRows;
   } catch (error) {
     if (postgresErrorCode(error) === '42P01') {
       return {
@@ -344,18 +424,27 @@ export async function getPublishedPageContent<K extends CmsPageKey>(
   }
 
   try {
-    const rows = await readSectionRows(db, pageKey, locale);
-    const overrides = effectiveSectionPayloads(rows, 'published');
+    const snapshot = await db.transaction(
+      async (tx) => {
+        const sectionRows = await readPublishedSectionRows(tx, pageKey, locale);
+        let faqRows: PublishedFaqRow[] = [];
+        if (pageKey === 'home') {
+          await options.testHooks?.afterSectionRead?.();
+          faqRows = await readPublishedFaqRows(tx, locale);
+        }
+        return { sectionRows, faqRows };
+      },
+      { isolationLevel: 'repeatable read', accessMode: 'read only' },
+    );
+
+    const overrides = effectiveSectionPayloads(snapshot.sectionRows, 'published');
     let faqForRender = DEFAULT_FAQ_FOR_RENDER;
 
-    if (pageKey === 'home') {
-      const faqRows = await readFaqRows(db, locale, true);
-      if (faqRows.length > 0) {
-        const publishedItems = publishedFaqItems(faqRows);
-        const visible = publishedItems.filter((item) => item.visible);
-        assertFaqRenderable(publishedItems);
-        faqForRender = visible.map(({ question, answer }) => ({ question, answer }));
-      }
+    if (pageKey === 'home' && snapshot.faqRows.length > 0) {
+      const publishedItems = publishedFaqItems(snapshot.faqRows);
+      const visible = publishedItems.filter((item) => item.visible);
+      assertFaqRenderable(publishedItems);
+      faqForRender = visible.map(({ question, answer }) => ({ question, answer }));
     }
 
     return composeValidated(pageKey, overrides, faqForRender) as unknown as CmsPageContent[K];
@@ -375,19 +464,28 @@ export async function getPreviewPageContent<K extends CmsPageKey>(
   const db = resolveDb(options);
 
   try {
-    const rows = await readSectionRows(db, pageKey, locale);
-    const overrides = effectiveSectionPayloads(rows, 'draft');
+    const snapshot = await db.transaction(
+      async (tx) => {
+        const sectionRows = await readSectionRows(tx, pageKey, locale);
+        if (pageKey !== 'home') {
+          return { sectionRows, faqRows: [] as FaqRow[] };
+        }
+        await options.testHooks?.afterSectionRead?.();
+        const faq = await readFaqRows(tx, locale);
+        return { sectionRows, faqRows: faq };
+      },
+      { isolationLevel: 'repeatable read', accessMode: 'read only' },
+    );
+
+    const overrides = effectiveSectionPayloads(snapshot.sectionRows, 'draft');
     let faqForRender = DEFAULT_FAQ_FOR_RENDER;
 
-    if (pageKey === 'home') {
-      const faqRows = await readFaqRows(db, locale);
-      if (faqRows.length > 0) {
-        const items = draftFaqItems(faqRows);
-        assertFaqRenderable(items);
-        faqForRender = items
-          .filter((item) => item.visible)
-          .map(({ question, answer }) => ({ question, answer }));
-      }
+    if (pageKey === 'home' && snapshot.faqRows.length > 0) {
+      const items = draftFaqItems(snapshot.faqRows);
+      assertFaqRenderable(items);
+      faqForRender = items
+        .filter((item) => item.visible)
+        .map(({ question, answer }) => ({ question, answer }));
     }
 
     return composeValidated(pageKey, overrides, faqForRender) as unknown as CmsPageContent[K];
