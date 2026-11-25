@@ -2,13 +2,30 @@ import type { HTMLAttributes } from 'react';
 
 type SectionProps = HTMLAttributes<HTMLElement> & {
   tone?: 'default' | 'dark';
+  /**
+   * Vertical rhythm: `normal` is the default section cadence; `compact`
+   * tightens adjacent sections so long pages keep a consistent, less
+   * airy rhythm on mobile and desktop.
+   */
+  spacing?: 'normal' | 'compact';
 };
 
-export function Section({ tone = 'default', className = '', children, ...rest }: SectionProps) {
+const spacingClasses = {
+  normal: 'py-12 sm:py-16 lg:py-20',
+  compact: 'py-10 sm:py-12 lg:py-14',
+} as const;
+
+export function Section({
+  tone = 'default',
+  spacing = 'normal',
+  className = '',
+  children,
+  ...rest
+}: SectionProps) {
   return (
     <section
       data-theme={tone === 'dark' ? 'dark' : undefined}
-      className={`bg-page py-16 text-text-primary sm:py-20 lg:py-24 ${className}`}
+      className={`bg-page text-text-primary ${spacingClasses[spacing]} ${className}`}
       {...rest}
     >
       {children}

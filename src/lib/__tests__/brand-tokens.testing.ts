@@ -1,11 +1,14 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
-const TOKENS_PATH = path.resolve(process.cwd(), 'src/styles/brand-tokens.css');
-
+/**
+ * Test-tooling-only token inspection. Filesystem access is safe in tests and
+ * build tooling; the deployed application runtime never reads source files
+ * (enforced by the runtime-safety regression in `viewport-theme.test.ts`).
+ */
 export type TokenMap = Record<string, string>;
 
-function parseBlock(css: string, selector: string): TokenMap {
+export function parseBlock(css: string, selector: string): TokenMap {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const match = css.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`));
   if (!match) return {};
@@ -20,12 +23,8 @@ function parseBlock(css: string, selector: string): TokenMap {
   return map;
 }
 
-export function readBrandTokensCss(): string {
-  return readFileSync(TOKENS_PATH, 'utf8');
-}
-
 export function readTokens(): { light: TokenMap; dark: TokenMap } {
-  const css = readBrandTokensCss();
+  const css = readFileSync(path.join(process.cwd(), 'src/styles/brand-tokens.css'), 'utf8');
   return {
     light: parseBlock(css, ':root'),
     dark: parseBlock(css, '[data-theme="dark"]'),

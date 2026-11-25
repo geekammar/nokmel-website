@@ -49,7 +49,7 @@ describe('design system components', () => {
   });
 
   it('Input associates its label with the control and exposes error state', () => {
-    const html = renderToStaticMarkup(<Input label="Name" name="name" error="Required" />);
+    const html = renderToStaticMarkup(<Input label="Name" id="name" name="name" error="Required" />);
     expect(html).toContain('<label');
     expect(html).toContain('for="name"');
     expect(html).toContain('id="name"');
@@ -60,7 +60,13 @@ describe('design system components', () => {
     expect(html).toContain('border-border-interactive');
   });
 
-  it('Input generates stable unique ids when neither id nor name is provided', () => {
+  it('Input falls back to useId(), never to name, for the control id', () => {
+    const html = renderToStaticMarkup(<Input label="Name" name="name" />);
+    expect(html).not.toContain('for="name"');
+    expect(html).not.toContain('id="name"');
+  });
+
+  it('Input generates stable unique ids when no id is provided', () => {
     const html = renderToStaticMarkup(
       <>
         <Input label="A" />
@@ -74,9 +80,31 @@ describe('design system components', () => {
     expect(fors).toEqual(ids);
   });
 
+  it('multiple controls with identical names keep unique ids and correct label/error associations', () => {
+    const html = renderToStaticMarkup(
+      <>
+        <Input label="First phone" name="phone" error="Required" />
+        <Input label="Second phone" name="phone" error="Invalid" />
+        <Textarea label="First message" name="message" error="Required" />
+        <Textarea label="Second message" name="message" error="Too long" />
+      </>,
+    );
+    const inputs = [...html.matchAll(/<(?:input|textarea)[^>]*\bid="([^"]+)"/g)].map((m) => m[1]);
+    const labels = [...html.matchAll(/<label[^>]*\bfor="([^"]+)"/g)].map((m) => m[1]);
+    const errors = [...html.matchAll(/role="alert"/g)];
+    expect(inputs).toHaveLength(4);
+    expect(new Set(inputs).size).toBe(4);
+    expect(labels).toEqual(inputs);
+    expect(errors).toHaveLength(4);
+    for (const id of inputs) {
+      expect(html).toContain(`aria-describedby="${id}-error"`);
+      expect(html).toContain(`id="${id}-error"`);
+    }
+  });
+
   it('Input keeps caller-provided aria-describedby alongside the error association', () => {
     const html = renderToStaticMarkup(
-      <Input label="Name" name="name" error="Required" aria-describedby="hint" />,
+      <Input label="Name" id="name" name="name" error="Required" aria-describedby="hint" />,
     );
     expect(html).toContain('aria-describedby="hint name-error"');
     expect(html).toContain('aria-invalid="true"');
@@ -96,10 +124,12 @@ describe('design system components', () => {
     expect(html).toContain('aria-invalid="true"');
   });
 
-  it('Textarea associates its label with the control', () => {
-    const html = renderToStaticMarkup(<Textarea label="Message" name="message" />);
-    expect(html).toContain('for="message"');
-    expect(html).toContain('<textarea');
+  it('Textarea associates its label with the control via explicit id or useId()', () => {
+    const explicit = renderToStaticMarkup(<Textarea label="Message" id="message" name="message" />);
+    expect(explicit).toContain('for="message"');
+    expect(explicit).toContain('<textarea');
+    const generated = renderToStaticMarkup(<Textarea label="Message" name="message" />);
+    expect(generated).not.toContain('for="message"');
   });
 
   it('TextLink uses the secondary interaction color', () => {

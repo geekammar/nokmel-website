@@ -1,37 +1,33 @@
 import Link from 'next/link';
+import { Logo } from '@/components/brand/Logo';
+import { MobileMenu } from '@/components/layout/MobileMenu';
+import { DesktopNavLinks } from '@/components/layout/NavLinks';
 import { Button } from '@/components/ui/Button';
 import { Container } from '@/components/ui/Container';
-import { Logo } from '@/components/brand/Logo';
 import { ar } from '@/i18n/messages/ar';
 import { site } from '@/lib/site';
-
-const navItems = [
-  { href: '#tokens', label: ar.nav.tokens },
-  { href: '#typography', label: ar.nav.typography },
-  { href: '#components', label: ar.nav.components },
-];
 
 export function Header() {
   return (
     <header className="sticky top-0 z-40 border-b border-border-subtle bg-surface">
-      <Container className="flex min-h-16 flex-wrap items-center justify-between gap-x-4 gap-y-2 py-2">
+      <Container className="relative flex min-h-16 items-center justify-between gap-x-2 py-2">
         <Link href="/" aria-label={ar.nav.home} className="inline-flex items-center">
-          <Logo variant="primary" size={36} withWordmark wordmarkLang="ar" />
+          <Logo variant="primary" size={28} withWordmark wordmarkLang="ar" />
         </Link>
-        <nav aria-label={ar.nav.primary} className="hidden items-center gap-6 text-sm sm:flex">
-          {navItems.map((item) => (
-            <a
-              key={item.href}
-              href={item.href}
-              className="font-medium text-text-secondary hover:text-text-primary"
-            >
-              {item.label}
-            </a>
-          ))}
+        <nav aria-label={ar.nav.primary} className="hidden md:block">
+          <DesktopNavLinks items={ar.nav.items} />
         </nav>
-        <Button href="#join-preview" size="md">
-          {site.ctaLabel}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button href="/join" size="md" className="whitespace-nowrap px-4 text-sm sm:px-5 sm:text-base">
+            {site.ctaLabel}
+          </Button>
+          <MobileMenu
+            items={ar.nav.items}
+            legalItems={ar.footer.legal}
+            labels={{ open: ar.nav.menu, close: ar.nav.closeMenu, panel: ar.nav.mobile }}
+            ctaLabel={site.ctaLabel}
+          />
+        </div>
       </Container>
     </header>
   );

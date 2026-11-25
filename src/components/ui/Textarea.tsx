@@ -11,7 +11,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
   ref,
 ) {
   const generatedId = useId();
-  const textareaId = id ?? rest.name ?? generatedId;
+  const textareaId = id ?? generatedId;
   const { 'aria-describedby': callerDescribedBy, 'aria-invalid': callerInvalid, ...textareaRest } =
     rest;
   const describedBy =

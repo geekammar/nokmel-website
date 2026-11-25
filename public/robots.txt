@@ -1,0 +1,3 @@
+# Pre-launch: search indexing stays fully disabled until launch approval.
+User-agent: *
+Disallow: /

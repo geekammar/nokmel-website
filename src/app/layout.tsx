@@ -6,7 +6,8 @@ import { Footer } from '@/components/layout/Footer';
 import { Header } from '@/components/layout/Header';
 import { defaultLocale, dirByLocale } from '@/i18n/config';
 import { ar } from '@/i18n/messages/ar';
-import { readTokens } from '@/lib/brand-tokens';
+import { home } from '@/content/ar/home';
+import { THEME_COLOR_LIGHT } from '@/lib/viewport-theme';
 import { site, siteUrl } from '@/lib/site';
 
 const plexSansArabic = localFont({
@@ -55,7 +56,7 @@ const alexandria = localFont({
   display: 'swap',
 });
 
-const tokens = readTokens();
+
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -63,7 +64,7 @@ export const metadata: Metadata = {
     default: `${site.nameAr} (${site.name})`,
     template: `%s — ${site.name}`,
   },
-  description: `${ar.hero.headline} ${ar.hero.tagline}`,
+  description: home.hero.subheadline,
   alternates: { canonical: '/' },
   openGraph: {
     siteName: site.name,
@@ -84,7 +85,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: tokens.light['--brand-primary'],
+  themeColor: THEME_COLOR_LIGHT,
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -95,8 +96,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       className={`${plexSansArabic.variable} ${geist.variable} ${alexandria.variable}`}
     >
       <body className="flex min-h-screen flex-col antialiased">
+        <a href="#main-content" className="skip-link rounded-control bg-action-primary-bg px-4 py-2 text-sm font-semibold" style={{ color: 'var(--action-primary-fg)' }}>
+          {ar.common.skipLink}
+        </a>
         <Header />
-        <main className="flex-1">{children}</main>
+        <main id="main-content" className="flex-1">{children}</main>
         <Footer />
       </body>
     </html>
