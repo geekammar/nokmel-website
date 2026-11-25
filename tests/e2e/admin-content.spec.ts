@@ -13,6 +13,8 @@ const DEFAULT_HEADLINE = 'متجرك في المحادثة. وبزنسك في م
 const SAVE_SUCCESS = 'تم حفظ المسودة. لم يتغيّر المحتوى العام بعد.';
 const PUBLISH_SUCCESS = 'تم نشر المحتوى وأصبحت النسخة الجديدة هي المعروضة للزوار.';
 const DISCARD_SUCCESS = 'تم تجاهل المسودة غير المنشورة. النسخة المنشورة لم تتغيّر.';
+const CONFLICT_REVIEW =
+  'تغيّرت المسودة بعد إعداد المراجعة. لم يُنشر أي شيء. أعد تحميل أحدث نسخة ثم أعد المراجعة.';
 
 test.skip(!enabled, 'Admin e2e environment is not configured');
 
@@ -138,10 +140,23 @@ test.describe('homepage content workflow', () => {
       await preview.close();
 
       await page.getByTestId('publish-content').click();
-      await expect(page.getByTestId('confirm-publish')).toBeVisible();
-      await page.getByTestId('confirm-publish').click();
+      await expect(page.getByTestId('publication-review')).toBeVisible();
+      await expect(page.getByTestId('review-revision')).toContainText('1');
+      await expect(page.getByTestId('review-section-summary')).toContainText('الواجهة الرئيسية');
+      await expect(page.getByTestId('publication-review')).toContainText(
+        'النشر يطبّق كامل المحتوى المحفوظ',
+      );
+      await page.getByTestId('review-cancel').click();
+      await expect(page.getByTestId('publication-review')).toBeHidden();
+      await visitor.goto('/');
+      await expect(visitor.locator('h1')).toHaveText(DEFAULT_HEADLINE);
+
+      await page.getByTestId('publish-content').click();
+      await expect(page.getByTestId('publication-review')).toBeVisible();
+      await page.getByTestId('review-confirm-publish').click();
       await expect(page.getByText(PUBLISH_SUCCESS)).toBeVisible();
       await expect(page.getByTestId('editor-status')).toContainText('محتوى منشور');
+      await expect(page.getByTestId('editor-revision')).toContainText('آخر إصدار منشور: 1');
 
       await visitor.goto('/');
       await expect(visitor.locator('h1')).toHaveText(publishedHeadline);
@@ -178,7 +193,8 @@ test.describe('homepage content workflow', () => {
       await page.getByTestId('save-draft').click();
       await expect(page.getByText(SAVE_SUCCESS)).toBeVisible();
       await page.getByTestId('publish-content').click();
-      await page.getByTestId('confirm-publish').click();
+      await expect(page.getByTestId('publication-review')).toBeVisible();
+      await page.getByTestId('review-confirm-publish').click();
       await expect(page.getByText(PUBLISH_SUCCESS)).toBeVisible();
 
       await visitor.goto('/');
@@ -190,6 +206,101 @@ test.describe('homepage content workflow', () => {
     } finally {
       await anonymous.close();
     }
+  });
+});
+
+test.describe('publication review safety', () => {
+  test('cancelling the review never publishes and a stale confirmation is rejected', async ({
+    browser,
+    page,
+  }) => {
+    test.slow();
+    await resetCmsData();
+    await signIn(page);
+    await page.goto('/admin/content/home');
+    await expect(page.getByTestId('content-editor')).toBeVisible();
+    await page.locator('[data-field="hero.headline"]').fill('مسودة أولى للمراجعة');
+    await page.getByTestId('save-draft').click();
+    await expect(page.getByText(SAVE_SUCCESS)).toBeVisible();
+
+    await page.getByTestId('publish-content').click();
+    await expect(page.getByTestId('publication-review')).toBeVisible();
+    await expect(page.getByTestId('review-revision')).toContainText('1');
+
+    const anonymous = await browser.newContext();
+    try {
+      const visitor = await anonymous.newPage();
+      await page.getByTestId('review-cancel').click();
+      await expect(page.getByTestId('publication-review')).toBeHidden();
+      await visitor.goto('/');
+      await expect(visitor.locator('h1')).toHaveText(DEFAULT_HEADLINE);
+
+      await page.getByTestId('publish-content').click();
+      await expect(page.getByTestId('publication-review')).toBeVisible();
+
+      const secondOwnerPage = await page.context().newPage();
+      await secondOwnerPage.goto('/admin/content/home');
+      await expect(secondOwnerPage.getByTestId('content-editor')).toBeVisible();
+      await secondOwnerPage.locator('[data-field="finalCta.title"]').fill('تعديل من تبويب آخر');
+      await secondOwnerPage.getByTestId('save-draft').click();
+      await expect(secondOwnerPage.getByText(SAVE_SUCCESS)).toBeVisible();
+      await expect(secondOwnerPage.getByTestId('editor-status')).toContainText('مسودة غير منشورة');
+      await secondOwnerPage.close();
+
+      await page.getByTestId('review-confirm-publish').click();
+      await expect(page.getByText(CONFLICT_REVIEW)).toBeVisible();
+      await expect(page.getByTestId('publication-review')).toBeHidden();
+
+      await visitor.goto('/');
+      await expect(visitor.locator('h1')).toHaveText(DEFAULT_HEADLINE);
+    } finally {
+      await anonymous.close();
+    }
+  });
+
+  test('publication review remains usable at mobile and desktop widths', async ({ page }) => {
+    await resetCmsData();
+    await signIn(page);
+    await page.goto('/admin/content/home');
+    await expect(page.getByTestId('content-editor')).toBeVisible();
+    await page.locator('[data-field="hero.headline"]').fill('عنوان مراجعة متجاوبة');
+    await page.getByTestId('save-draft').click();
+    await expect(page.getByText(SAVE_SUCCESS)).toBeVisible();
+    await page.getByTestId('publish-content').click();
+    await expect(page.getByTestId('publication-review')).toBeVisible();
+
+    for (const width of [320, 390, 430, 768, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflow, `overflow at ${width}px`).toBeLessThanOrEqual(1);
+      const panel = page.getByTestId('publication-review');
+      await expect(panel).toBeVisible();
+      const panelBox = await panel.boundingBox();
+      expect(panelBox!.width).toBeLessThanOrEqual(width);
+      await expect(page.getByTestId('review-confirm-publish')).toBeVisible();
+      await expect(page.getByTestId('review-cancel')).toBeVisible();
+      if (width < 768) {
+        await expect(page.getByTestId('admin-nav-toggle')).toBeVisible();
+      } else {
+        await expect(page.getByTestId('admin-nav-toggle')).toBeHidden();
+      }
+    }
+
+    await page.setViewportSize({ width: 390, height: 900 });
+    await page.screenshot({
+      path: 'test-results/screenshots/w32-publication-review-390.png',
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.screenshot({
+      path: 'test-results/screenshots/w32-publication-review-1440.png',
+      fullPage: true,
+    });
+
+    await page.getByTestId('review-cancel').click();
+    await expect(page.getByTestId('publication-review')).toBeHidden();
   });
 });
 
@@ -244,7 +355,8 @@ test.describe('per-page editing', () => {
       await page.getByTestId('save-draft').click();
       await expect(page.getByText(SAVE_SUCCESS)).toBeVisible();
       await page.getByTestId('publish-content').click();
-      await page.getByTestId('confirm-publish').click();
+      await expect(page.getByTestId('publication-review')).toBeVisible();
+      await page.getByTestId('review-confirm-publish').click();
       await expect(page.getByText(PUBLISH_SUCCESS)).toBeVisible();
 
       const anonymous = await browser.newContext();

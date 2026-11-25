@@ -1,6 +1,6 @@
 # CURRENT_STATE.md — Nokmel Website
 
-Last updated: W3.2 focused published-content consistency closure, 2026-11-25. Keep concise.
+Last updated: W3.2 final acceptance closure, 2026-11-25. Keep concise.
 
 ## Status: W3.2 — lightweight CMS implemented on `feature/w32-content-management` (draft PR, not merged; no production claim)
 
@@ -25,23 +25,33 @@ Last updated: W3.2 focused published-content consistency closure, 2026-11-25. Ke
 - Existing fallback/invalid-data behavior is unchanged. No schema change was needed; `0002_w32-content-cms` is unchanged and no new migration was added.
 - Deterministic integration tests commit a publication or draft save between the two logical reads via a test-only synchronization seam (no sleeps), and a temporary column-privilege role proves public reads work without access to draft columns.
 
+### W3.2 final acceptance closure (2026-11-25)
+
+- Independent Muse acceptance returned CONDITIONAL ACCEPT for the configured Preview only: 52 cases, 48 PASS, 0 FAIL, 3 BLOCKED, 1 NOT TESTED; desktop CMS workflow and FAQ 10/10 passed, all seven editors passed, stale save/discard rejected, stale publish not completed, mobile viewport coverage blocked by Muse tooling.
+- NKW-W32-001 confirmed publication-UX issue: page-level publication intentionally includes homepage FAQ, but the old two-step confirmation did not show pending FAQ/draft changes beyond the current editor baseline. The publication flow now generates an owner-only server-side review from the persisted draft versus effective published/default content in one consistent snapshot, shows changed section fields and FAQ add/remove/edit/visibility/order changes, and binds confirmation to the reviewed saved-draft revision. Stale confirmation is rejected by the existing advisory lock + revision check with no public change.
+- Content-source investigation: the repository has a single homepage FAQ default source (`src/content/ar/home.ts`) and a single `faq_items` store; public/editor/preview all consume the composed content (FaqSection receives passed items). Join fields have one code-controlled source and are not CMS-editable. The five long hosted FAQ answers do not appear anywhere in git history, so they originated from hosted CMS data rather than code defaults. Empty-database and published-override parity tests pass; changing only the tagline preserves published FAQ exactly. The exact historical hosted draft/build state at the first Muse publication cannot be reconstructed from the repository; no duplicate-source/fallback bug was reproduced. The reproducible code-level mechanism is pre-existing draft FAQ changes being included in full-page publication, which the review now exposes.
+- Editor status now distinguishes the current editing-state revision from the last published revision/timestamp; a higher editing revision does not imply a new public publication. Revisions are not renumbered or reset.
+- Verification: unit 113/113; PostgreSQL integration 87/87 (adds effective-default parity, published FAQ/section preservation, persisted-draft review, first-publication/default comparison, no-change review, stale review, join structure); Playwright 86/86 (adds publication review cancel/stale-confirmation browser workflow and review layout at 320/390/430/768/1440). Final CI is checked on the exact final HEAD.
+- External report: hosted Neon development has migrations 0000/0001/0002, CMS tables/runtime grants configured, temporary migrator CREATE revoked, W3.2 Preview variables configured, QA owner/credentials unchanged. The external lead reports no remaining section drafts, homepage published revision 11/current editing revision 13, eight published home sections and six visible published FAQ items. These are external observations, not coding-agent hosted access.
+- Remaining: independent hosted retest after this closure, official mobile acceptance (Playwright is supplementary; no physical Android claim), W3.1 hosted closure checks and W6 launch gates. Production remains unconfigured/protected and not claimed ready.
+
 ### Verification (local)
 
 - Unit tests: 113/113 passing (101 existing + 12 CMS registry/rendering/fallback).
-- PostgreSQL integration: 78/78 passing on disposable PostgreSQL 18 (auth 50 + CMS 28: migration upgrade preserving auth data, draft/privacy, atomic publication, failed-publication rollback, discard, stale write/publication/discard, concurrent writers, FAQ lifecycle, consistent-snapshot interleaving for public/editor/preview, published-only column projection, fallback safety, runtime-role DML/DDL refusal).
-- Playwright: 84/84 passing with synthetic owner + disposable DB (existing public/auth/login suites + W3.2 navigation, homepage draft/preview/publish/discard, FAQ, per-page editing, 320–1440 responsiveness, field validation, anonymous/non-owner protection).
+- PostgreSQL integration: 87/87 passing on disposable PostgreSQL 18 (auth 50 + CMS 37: migration upgrade preserving auth data, draft/privacy, atomic publication, failed-publication rollback, discard, stale write/publication/discard, concurrent writers, FAQ lifecycle, consistent-snapshot interleaving for public/editor/preview, published-only column projection, publication review/revision binding, default/published parity, fallback safety, runtime-role DML/DDL refusal).
+- Playwright: 86/86 passing with synthetic owner + disposable DB (existing public/auth/login suites + W3.2 navigation, homepage draft/preview/publish/discard, FAQ, per-page editing, 320–1440 responsiveness, field validation, anonymous/non-owner protection).
 - `pnpm db:check`, lint (0 errors; 3 pre-existing warnings), typecheck and production build pass. Exact remote CI URL and Preview identity are recorded in the draft PR/handoff; they must be checked on the exact final HEAD.
 
 ### W3.2 infrastructure handoff (external operator; not performed here)
 
-- W3.2 migration has **not** been applied to hosted Neon. Required: `pnpm db:check`, temporary `GRANT CREATE ON DATABASE nokmel_website TO nokmel_migrator`, `DATABASE_URL_DIRECT=<direct migrator URL> pnpm db:migrate`, verification, then immediate `REVOKE CREATE ON DATABASE ... FROM nokmel_migrator`, followed by runtime grants in `docs/DATABASE_PERMISSIONS.md`. Never expose `DATABASE_URL_DIRECT` to Vercel; never use the pooled URL for migrations.
-- Existing Vercel variables are scoped to the W3.1 preview branch. The new W3.2 branch Preview requires its own/explicit `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `TRUSTED_ORIGINS` (exact alias) and `OWNER_EMAIL` configuration before live acceptance. A READY deployment alone is not CMS acceptance.
+- W3.2 migration 0002 is reported applied on hosted development Neon by the external lead; CMS runtime grants configured and temporary migrator database-level CREATE revoked. QA owner/credentials/sessions unchanged. If a future migration is required, the temporary grant/revoke procedure in `docs/DATABASE_PERMISSIONS.md` still applies; never expose `DATABASE_URL_DIRECT` to Vercel.
+- W3.2 branch Preview variables are reported configured by the external lead. Authorized branch origin: `https://nokmel-website-git-feature-w32-content-fa5a4c-ammarjaberd-7111.vercel.app`; configured acceptance deployment `dpl_DwwbRVL5Lse1VnaWU5eKRyYkC28C`. A READY deployment alone is not CMS acceptance.
 - Do not rotate QA credentials, revoke QA sessions, reset the QA account, delete deployments, modify Production, or run hosted password recovery during W3.2.
 
 ### Outstanding live checks (must not be claimed as done)
 
-- Apply and verify the W3.2 migration on the hosted development database, then apply least-privilege CMS grants.
-- Configure and independently accept the W3.2 Preview branch (authentication + persistence + public publication).
+- Independent hosted retest of this closure on the configured W3.2 Preview: publication review, published FAQ/unchanged-section preservation, stale publish rejection, mobile review layout.
+- Official mobile acceptance for the review UI (Playwright evidence is supplementary; no physical Android claim). Hosted mobile viewport coverage was blocked by Muse tooling.
 - Authorized live retest of W3.1 closure items retained from the prior state (sign-in/recovery lock through Neon's pooled endpoint, hosted request headers, password visibility, Overview, rate-limit UX).
 - W6 launch gates: hosted recovery-lock/pooler verification, historical deployment isolation, hosted request-header evidence, hosted cookie/origin/session evidence, deployed noindex/canonical verification, production migration and owner provisioning.
 - Public copy and legal texts remain working drafts; legal review and headline/tagline approval remain pending. No contact channels or join submission were enabled.

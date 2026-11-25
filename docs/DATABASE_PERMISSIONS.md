@@ -8,9 +8,10 @@ Current development state (2026-11-25, external configuration): roles
 `nokmel_migrator` and `nokmel_runtime` exist; W3.1 migrations `0000`/`0001` are
 applied; the QA owner is provisioned; the runtime role has no database/schema
 CREATE; the migrator retains `public`/`drizzle` schema privileges and its
-temporary database-level CREATE was revoked after migration. W3.2 adds
-`0002_w32-content-cms` (external operator task). No credentials are recorded
-here.
+temporary database-level CREATE was revoked after migration. The external lead
+reports W3.2 `0002_w32-content-cms` applied on hosted development, CMS runtime
+grants configured, and database-level CREATE revoked. No credentials are
+recorded here.
 
 ## Roles
 

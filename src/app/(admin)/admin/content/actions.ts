@@ -16,8 +16,10 @@ import {
 import {
   discardPageDraft,
   getEditorPageData,
+  getPublicationReview,
   publishPageContent,
   savePageDraft,
+  type PublicationReviewResult,
   type PublishResult,
   type SaveDraftResult,
 } from '@/lib/cms/service';
@@ -131,6 +133,24 @@ export async function saveDraftAction(input: {
     return { ok: true, data };
   } catch (error) {
     return mapError('save-draft', error);
+  }
+}
+
+export async function getPublicationReviewAction(input: {
+  pageKey: string;
+  revision: number;
+}): Promise<ContentActionResult<PublicationReviewResult>> {
+  const unauthorized = await ensureOwner();
+  if (unauthorized) return unauthorized;
+  try {
+    const data = await getPublicationReview({
+      pageKey: input.pageKey,
+      locale: 'ar',
+      expectedRevision: input.revision,
+    });
+    return { ok: true, data };
+  } catch (error) {
+    return mapError('publication-review', error);
   }
 }
 

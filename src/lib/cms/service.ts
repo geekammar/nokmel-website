@@ -21,6 +21,7 @@ import {
   type CmsPageKey,
   type EditablePageValues,
 } from '@/content/cms/registry';
+import { buildPublicationReview, type PublicationReview } from '@/content/cms/review';
 import { ConfigError } from '@/lib/config-error';
 import { getDb } from '@/lib/db';
 import { contentSections, faqItems } from '@/lib/db/schema';
@@ -66,6 +67,7 @@ export type EditorPageData = {
   pageKey: CmsPageKey;
   locale: CmsLocale;
   revision: number;
+  publishedRevision: number | null;
   values: EditablePageValues;
   faqItems: CmsFaqItem[] | null;
   hasDraft: boolean;
@@ -79,6 +81,7 @@ export type EditorLoadResult =
 
 export type SaveDraftResult = {
   revision: number;
+  publishedRevision: number | null;
   values: EditablePageValues;
   faqItems: CmsFaqItem[] | null;
   hasDraft: boolean;
@@ -88,11 +91,14 @@ export type SaveDraftResult = {
 
 export type PublishResult = {
   revision: number;
+  publishedRevision: number;
   publishedAt: string;
   hasDraft: false;
   hasPublished: true;
   lastPublishedAt: string;
 };
+
+export type PublicationReviewResult = PublicationReview;
 
 export type DiscardResult = {
   revision: number;
@@ -179,6 +185,14 @@ function hasPublishedContent(rows: SectionRow[], faqRows: FaqRow[]): boolean {
   );
 }
 
+function currentPublishedRevision(rows: SectionRow[]): number | null {
+  const revisions = rows
+    .filter((row) => row.publishedPayload !== null)
+    .map((row) => row.publishedRevision)
+    .filter((value): value is number => typeof value === 'number');
+  return revisions.length > 0 ? Math.max(...revisions) : null;
+}
+
 function faqDraftDiffers(rows: FaqRow[]): boolean {
   return rows.some(
     (row) =>
@@ -200,6 +214,18 @@ function draftFaqItems(rows: FaqRow[]): CmsFaqItem[] {
       question: row.draftQuestion,
       answer: row.draftAnswer,
       visible: row.draftVisible,
+    }));
+}
+
+function publishedReviewFaqItems(rows: FaqRow[]): CmsFaqItem[] {
+  return rows
+    .filter((row) => row.publishedQuestion !== null)
+    .sort((a, b) => (a.publishedSortOrder ?? 0) - (b.publishedSortOrder ?? 0))
+    .map((row) => ({
+      id: row.id,
+      question: row.publishedQuestion ?? '',
+      answer: row.publishedAnswer ?? '',
+      visible: row.publishedVisible ?? false,
     }));
 }
 
@@ -387,6 +413,7 @@ export async function getEditorPageData(
         pageKey,
         locale,
         revision: maxRevision(rows),
+        publishedRevision: currentPublishedRevision(rows),
         values,
         faqItems: pageKey === 'home' ? (faq ?? []) : null,
         hasDraft,
@@ -496,6 +523,76 @@ export async function getPreviewPageContent<K extends CmsPageKey>(
   }
 }
 
+export async function getPublicationReview(
+  args: { pageKey: unknown; locale: unknown; expectedRevision: unknown },
+  options: CmsServiceOptions = {},
+): Promise<PublicationReview> {
+  const pageKey = assertCmsPageKey(args.pageKey);
+  const locale = assertCmsLocale(args.locale);
+  const expectedRevision = assertExpectedRevision(args.expectedRevision);
+  const db = resolveDb(options);
+
+  try {
+    const snapshot = await db.transaction(
+      async (tx) => {
+        const rows = await readSectionRows(tx, pageKey, locale);
+        let faqRows: FaqRow[] = [];
+        if (pageKey === 'home') faqRows = await readFaqRows(tx, locale);
+        return { rows, faqRows };
+      },
+      { isolationLevel: 'repeatable read', accessMode: 'read only' },
+    );
+
+    const { rows, faqRows } = snapshot;
+    const revision = maxRevision(rows);
+    if (revision !== expectedRevision) throw new CmsConflictError();
+
+    const faqDiffers = pageKey === 'home' && faqDraftDiffers(faqRows);
+    const hasSectionDraft = rows.some((row) => row.draftPayload !== null);
+    if (!hasSectionDraft && !faqDiffers) throw new CmsNoDraftError();
+
+    const draftFaq =
+      pageKey === 'home'
+        ? faqRows.length > 0
+          ? draftFaqItems(faqRows)
+          : DEFAULT_FAQ_ITEMS.map((item) => ({ ...item }))
+        : null;
+    const publishedFaq =
+      pageKey === 'home'
+        ? faqRows.some((row) => row.publishedQuestion !== null)
+          ? publishedReviewFaqItems(faqRows)
+          : DEFAULT_FAQ_ITEMS.map((item) => ({ ...item }))
+        : null;
+
+    const draftContent = composeValidated(
+      pageKey,
+      effectiveSectionPayloads(rows, 'draft'),
+      (draftFaq ?? DEFAULT_FAQ_ITEMS).map(({ question, answer }) => ({ question, answer })),
+    );
+    const publishedContent = composeValidated(
+      pageKey,
+      effectiveSectionPayloads(rows, 'published'),
+      (publishedFaq ?? DEFAULT_FAQ_ITEMS).map(({ question, answer }) => ({ question, answer })),
+    );
+
+    return buildPublicationReview({
+      pageKey,
+      draftContent,
+      publishedContent,
+      draftFaq,
+      publishedFaq,
+      revision,
+      publishedRevision: currentPublishedRevision(rows),
+      lastPublishedAt: lastPublished(rows, faqRows),
+      publishedSource: hasPublishedContent(rows, faqRows) ? 'published' : 'defaults',
+    });
+  } catch (error) {
+    if (error instanceof CmsError) throw error;
+    if (postgresErrorCode(error) === '42P01') throw new CmsNotMigratedError();
+    throw new CmsStorageError();
+  }
+}
+
 async function lockPage(tx: QueryDb, pageKey: CmsPageKey, locale: CmsLocale): Promise<void> {
   const key = `nokmel.cms.page:${pageKey}:${locale}`;
   await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${key})::bigint)`);
@@ -582,6 +679,7 @@ export async function savePageDraft(
 
     return {
       revision: nextRevision,
+      publishedRevision: currentPublishedRevision(rows),
       values: parsedValues,
       faqItems: savedFaq,
       hasDraft: true,
@@ -740,6 +838,7 @@ export async function publishPageContent(
 
     return {
       revision: expectedRevision,
+      publishedRevision: expectedRevision,
       publishedAt: now.toISOString(),
       hasDraft: false,
       hasPublished: true,

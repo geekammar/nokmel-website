@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
+import { PublicationReviewPanel } from '@/components/admin/PublicationReviewPanel';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
@@ -16,9 +17,11 @@ import {
   type FieldDescriptor,
 } from '@/content/cms/registry';
 import { adminContentUi } from '@/content/ar/admin-content';
+import type { PublicationReview } from '@/content/cms/review';
 import type { EditorPageData } from '@/lib/cms/service';
 import {
   discardDraftAction,
+  getPublicationReviewAction,
   publishContentAction,
   saveDraftAction,
 } from '@/app/(admin)/admin/content/actions';
@@ -88,6 +91,7 @@ export function ContentEditor({
     (initial.faqItems ?? []).map((item) => ({ ...item })),
   );
   const [revision, setRevision] = useState(initial.revision);
+  const [publishedRevision, setPublishedRevision] = useState(initial.publishedRevision);
   const [hasDraft, setHasDraft] = useState(initial.hasDraft);
   const [hasPublished, setHasPublished] = useState(initial.hasPublished);
   const [lastPublishedAt, setLastPublishedAt] = useState(initial.lastPublishedAt);
@@ -98,16 +102,18 @@ export function ContentEditor({
     ),
   );
   const [saving, setSaving] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [discarding, setDiscarding] = useState(false);
   const [banner, setBanner] = useState<Banner>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [confirmPublish, setConfirmPublish] = useState(false);
+  const [review, setReview] = useState<PublicationReview | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [confirmRemoveFaq, setConfirmRemoveFaq] = useState<string | null>(null);
   const newItemCounter = useRef(0);
+  const publishButtonRef = useRef<HTMLButtonElement>(null);
 
-  const busy = saving || publishing || discarding;
+  const busy = saving || reviewing || publishing || discarding;
   const dirty = serializeState(values, faqItems) !== baseline;
   const previewHref = `/admin/content/${pageKey}/preview`;
 
@@ -128,7 +134,12 @@ export function ContentEditor({
     }
   }
 
+  function invalidateReview() {
+    setReview((current) => (current ? null : current));
+  }
+
   function updatePath(path: readonly (string | number)[], value: unknown) {
+    invalidateReview();
     setValues((current) => setAtPath(current, path, value) as EditablePageValues);
     const key = path.join('.');
     setFieldErrors((current) => {
@@ -185,7 +196,7 @@ export function ContentEditor({
   async function handleSave() {
     if (busy) return;
     setBanner(null);
-    setConfirmPublish(false);
+    setReview(null);
     const validation = validateForm();
     if (!validation.ok) {
       setBanner({ kind: 'error', text: adminContentUi.messages.fixFields });
@@ -213,6 +224,7 @@ export function ContentEditor({
       setValues(result.data.values);
       setFaqItems(savedFaq);
       setRevision(result.data.revision);
+      setPublishedRevision(result.data.publishedRevision);
       setHasDraft(result.data.hasDraft);
       setHasPublished(result.data.hasPublished);
       setLastPublishedAt(result.data.lastPublishedAt);
@@ -236,26 +248,51 @@ export function ContentEditor({
       setBanner({ kind: 'error', text: adminContentUi.messages.noDraft });
       return;
     }
-    if (!confirmPublish) {
-      setConfirmPublish(true);
-      setBanner(null);
-      return;
-    }
+    if (review) return;
+    if (reviewing) return;
 
-    setPublishing(true);
+    setReviewing(true);
     setBanner(null);
     try {
-      const result = await publishContentAction({ pageKey, revision });
+      const result = await getPublicationReviewAction({ pageKey, revision });
       if (!result.ok) {
         setBanner({
           kind: result.code === 'conflict' ? 'conflict' : 'error',
           text: result.message,
         });
+        if (result.code === 'conflict') setReview(null);
         return;
       }
-      setConfirmPublish(false);
+      setReview(result.data);
+    } catch {
+      setBanner({ kind: 'error', text: adminContentUi.messages.unexpected });
+    } finally {
+      setReviewing(false);
+    }
+  }
+
+  async function handleConfirmPublish() {
+    if (!review || publishing) return;
+    setPublishing(true);
+    setBanner(null);
+    try {
+      const result = await publishContentAction({
+        pageKey,
+        revision: review.revision,
+      });
+      if (!result.ok) {
+        const stale = result.code === 'conflict' || result.code === 'no_draft';
+        setBanner({
+          kind: stale ? 'conflict' : 'error',
+          text: stale ? adminContentUi.review.conflictReview : result.message,
+        });
+        if (stale) setReview(null);
+        return;
+      }
+      setReview(null);
       setHasDraft(false);
       setHasPublished(true);
+      setPublishedRevision(result.data.publishedRevision);
       setLastPublishedAt(result.data.lastPublishedAt);
       setBanner({ kind: 'success', text: adminContentUi.messages.publishSuccess });
     } catch {
@@ -265,9 +302,17 @@ export function ContentEditor({
     }
   }
 
+  function handleCancelPublishReview() {
+    if (publishing) return;
+    setReview(null);
+    setBanner(null);
+    window.requestAnimationFrame(() => publishButtonRef.current?.focus());
+  }
+
   async function handleDiscard() {
     if (busy) return;
     if (!confirmDiscard) {
+      setReview(null);
       setConfirmDiscard(true);
       setBanner(null);
       return;
@@ -311,6 +356,7 @@ export function ContentEditor({
 
   function addFaqItem() {
     if (faqItems.length >= CMS_MAX_FAQ_ITEMS) return;
+    invalidateReview();
     newItemCounter.current += 1;
     setFaqItems((current) => [
       ...current,
@@ -327,6 +373,7 @@ export function ContentEditor({
   function moveFaqItem(index: number, direction: -1 | 1) {
     const target = index + direction;
     if (target < 0 || target >= faqItems.length) return;
+    invalidateReview();
     setFaqItems((current) => {
       const next = [...current];
       [next[index], next[target]] = [next[target], next[index]];
@@ -335,6 +382,7 @@ export function ContentEditor({
   }
 
   function updateFaqItem(index: number, patch: Partial<FaqEditorItem>) {
+    invalidateReview();
     setFaqItems((current) =>
       current.map((item, itemIndex) => (itemIndex === index ? { ...item, ...patch } : item)),
     );
@@ -348,6 +396,7 @@ export function ContentEditor({
   }
 
   function removeFaqItem(index: number) {
+    invalidateReview();
     setConfirmRemoveFaq(null);
     setFaqItems((current) => current.filter((_, itemIndex) => itemIndex !== index));
     setFieldErrors({});
@@ -490,8 +539,15 @@ export function ContentEditor({
         <p className="text-sm font-semibold text-text-primary" data-testid="editor-status">
           {statusText}
         </p>
-        <p className="mt-1 text-xs text-text-secondary">
+        <p className="mt-1 text-xs text-text-secondary" data-testid="editor-revision">
           {adminContentUi.status.revision}: {revision}
+          {' · '}
+          {adminContentUi.status.publishedRevision}:{' '}
+          {publishedRevision === null ? (
+            adminContentUi.status.noPublishedRevision
+          ) : (
+            publishedRevision
+          )}
           {lastPublishedAt ? (
             <>
               {' · '}
@@ -516,19 +572,20 @@ export function ContentEditor({
             {saving ? adminContentUi.actions.saving : adminContentUi.actions.saveDraft}
           </Button>
           <Button
+            ref={publishButtonRef}
             type="button"
             variant="secondary"
             onClick={handlePublish}
-            disabled={busy || dirty || !hasDraft || confirmPublish}
+            disabled={busy || dirty || !hasDraft || review !== null}
             data-testid="publish-content"
           >
-            {publishing ? adminContentUi.actions.publishing : adminContentUi.actions.publish}
+            {reviewing ? adminContentUi.review.preparing : adminContentUi.actions.publish}
           </Button>
           <Button
             type="button"
             variant="secondary"
             onClick={handleDiscard}
-            disabled={busy || !hasDraft || confirmDiscard}
+            disabled={busy || !hasDraft || confirmDiscard || review !== null}
             data-testid="discard-draft"
           >
             {discarding ? adminContentUi.actions.discarding : adminContentUi.actions.discard}
@@ -563,35 +620,13 @@ export function ContentEditor({
           <p className="mt-1 text-xs text-text-secondary">{adminContentUi.hints.noDraft}</p>
         ) : null}
 
-        {confirmPublish ? (
-          <div
-            role="group"
-            aria-label={adminContentUi.confirm.publishTitle}
-            className="mt-4 rounded-card border-s-4 border-status-warning bg-background p-4"
-          >
-            <p className="font-semibold text-text-primary">{adminContentUi.confirm.publishTitle}</p>
-            <p className="mt-1 text-sm leading-6 text-text-secondary">
-              {adminContentUi.confirm.publishBody}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Button
-                type="button"
-                onClick={handlePublish}
-                disabled={busy}
-                data-testid="confirm-publish"
-              >
-                {publishing ? adminContentUi.actions.publishing : adminContentUi.actions.confirmPublish}
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => setConfirmPublish(false)}
-                disabled={publishing}
-              >
-                {adminContentUi.actions.cancelPublish}
-              </Button>
-            </div>
-          </div>
+        {review ? (
+          <PublicationReviewPanel
+            review={review}
+            publishing={publishing}
+            onConfirm={handleConfirmPublish}
+            onCancel={handleCancelPublishReview}
+          />
         ) : null}
 
         {confirmDiscard ? (

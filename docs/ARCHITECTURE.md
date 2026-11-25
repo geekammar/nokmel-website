@@ -271,6 +271,14 @@ Public queries use explicit published-only projections:
 
 Draft payloads, draft FAQ answers/visibility/order and draft revisions are never selected on public paths and do not influence public ordering. Full draft rows remain restricted to the owner editor/preview and write transactions. Existing stored-payload validation and safe defaults/fallback are unchanged. Deterministic integration tests use a test-only synchronization seam (no sleeps) to commit a publication/draft between the two reads, and a temporary column-privilege probe role proves public reads succeed without SELECT access to any draft columns.
 
+### Publication review and revision binding
+
+Publishing remains explicit, owner-only and page-level. Before confirmation, the editor requests a server-side review action from the owner editor. The review action independently checks the owner session, validates page/locale, reads section + FAQ draft/published state in one read-only `REPEATABLE READ` snapshot, checks the expected revision, and compares **validated persisted draft content** with the **effective published content or approved defaults**. It is not derived from client dirty fields.
+
+The review shows the page, reviewed saved-draft revision, published revision (or default-content state), last publication timestamp, the statement that the complete saved page (sections + homepage FAQ) will be published atomically, changed section fields with before/after plain text, and FAQ additions/removals/edits/visibility/ordering changes. If the effective values are identical it states that no changes exist. Editing after a review invalidates/closes it.
+
+Confirmation submits the exact reviewed revision to the existing publish action. The page advisory lock and revision check remain authoritative: a concurrent save/publish/discard makes the stale confirmation fail safely with the existing Arabic conflict/ reload guidance and no public change. There is no public diff endpoint, no second concurrency mechanism, no revision history, and no per-field publication.
+
 ### Authorization and mobile admin navigation
 
 - Every editor page, preview, and server action independently calls `requireOwner()`/`getOwnerSession()`; the admin layout and middleware are not security boundaries. Server actions are POST-only with Next.js origin/CSRF checks preserved. Unauthorized/non-owner requests write nothing and receive controlled errors.
@@ -279,4 +287,4 @@ Draft payloads, draft FAQ answers/visibility/order and draft revisions are never
 
 ### W3.2 migrations and infrastructure handoff
 
-Additive migration: `drizzle/0002_w32-content-cms.sql` (tables + indexes + checks). It applies from an empty database and upgrades a W3.1 database without touching auth tables/rows (verified against synthetic user/account/session/verification/rate-limit records). Runtime grants and the temporary migrator database-level CREATE requirement are documented in `docs/DATABASE_PERMISSIONS.md`; the runtime receives only SELECT/INSERT/UPDATE/DELETE on the two CMS tables. There are no application sequences. The hosted development migration and new branch Preview configuration are external operator tasks; the coding agent never connects to hosted Neon, never runs hosted migrations, rotates credentials, revokes QA sessions, or touches production.
+Additive migration: `drizzle/0002_w32-content-cms.sql` (tables + indexes + checks). It applies from an empty database and upgrades a W3.1 database without touching auth tables/rows (verified against synthetic user/account/session/verification/rate-limit records). Runtime grants and the temporary migrator database-level CREATE requirement are documented in `docs/DATABASE_PERMISSIONS.md`; the runtime receives only SELECT/INSERT/UPDATE/DELETE on the two CMS tables. There are no application sequences. The external lead reports that hosted development migration 0002, CMS runtime grants and the new branch Preview configuration are complete; independent hosted acceptance remains external. The coding agent never connects to hosted Neon, never runs hosted migrations, rotates credentials, revokes QA sessions, or touches production.
