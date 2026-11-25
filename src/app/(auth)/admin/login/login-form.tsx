@@ -1,13 +1,57 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { adminUi } from '@/content/ar/admin';
-import { authClient } from '@/lib/auth-client';
+import { authClient, takeSignInRetryAfterSeconds } from '@/lib/auth-client';
+import {
+  remainingCooldownSeconds,
+  resolveSignInCooldownSeconds,
+} from '@/lib/login-cooldown';
 
 type ErrorState = 'none' | 'invalid' | 'rate-limited' | 'unavailable' | 'unexpected';
+
+function EyeIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      focusable="false"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-5 w-5"
+    >
+      <path d="M2.2 12s3.5-6.3 9.8-6.3S21.8 12 21.8 12s-3.5 6.3-9.8 6.3S2.2 12 2.2 12Z" />
+      <circle cx="12" cy="12" r="2.8" />
+    </svg>
+  );
+}
+
+function EyeOffIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      focusable="false"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-5 w-5"
+    >
+      <path d="M3 3l18 18" />
+      <path d="M10.6 6c.46-.08.93-.12 1.4-.12 6.3 0 9.8 6.12 9.8 6.12a18 18 0 0 1-2.2 3.03" />
+      <path d="M6.3 6.9A17.7 17.7 0 0 0 2.2 12s3.5 6.12 9.8 6.12c1.5 0 2.86-.35 4.06-.9" />
+      <path d="M9.9 10a2.8 2.8 0 0 0 4.05 4.05" />
+    </svg>
+  );
+}
 
 export function LoginForm() {
   const router = useRouter();
@@ -16,10 +60,31 @@ export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<ErrorState>('none');
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
+
+  useEffect(() => {
+    if (cooldownUntil === null) {
+      setCooldownRemaining(0);
+      return;
+    }
+    const update = () => {
+      const remaining = remainingCooldownSeconds(cooldownUntil, Date.now());
+      setCooldownRemaining(remaining);
+      if (remaining === 0) {
+        setCooldownUntil(null);
+        setError((current) => (current === 'rate-limited' ? 'none' : current));
+      }
+    };
+    update();
+    const timer = window.setInterval(update, 500);
+    return () => window.clearInterval(timer);
+  }, [cooldownUntil]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (submitting) return;
+    if (cooldownUntil !== null && Date.now() < cooldownUntil) return;
     setSubmitting(true);
     setError('none');
     try {
@@ -30,6 +95,9 @@ export function LoginForm() {
       });
       if (signInError) {
         if (signInError.status === 429) {
+          const seconds = resolveSignInCooldownSeconds(takeSignInRetryAfterSeconds());
+          setCooldownRemaining(seconds);
+          setCooldownUntil(Date.now() + seconds * 1000);
           setError('rate-limited');
         } else if (signInError.status === 503) {
           setError('unavailable');
@@ -51,7 +119,12 @@ export function LoginForm() {
     error === 'invalid'
       ? adminUi.login.invalidCredentials
       : error === 'rate-limited'
-        ? adminUi.login.rateLimited
+        ? cooldownRemaining > 0
+          ? `${adminUi.login.rateLimited} ${adminUi.login.rateLimitedRetry.replace(
+              '{seconds}',
+              String(cooldownRemaining),
+            )}`
+          : adminUi.login.rateLimited
         : error === 'unavailable'
           ? adminUi.login.authUnavailable
           : error === 'unexpected'
@@ -92,7 +165,7 @@ export function LoginForm() {
           <label htmlFor="admin-password" className="text-sm font-semibold text-text-primary">
             {adminUi.login.passwordLabel}
           </label>
-          <div className="relative">
+          <div className="relative" dir="ltr">
             <input
               id="admin-password"
               type={showPassword ? 'text' : 'password'}
@@ -100,7 +173,7 @@ export function LoginForm() {
               autoComplete="current-password"
               dir="ltr"
               required
-              className="min-h-control w-full rounded-control border border-border-interactive bg-surface px-4 pe-16 text-base text-text-primary"
+              className="min-h-control w-full rounded-control border border-border-interactive bg-surface px-4 pe-14 text-base text-text-primary"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
             />
@@ -108,10 +181,12 @@ export function LoginForm() {
               type="button"
               aria-pressed={showPassword}
               aria-label={showPassword ? adminUi.login.hidePassword : adminUi.login.showPassword}
+              title={showPassword ? adminUi.login.hidePassword : adminUi.login.showPassword}
+              data-testid="password-visibility-toggle"
               onClick={() => setShowPassword((visible) => !visible)}
-              className="absolute inset-y-0 end-2 my-auto min-h-control rounded-control px-3 text-sm font-semibold text-action-secondary hover:bg-surface"
+              className="absolute end-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-control text-action-secondary hover:bg-background"
             >
-              {showPassword ? adminUi.login.hidePassword : adminUi.login.showPassword}
+              {showPassword ? <EyeOffIcon /> : <EyeIcon />}
             </button>
           </div>
         </div>
@@ -122,7 +197,12 @@ export function LoginForm() {
             </p>
           ) : null}
         </div>
-        <Button type="submit" disabled={submitting} size="lg" className="mt-2 w-full">
+        <Button
+          type="submit"
+          disabled={submitting || cooldownRemaining > 0}
+          size="lg"
+          className="mt-2 w-full"
+        >
           {submitting ? adminUi.login.submitting : adminUi.login.submit}
         </Button>
       </form>

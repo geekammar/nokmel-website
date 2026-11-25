@@ -102,6 +102,7 @@ export async function clearRateLimits(pg: DisposablePostgres): Promise<void> {
 
 export type TestAuthOptions = {
   rateLimit?: { enabled?: boolean; windowSeconds?: number; max?: number; signInMax?: number };
+  passwordVerifier?: (data: { hash: string; password: string }) => Promise<boolean>;
 };
 
 export function createTestAuth(
@@ -110,6 +111,7 @@ export function createTestAuth(
 ): Auth {
   return createAuth({
     db,
+    passwordVerifier: options.passwordVerifier,
     rateLimit: {
       enabled: options.rateLimit?.enabled ?? false,
       windowSeconds: options.rateLimit?.windowSeconds,

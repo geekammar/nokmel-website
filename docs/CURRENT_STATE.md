@@ -1,26 +1,32 @@
-Last updated: W3.1 (admin foundation & secure owner authentication), 2026-11-25. Keep concise.
+Last updated: W3.1 final acceptance closure, 2026-11-25. Keep concise.
 
-## Status: W3.1 — draft PR on branch `vibe/w31-owner-auth-ff98b7` (awaiting review)
+## Status: W3.1 — final acceptance closure delivered on draft PR #4 (`vibe/w31-owner-auth-ff98b7`)
 
-### W3.1 (this phase)
-- Security hardening recovery applied on the existing PR branch: centralized disposable-test target validation (loopback + approved DB name + explicit `sslmode=disable`, no destination/TLS-overriding params, validation before connect/migrate/truncate; E2E uses the same gate); advisory-lock serialization + identity-integrity checks + partial unique credential index for owner provisioning; `DATABASE_URL_DIRECT`-only operator/migration path (no runtime fallback, pooled endpoints refused, validated migrate wrapper); explicit trusted-origin policy (mandatory exact `BETTER_AUTH_URL`, exact `TRUSTED_ORIGINS`, no wildcard/vercel.app auto-trust, reject `BETTER_AUTH_TRUSTED_ORIGINS`); Vercel-evidence-based `x-forwarded-for` identity handling and gated `RATE_LIMIT_SIGNIN_MAX`; shared verified-TLS connection policy; awaited auth handler error boundary with sanitized logging; least-privilege role plan (`docs/DATABASE_PERMISSIONS.md`) verified with a restricted synthetic role.
-- Admin foundation implemented: self-hosted Better Auth (`better-auth@1.7.28`), email+password, single owner, public sign-up disabled server-side (`disableSignUp`), no social login, no anonymous/guest sessions, no roles.
-- Owner-only authorization enforced server-side (`getOwnerSession`/`requireOwner`/`enforceOwnerForMutation` + `OWNER_EMAIL` normalization); missing config fails closed.
-- Neon PostgreSQL + Drizzle: auth schema (user, session, account, verification, rate_limit) via Drizzle Kit migration `drizzle/0000_w31-auth-foundation.sql`; migrations never run at build/startup; pooled runtime connection (`DATABASE_URL`) vs direct migration connection (`DATABASE_URL_DIRECT`); TLS with certificate validation for hosted DBs.
-- Sessions: 7-day expiry, daily refresh, HTTP-only SameSite=Lax cookies (Secure on HTTPS), server-side revocation enforced.
-- Login rate limiting persisted in the `rate_limit` table (≈5 sign-in attempts/min with window expiry; no permanent lockout); Better Auth origin/CSRF checks kept; generic login errors; open-redirect protection.
-- Routes: public website unchanged under `src/app/(public)/` (same 7 routes, layout, CTA, SEO, robots); new `/admin/login` (Arabic-first RTL) and protected `/admin` shell (honest structure: Overview available; Content & SEO, Plans & Pricing, Join Requests, Settings shown as unavailable; no fake data).
-- Owner provisioning: operator CLI `pnpm owner:provision` (interactive hidden input or stdin; refuses second owner; idempotent; never mounted as HTTP handler) + `pnpm owner:reset-password` recovery (rehash + session invalidation).
-- Tests: 46 DB integration tests (disposable PostgreSQL 18; local run required a manually launched embedded PG18 because the VPS runs as root and `embedded-postgres` refuses root; CI uses the postgres:18 service) covering auth flows, origin/CSRF, provisioning concurrency/integrity, rate-limit persistence/overrides/identity, operator CLI, TLS/target policy, and a restricted runtime role; 92 unit tests. Admin e2e runs in CI where browser system deps exist (local browser e2e unavailable in this sandbox).
-- CI: retains `verify`, `db-integration` (postgres:18 service; `pnpm db:check` + operator `pnpm db:migrate` + `pnpm test:db`), and `e2e-auth` (postgres:18 + full Playwright) jobs.
+### W3.1 final acceptance closure (2026-11-25)
+
+- Live infrastructure configured by the external lead: Neon project `nokmel-website` (`delicate-cake-38544235`), development branch `br-winter-hat-bdqgatki`, database `nokmel_website`; roles `nokmel_migrator` and `nokmel_runtime`; two migrations applied (`0000_w31-auth-foundation`, `0001_parallel_skin`); QA owner provisioned. Runtime uses the restricted role and has no database/schema CREATE. The migrator's database-level CREATE was revoked after migration; the pinned migration tool requires a temporary re-grant for any future migration (documented in `docs/DATABASE_PERMISSIONS.md`); it retains `public`/`drizzle` schema privileges.
+- Preview runtime variables configured for the existing PR Preview only (`DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `TRUSTED_ORIGINS`, `OWNER_EMAIL`); `DATABASE_URL_DIRECT` is not in Vercel.
+- Configured/accepted Preview: `dpl_Gs4fzWGwMGcPjkLxcTbECp33HWRn`, immutable URL `https://nokmel-website-96pnuvu12-ammarjaberd-7111.vercel.app`, authorized origin `https://nokmel-website-git-vibe-w31-owner-auth-ff98b7-ammarjaberd-7111.vercel.app`. The earlier `dpl_FNtx2FMXi8MHAo2NEfz4a5EkG27q` was the same HEAD but built before database/auth configuration; different deployment identity is not a functional defect.
+- Acceptance evidence: physical Android functional checks 7/7 PASS (owner-reported); independent Muse desktop acceptance 35 cases (23 PASS, 2 PARTIAL, 2 FAIL, 6 BLOCKED, 2 NOT TESTED), CONDITIONAL ACCEPT for Preview only. Live authenticated Preview retesting is still required after this closure.
+- NKW-W31-REC-01 resolved: credential sign-in and owner provisioning/recovery share a database advisory lock (`nokmel.website.owner_credentials`); the sign-in route holds it around the whole Better Auth handler on a dedicated DB connection. Recovery waits for in-flight session creation, then replaces the hash and deletes all sessions in the same transaction. Deterministic PostgreSQL tests include an unlocked control reproducing the original race and a guarded-route proof that no usable old-password session survives.
+- NKW-W31-UX-01 resolved: compact eye/eye-off icon (44px target, Arabic accessible name, `aria-pressed`) in an LTR wrapper; Arabic label stays RTL, password content LTR, reserved padding/positioning consistent, value/keyboard/focus/autocomplete preserved.
+- NKW-W31-UX-02/03 resolved: Overview no longer duplicates navigation or shows `W3.1`; compact honest empty state, existing navigation availability retained, minimal spacing only; no navigation redesign.
+- NKW-W31-S05-01 resolved: login captures the real `X-Retry-After` response header via the Better Auth client response hook and shows an approximate countdown, with a conservative 60-second fallback; submit is blocked during cooldown; server remains authoritative; no permanent lockout.
+- Coverage closure: separate browser contexts, server-side HTTP sign-up refusal, cookie attributes, untrusted Origin, unsafe callback URL, request-identity evidence separation, and production-mode noindex/canonical checks for all seven public routes. Physical Android remains owner-reported evidence, not emulated.
+- Verification (local Node.js 22.23.5, disposable PostgreSQL 18): lint 0 errors (3 pre-existing warnings), typecheck pass, unit 101/101, DB integration 50/50, production build pass, full Playwright 73/73 (public + admin + login UX + security closure). Final CI run and exact URLs are recorded in the PR #4 description/report; all three existing CI jobs are retained.
+
+## Outstanding live checks (must not be claimed as done)
+
+- Authorized live retest of the configured Preview after this closure (sign-in, recovery behavior, password visibility, simplified Overview, rate-limit UX).
+- Hosted runtime verification that the transaction-scoped sign-in/recovery lock behaves correctly through Neon's pooled endpoint (local evidence uses a direct disposable PostgreSQL 18; the lock transaction is designed for PgBouncer transaction pooling and requires live confirmation).
+- Hosted Vercel request-header inspection for rate-limit identity (Preview remains behind Vercel SSO; no public debug endpoint is provided).
+- Immutable deployment URL/ID record from the Vercel dashboard if required; the PR integration exposes the configured Preview alias and inspector ID.
+- If an external proxy is placed in front of Vercel, re-evaluate the `x-forwarded-for` trust decision.
 
 ## Blockers / pending approvals
 
-- W3.1 live acceptance is NOT done and must not be claimed: the external lead must configure the isolated development database (pooled runtime + direct operator URLs with separate roles per `docs/DATABASE_PERMISSIONS.md`), trusted origins for the preview URL, a unique `BETTER_AUTH_SECRET`, `OWNER_EMAIL`, and provision the owner with the documented CLI before independently verifying the protected preview. No production migration and no production owner creation happen in W3.1.
-- Vercel request-identity behavior is configured from official documentation (Vercel overwrites `x-forwarded-for`; Better Auth trusts only single-value headers without `trustedProxies`), but live preview header inspection was not possible without authorized Vercel access. Re-verify if an external proxy is added.
-- Password recovery revokes all sessions committed before its transaction; a sign-in already in flight with the old password can still create a session immediately after recovery commits (narrow race not covered by the current transaction boundary). Documented, not fixed in this scope.
-- Remaining release coverage carried over: physical Android acceptance and deployed SEO metadata verification (unverified from this environment; protected-preview inspection requires authorized Vercel access). A separate visual-polish workstream is planned and was not executed here.
-- Do not start W3.2 (CMS) before independent review of W3.1.
+- Do not start W3.2 (CMS) before independent review of this closure. No merge or production deployment has been performed.
+- Public copy and legal texts remain working proposals/drafts; pre-launch noindex/robots policy is unchanged.
 
 ### W2 snapshot (accepted baseline)
 

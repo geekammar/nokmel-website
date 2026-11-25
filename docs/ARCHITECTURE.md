@@ -60,9 +60,9 @@ Website-managed plans are marketing data only. They must not control subscriptio
 
 Vercel project under account `ammarjaberd`, linked to `geekammar/nokmel-website`; CI via GitHub Actions (lint, typecheck, build, tests on PRs). No deployment performed in W0; production deployment requires explicit approval.
 
-## W3.1 — Admin foundation & owner authentication [IMPLEMENTED, branch review pending]
+## W3.1 — Admin foundation & owner authentication [IMPLEMENTED; conditional Preview acceptance]
 
-Status below reflects the W3.1 implementation (self-hosted Better Auth approved by the external technical lead). Items marked in the handoff section require external infrastructure configuration before live acceptance.
+Status below reflects the W3.1 implementation plus the final acceptance closure (2026-11-25). The isolated Neon development database and Vercel Preview are configured, physical Android functional acceptance passed (owner-reported 7/7), and independent Muse desktop acceptance returned CONDITIONAL ACCEPT for Preview. This closure addresses the confirmed defects; W3.2 has not started.
 
 ### Authentication stack [APPROVED, W3.1]
 
@@ -93,10 +93,10 @@ The target is re-validated before destructive SQL. `TEST_DATABASE_URL` never fal
 
 ### Owner provisioning serialization & integrity [W3.1 hardening]
 
-- `provisionOwner`/`resetOwnerPassword` take a transaction-scoped PostgreSQL advisory lock (`pg_advisory_xact_lock(hashtext('nokmel.website.owner_provisioning'))`) **before** reading owner state, so concurrent operator processes cannot both see an empty database. No process-local mutex is used.
+- `provisionOwner`/`resetOwnerPassword` take a transaction-scoped PostgreSQL advisory lock (`pg_advisory_xact_lock(hashtext('nokmel.website.owner_credentials')::bigint)`) **before** reading owner state, so concurrent operator processes cannot both see an empty database. The HTTP credential sign-in path takes the same exclusive lock around the whole `auth.handler()` call (dedicated single-connection lock pool). No process-local mutex is used.
 - An existing matching email is not accepted as proof of a valid owner: provisioning requires exactly one credential account whose `account.user_id = account.account_id = user.id`, with a usable Better Auth password hash. Incomplete, duplicate, inconsistent, or unusable records are refused and never silently overwritten.
 - A partial unique index (`account_user_credential_unique` on `account(user_id) WHERE provider_id = 'credential'`, migration `drizzle/0001_*.sql`) provides database-level defense in depth.
-- Password recovery rehashes in the same transaction that deletes all sessions for the owner. Previously issued sessions stop authorizing immediately (verified). A sign-in that starts with the old hash concurrently with recovery can still complete after the reset transaction commits — an unresolved narrow race documented in `CURRENT_STATE.md`; it requires no change to current scope.
+- Password recovery rehashes in the same transaction that deletes all sessions for the owner. Previously issued sessions stop authorizing immediately (verified). NKW-W31-REC-01 is resolved by the shared sign-in/recovery lock: recovery waits for any in-flight sign-in to finish creating its session, then deletes it in the same transaction. A deterministic PostgreSQL-backed test reproduces the original unlocked race and proves the guarded route leaves no usable old-password session.
 
 #### Authentication schema (W3.1 — actual)
 
@@ -119,7 +119,7 @@ Future schema boundaries (NOT in W3.1, no tables created): `content_sections`, `
 
 ### Login abuse prevention & CSRF (W3.1)
 
-- Better Auth rate limiting backed by the `rate_limit` table (survives serverless instance restarts): 5 sign-in attempts / minute / resolved request identity; generic 429 response with `Retry-After`. Window-based expiry means no permanent account lockout.
+- Better Auth rate limiting backed by the `rate_limit` table (survives serverless instance restarts): 5 sign-in attempts / minute / resolved request identity; generic 429 response with `X-Retry-After` (Better Auth's actual header; the UI captures it and otherwise uses a conservative 60-second client cooldown). Window-based expiry means no permanent account lockout.
 - `RATE_LIMIT_SIGNIN_MAX` is honored only when `NOKMEL_DISPOSABLE_TEST_ENV=1` is also set and `VERCEL_ENV` is not `production`/`preview`. Invalid, zero, negative, or excessive values are ignored and the default 5 remains. Hosted Vercel environments therefore cannot weaken the limit through environment configuration (unit + DB integration tests).
 - Better Auth origin checks + Fetch-Metadata CSRF checks remain enabled. `BETTER_AUTH_URL` is mandatory and must be an exact absolute origin: HTTPS for hosted deployments, HTTP only for explicit loopback development/tests. `TRUSTED_ORIGINS` adds exact immutable aliases (for example one preview URL) with no wildcards, credentials, paths, queries, or fragments. `BETTER_AUTH_TRUSTED_ORIGINS` is rejected because Better Auth would merge it without validation. Unknown origins are rejected with 403 for sign-in and sign-out (verified), including arbitrary `*.vercel.app` hosts.
 - `callbackURL`/redirect parameters are validated against trusted origins (open-redirect protection, verified). Middleware redirects target fixed app paths only.
@@ -127,7 +127,31 @@ Future schema boundaries (NOT in W3.1, no tables created): `content_sections`, `
 
 ### W3.1 request-identity evidence (Vercel)
 
-Pinned Better Auth 1.7.28 resolves the rate-limit identity only from single-value configured headers unless `trustedProxies` is set; a multi-value chain resolves to no IP and falls back to one shared per-path bucket rather than trusting the leftmost value. The official Vercel request-header documentation states that Vercel overwrites `X-Forwarded-For` and does not forward externally supplied IPs ("This restriction is in place to prevent IP spoofing"), and documents `x-real-ip`/`x-vercel-forwarded-for` as identical. `src/lib/auth.ts` therefore configures `advanced.ipAddress.ipAddressHeaders = ['x-forwarded-for']` explicitly and does not trust a proxy chain. Automated tests cover single-value buckets, spoofed multi-value chains, and shared-bucket fallback. Live header behavior on the protected Vercel preview still requires an authorized deployment check (see CURRENT_STATE). If an external proxy is placed in front of Vercel, this decision must be re-evaluated.
+Three evidence layers are kept separate:
+
+1. **Library-level integration evidence.** Pinned Better Auth 1.7.28 resolves the rate-limit identity only from single-value configured headers unless `trustedProxies` is set; a multi-value chain resolves to no IP and falls back to one shared per-path bucket rather than trusting the leftmost value. `src/lib/auth.ts` explicitly configures `advanced.ipAddress.ipAddressHeaders = ['x-forwarded-for']` and does not trust a proxy chain. Automated tests cover single-value buckets, spoofed multi-value chains, and shared-bucket fallback.
+2. **Official Vercel forwarding guarantee.** The Vercel request-header documentation states that Vercel overwrites `X-Forwarded-For` and does not forward externally supplied IPs ("This restriction is in place to prevent IP spoofing"), and documents `x-real-ip`/`x-vercel-forwarded-for` as identical. The trust decision above relies on that platform guarantee, not on an assumption that arbitrary forwarded headers are safe.
+3. **Actual hosted request-header evidence.** Not obtained: the configured Preview remains behind Vercel SSO and no authorized Vercel access is available from the execution environment. This remains an explicit live check; no public debug endpoint exposes request headers. If an external proxy is placed in front of Vercel, this decision must be re-evaluated.
+
+### W3.1 final acceptance closure (2026-11-25)
+
+**Live infrastructure state (configured externally; no secrets in this repository):**
+
+- Neon project `nokmel-website` (`delicate-cake-38544235`), development branch `br-winter-hat-bdqgatki`, database `nokmel_website`. Production branch `br-noisy-fire-bdkl5wa4` remains untouched.
+- Roles `nokmel_migrator` and `nokmel_runtime` configured. Runtime has no database/schema CREATE permission and uses the restricted runtime role. The migration role has the required `public` and `drizzle` schema privileges; its temporary database-level CREATE was revoked after the two applied migrations. Future migrations require the temporary re-grant/revoke sequence documented in `docs/DATABASE_PERMISSIONS.md`.
+- Migrations applied to development: `0000_w31-auth-foundation` and `0001_parallel_skin` (auth tables + partial credential uniqueness index). QA owner provisioned by the external lead.
+- Preview runtime variables configured for the existing PR Preview only: `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `TRUSTED_ORIGINS`, `OWNER_EMAIL`. `DATABASE_URL_DIRECT` is not configured in Vercel.
+- Configured, independently accepted Preview deployment: `dpl_Gs4fzWGwMGcPjkLxcTbECp33HWRn`, immutable URL `https://nokmel-website-96pnuvu12-ammarjaberd-7111.vercel.app`, authorized auth origin `https://nokmel-website-git-vibe-w31-owner-auth-ff98b7-ammarjaberd-7111.vercel.app`. The earlier unconfigured deployment `dpl_FNtx2FMXi8MHAo2NEfz4a5EkG27q` is a different deployment identity (not a functional defect).
+
+**Closure corrections:**
+
+- NKW-W31-REC-01 (password-recovery race) is resolved with the shared database advisory lock described above; deterministic concurrency coverage includes an unlocked control that reproduces the original race.
+- NKW-W31-UX-01: password visibility control is a compact eye/eye-off icon with a 44px target inside an LTR wrapper; the Arabic label remains RTL, password content stays LTR, reserved padding and logical positioning are consistent, and the toggle preserves value/accessibility/keyboard behavior.
+- NKW-W31-UX-02/03: the Overview card no longer duplicates the navigation section list or displays `W3.1`; it is a compact honest empty state using existing navigation availability labels. Minimal spacing adjustments only; no navigation redesign.
+- NKW-W31-S05-01: the login UI captures Better Auth's real `X-Retry-After` response header and shows an approximate countdown; if unavailable it uses a conservative 60-second cooldown. Submission is disabled during cooldown, no permanent lockout is introduced, and the server remains authoritative.
+- Security coverage closure: separate-browser-context authorization, server-side public sign-up refusal over HTTP, session cookie attributes, untrusted Origin, unsafe callback URL, request-identity evidence separation, and production-mode noindex/canonical metadata for all seven public routes.
+
+**Acceptance state:** physical Android functional checks 7/7 PASS (owner-reported); Muse desktop acceptance: 35 cases (23 PASS, 2 PARTIAL, 2 FAIL, 6 BLOCKED, 2 NOT TESTED), CONDITIONAL ACCEPT for Preview. The sign-in/recovery lock is transaction-scoped specifically for Neon's pooled endpoint, but local evidence uses a direct disposable PostgreSQL 18; live Preview retesting must confirm the lock through the actual pooler. Remaining live checks are listed in `CURRENT_STATE.md`.
 
 ### W3.1 authentication error boundary
 
@@ -141,7 +165,7 @@ Pinned Better Auth 1.7.28 resolves the rate-limit identity only from single-valu
 
 ### W3.1 infrastructure handoff (external lead + owner）
 
-Environment variables (Vercel; per environment — preview values separate from production):
+Environment variables (runtime on Vercel; operator values only on the operator machine):
 
 | Variable | Scope | Notes |
 |---|---|---|
@@ -156,7 +180,7 @@ Environment variables (Vercel; per environment — preview values separate from 
 
 Neon role separation (least privilege; exact reviewed SQL in `docs/DATABASE_PERMISSIONS.md`):
 - **Runtime role** (`DATABASE_URL`): USAGE on `public` + SELECT/INSERT/UPDATE/DELETE on the five auth tables only; **no** CREATE/ALTER/DROP/TRUNCATE, does not own the database/schema/tables. The runtime never migrates or provisions.
-- **Migration/provisioning role** (`DATABASE_URL_DIRECT`): owns the auth tables (for future `ALTER`), has CREATE on `public` for migrations, and DML for owner provisioning/recovery. Never used by deployed app instances and never configured in Vercel.
+- **Migration/provisioning role** (`DATABASE_URL_DIRECT`): owns the auth tables (for future `ALTER`), has CREATE on `public` and `drizzle`, and DML for owner provisioning/recovery. Database-level CREATE was granted temporarily for the two applied migrations and then revoked. The current pinned migration tool requires that temporary grant again for any future migration run (PostgreSQL checks it even though `drizzle` exists); revoke it immediately afterward. Never used by deployed app instances and never configured in Vercel.
 
 Commands (operator machine; secrets via env — never argv, never committed). `DATABASE_URL_DIRECT` is required for both migration and provisioning; the runtime `DATABASE_URL` is never accepted as a fallback:
 ```bash

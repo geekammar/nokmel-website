@@ -150,6 +150,7 @@ describe('sign-in', () => {
       const setCookie = findSessionCookie(response);
       expect(setCookie).toContain('Secure');
       expect(setCookie).toContain('HttpOnly');
+      expect(setCookie).toContain('SameSite=Lax');
     } finally {
       process.env.BETTER_AUTH_URL = previousBaseURL;
     }

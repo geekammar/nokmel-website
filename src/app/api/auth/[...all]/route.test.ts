@@ -10,6 +10,13 @@ vi.mock('@/lib/auth', () => ({
   getAuth: mocks.getAuth,
 }));
 
+vi.mock('@/lib/owner-credential-lock', () => ({
+  handleOwnerAuthRequest: (
+    request: Request,
+    auth: { handler: (request: Request) => Promise<Response> },
+  ) => auth.handler(request),
+}));
+
 import { GET, POST } from './route';
 
 const request = () =>

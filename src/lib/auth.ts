@@ -34,6 +34,8 @@ type CreateAuthOptions = {
   rateLimit?: RateLimitOptions;
   /** Overrides the lazy singleton DB (used by integration tests only). */
   db?: ReturnType<typeof getDb>['db'];
+  /** Test-only verifier wrapper used to pause after a real password verification. */
+  passwordVerifier?: (data: { hash: string; password: string }) => Promise<boolean>;
 };
 
 export function createAuth(options: CreateAuthOptions = {}) {
@@ -72,6 +74,9 @@ export function createAuth(options: CreateAuthOptions = {}) {
       disableSignUp: true,
       minPasswordLength: 12,
       maxPasswordLength: 128,
+      ...(options.passwordVerifier
+        ? { password: { verify: options.passwordVerifier } }
+        : {}),
     },
     account: {
       accountLinking: {

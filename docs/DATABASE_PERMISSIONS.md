@@ -4,6 +4,13 @@ Status: reviewed plan for W3.1 hardening. Execute only on the dedicated
 `nokmel-website` Neon project (development branch first) with explicit owner
 approval. Never run against `Nokmel_prod`, `Nokmel_dev`, or any other project.
 
+Current development state (2026-11-25, external configuration): roles
+`nokmel_migrator` and `nokmel_runtime` exist; two migrations are applied; the QA
+owner is provisioned; the runtime role has no database/schema CREATE; the
+migrator retains `public`/`drizzle` schema privileges and its temporary
+database-level CREATE was revoked after migration. No credentials are recorded
+here.
+
 ## Roles
 
 | Role | Used by | Must NOT be able to |
@@ -51,6 +58,47 @@ GRANT USAGE ON SCHEMA public TO nokmel_runtime;
 - The schema remains owned by the project/database owner (`pg_database_owner`
   on PostgreSQL 15+). `nokmel_runtime` must not own it. If the project owner
   also transfers schema ownership, never transfer it to `nokmel_runtime`.
+
+## 2a. Dedicated Drizzle migration schema
+
+Drizzle Kit / the Drizzle PostgreSQL migrator keeps its bookkeeping table in the
+`drizzle` schema (`drizzle.__drizzle_migrations`). Prepare it once as the
+project/database owner **before** removing database-level `CREATE` from the
+migration role:
+
+```sql
+CREATE SCHEMA IF NOT EXISTS drizzle AUTHORIZATION nokmel_migrator;
+GRANT USAGE, CREATE ON SCHEMA drizzle TO nokmel_migrator;
+ALTER DEFAULT PRIVILEGES FOR ROLE nokmel_migrator IN SCHEMA drizzle
+  REVOKE ALL ON TABLES FROM PUBLIC;
+```
+
+The runtime role must have **no** privileges on the `drizzle` schema.
+
+### Temporary database-level CREATE requirement (verified with PostgreSQL 18)
+
+The pinned migration tool issues `CREATE SCHEMA IF NOT EXISTS "drizzle"` on
+every `migrate` run. PostgreSQL 18 still checks database-level `CREATE` for that
+statement even when the schema already exists (verified: `42501 permission
+denied for database` with only schema-level grants). Therefore:
+
+```sql
+-- Before applying a new migration, as the project owner:
+GRANT CREATE ON DATABASE nokmel_website TO nokmel_migrator;
+-- ... run the reviewed migration as nokmel_migrator ...
+REVOKE CREATE ON DATABASE nokmel_website FROM nokmel_migrator;
+```
+
+- Temporary database-level `CREATE` is required **for each migration run** with
+  the current tool, despite the pre-created `drizzle` schema.
+- **Revoke it immediately after the migration.** It is not needed for normal
+  runtime traffic, owner provisioning, password recovery, or day-to-day
+  operation.
+- The current development branch has this grant revoked after the two applied
+  migrations; future migrations require the temporary grant/re-grant and revoke
+  sequence above.
+- Provisioning/recovery uses DML + advisory locks only and works with the grant
+  revoked.
 
 ## 3. Table privileges required by Better Auth
 

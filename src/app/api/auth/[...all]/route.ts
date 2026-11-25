@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { ConfigError } from '@/lib/config-error';
 import { getAuth } from '@/lib/auth';
+import { handleOwnerAuthRequest } from '@/lib/owner-credential-lock';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,6 +9,12 @@ export const dynamic = 'force-dynamic';
  * Better Auth route handler (documented mount: `/api/auth/[...all]`).
  * Lazy configuration access keeps the build/runtime safe when auth env is not
  * configured; admin access then fails closed.
+ *
+ * Credential sign-in is routed through `handleOwnerAuthRequest`, which holds a
+ * database-backed owner-credential lock around the whole Better Auth handler.
+ * Password recovery acquires the same lock before replacing the hash and
+ * deleting sessions, so an in-flight old-password sign-in cannot leave a
+ * usable session after recovery completes (NKW-W31-REC-01).
  *
  * `auth.handler()` is asynchronous. It must be awaited inside the error
  * boundary so rejected promises (database outages, adapter failures) are
@@ -43,7 +50,7 @@ function failResponse(error: unknown): NextResponse {
 
 async function dispatch(request: Request): Promise<NextResponse | Response> {
   try {
-    return await getAuth().handler(request);
+    return await handleOwnerAuthRequest(request, getAuth());
   } catch (error) {
     return failResponse(error);
   }

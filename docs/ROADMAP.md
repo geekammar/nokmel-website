@@ -15,6 +15,13 @@ Workstreams W0–W6. Each workstream ends with an external review gate before th
 | W5 | Analytics & Settings | Overview metrics (visitors, sources, pricing interest, join requests, conversion), Settings section | Metrics match event data; settings persist |
 | W6 | Launch Acceptance | End-to-end acceptance, accessibility pass, performance pass, launch checklist | Owner approval; deployment only with explicit approval |
 
+W3.1 status (2026-11-25): final acceptance closure delivered on draft PR #4.
+Physical Android functional checks passed (owner-reported 7/7); independent Muse
+desktop acceptance returned CONDITIONAL ACCEPT for the configured Preview.
+Password-recovery race, password-visibility UX, Overview duplication, and
+rate-limit UX corrections are implemented; authorized live Preview retesting
+remains outstanding. W3.2 has not started.
+
 ## Standing rules
 
 - Never push to `main`; feature branch + draft PR per workstream; never merge without owner approval.

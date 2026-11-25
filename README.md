@@ -26,7 +26,7 @@ A simple, professional, mobile-first SaaS marketing website with a lightweight o
 
 ## Status
 
-- **W3.1 (Admin Foundation & Secure Owner Authentication): implemented** on branch `vibe/w31-owner-auth-ff98b7` (draft PR). Self-hosted Better Auth (`better-auth@1.7.28`), single owner (email+password, public sign-up disabled server-side), Neon PostgreSQL + Drizzle auth schema/migrations, hardened sessions, DB-backed login rate limiting, owner provisioning CLI (`pnpm owner:provision`) and recovery (`pnpm owner:reset-password`), protected Arabic-first `/admin` shell. See `docs/ARCHITECTURE.md` (W3.1 section incl. infrastructure handoff) and `docs/CURRENT_STATE.md`.
+- **W3.1 (Admin Foundation & Secure Owner Authentication): final acceptance closure on draft PR #4** (`vibe/w31-owner-auth-ff98b7`). Self-hosted Better Auth (`better-auth@1.7.28`), single owner (email+password, public sign-up disabled server-side), Neon PostgreSQL + Drizzle auth schema/migrations, hardened sessions, DB-backed login rate limiting, owner provisioning CLI (`pnpm owner:provision`) and recovery (`pnpm owner:reset-password`), protected Arabic-first `/admin` shell. Password-recovery race, password visibility, Overview duplication, and rate-limit UX closures are implemented; physical Android 7/7 passed (owner-reported) and Muse returned conditional Preview acceptance. Authorized live Preview retesting remains outstanding. See `docs/ARCHITECTURE.md` and `docs/CURRENT_STATE.md`.
 - **W0 (Project Context & Repository Setup): merged** via PR #1 on `main` (base SHA `24171ba6805becc7a45fab51c6123b4248185080`).
 - **W1 (Application Foundation & Brand Design System): implemented** on branch `vibe/w1-app-foundation-c7fe34` (draft PR). Brand Kit v2.0 verified in-environment — archive SHA-256 `7c04840fc335daff52048f27b13ff3ac1e0159a3dc0d9299fbe8bf55b6931ff9`; canonical tokens from `04_DESIGN_TOKENS/nokmel.css` committed as `src/styles/brand-tokens.css`. See `docs/DESIGN_SYSTEM.md` and `docs/CURRENT_STATE.md`.
 
@@ -60,7 +60,8 @@ Local e2e with the admin suite (disposable DB only — synthetic identities):
 ```bash
 pnpm dev:postgres &
 DATABASE_URL=postgresql://nokmel_test:nokmel_test@127.0.0.1:55432/nokmel_test?sslmode=disable \
-OWNER_EMAIL=owner@nokmel-e2e.test E2E_OWNER_PASSWORD=... pnpm test:e2e
+OWNER_EMAIL=owner@nokmel-e2e.test E2E_OWNER_PASSWORD=... \
+RATE_LIMIT_SIGNIN_MAX=50 NOKMEL_DISPOSABLE_TEST_ENV=1 pnpm test:e2e
 ```
 
 CI (`.github/workflows/ci.yml`) runs the same checks on every PR to `main`, including the Playwright e2e suite.

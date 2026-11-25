@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { hashPassword } from 'better-auth/crypto';
 import type { Db } from '@/lib/db/types';
 import { account, session, user } from '@/lib/db/schema';
+import { OWNER_CREDENTIAL_TRANSACTION_LOCK_SQL } from '@/lib/owner-credential-lock';
 
 /**
  * Owner provisioning core (W3.1).
@@ -12,7 +13,8 @@ import { account, session, user } from '@/lib/db/schema';
  * never mounted as a public HTTP handler. Production owner creation remains
  * the responsibility of the external lead and owner after review.
  *
- * Concurrency: a transaction-scoped PostgreSQL advisory lock serializes all
+ * Concurrency: the owner-credential advisory lock (shared with the HTTP
+ * credential sign-in path, see `owner-credential-lock.ts`) serializes all
  * provisioning/recovery transactions before existing owner state is read, so
  * two concurrent runs cannot both observe an empty database and create two
  * owners. This is database-backed (not a process-local mutex), so it holds
@@ -29,7 +31,6 @@ import { account, session, user } from '@/lib/db/schema';
  * cryptography, no plaintext inserts, nothing logged.
  */
 
-const OWNER_PROVISIONING_LOCK_SQL = sql`select pg_advisory_xact_lock(hashtext('nokmel.website.owner_provisioning'))`;
 const PASSWORD_HASH_PATTERN = /^[0-9a-f]{32}:[0-9a-f]{128}$/i;
 
 export type ProvisionOwnerResult =
@@ -54,8 +55,8 @@ export function isUsablePasswordHash(value: string | null | undefined): boolean 
 
 type ProvisioningTransaction = Parameters<Parameters<Db['transaction']>[0]>[0];
 
-async function lockOwnerProvisioning(tx: ProvisioningTransaction): Promise<void> {
-  await tx.execute(OWNER_PROVISIONING_LOCK_SQL);
+async function lockOwnerCredentialState(tx: ProvisioningTransaction): Promise<void> {
+  await tx.execute(OWNER_CREDENTIAL_TRANSACTION_LOCK_SQL);
 }
 
 export async function provisionOwner(input: {
@@ -68,7 +69,7 @@ export async function provisionOwner(input: {
   const passwordHash = await hashPassword(input.password);
 
   return input.db.transaction(async (tx) => {
-    await lockOwnerProvisioning(tx);
+    await lockOwnerCredentialState(tx);
 
     const credentialOwners = await tx
       .select({ id: user.id, email: user.email })
@@ -159,7 +160,7 @@ export async function resetOwnerPassword(input: {
   const passwordHash = await hashPassword(input.password);
 
   return input.db.transaction(async (tx) => {
-    await lockOwnerProvisioning(tx);
+    await lockOwnerCredentialState(tx);
 
     const owners = await tx
       .select({ id: user.id })
