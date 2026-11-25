@@ -74,9 +74,29 @@ Status below reflects the W3.1 implementation (self-hosted Better Auth approved 
 ### Database & ORM [APPROVED, W3.1]
 
 - Neon PostgreSQL 18 (independent `nokmel-website` project), Drizzle ORM + Drizzle Kit migrations, `node-postgres` driver (pooled for runtime, direct connection for migrations/provisioning only: `DATABASE_URL_DIRECT`).
-- TLS always on with certificate validation for hosted connections (`sslmode=disable` accepted exclusively for loopback test databases).
+- All connection paths share `src/lib/db/connection-policy.ts`. It validates the target **before** a pool/client exists, rejects URL parameters that could override the destination or TLS (`host`, `port`, `user`, `password`, `dbname`, `ssl*`, `options`, `uselibpqcompat`, …), strips query parameters from the string handed to the pinned `pg` driver, and passes TLS explicitly. Hosted connections use certificate + hostname verification (`rejectUnauthorized: true`); `sslmode=disable` is accepted only for an explicit loopback test database. `rejectUnauthorized: false` is never used.
+- Migration TLS: `drizzle.config.ts` validates `DATABASE_URL_DIRECT` and supplies structured credentials with an explicit TLS option, so the pg connection-string parser cannot weaken the migration connection. `pnpm db:migrate` validates the direct target first in `scripts/db-migrate.ts`; a pooled endpoint or missing `DATABASE_URL_DIRECT` is refused.
 - Pooled connection is a lazy singleton (`src/lib/db/index.ts`) — no per-request pools.
 - Migrations are **not** applied during build or startup; they run explicitly via `pnpm db:migrate` (Drizzle Kit) against `DATABASE_URL_DIRECT` (or in tests via the Drizzle migrator against a disposable DB). No `drizzle push` against hosted environments, ever.
+- Least-privilege runtime/migration roles and exact grants: `docs/DATABASE_PERMISSIONS.md`. The runtime role does not own the database/schema/tables and has no DDL or TRUNCATE rights.
+
+### Destructive test database safety [W3.1 hardening]
+
+`src/lib/db/disposable-test-database.ts` is the single gate used by integration tests and browser e2e setup. Before any connection, migration, fixture write, truncate, or drop it requires:
+
+- an explicitly allowed loopback host (`127.0.0.1`, `::1`, `localhost`) — remote hosts and Neon endpoints are refused;
+- an approved disposable database name (`nokmel_test`, `nokmel_ci_test`, `nokmel_ci_e2e`, or `nokmel_test_*` / `nokmel_ci_*`; the generic `postgres` database is accepted only for the harness-owned temporary embedded instance);
+- an explicit `sslmode=disable` (plaintext is not implied);
+- no destination/TLS-overriding connection parameters; invalid protocols/malformed URLs are rejected.
+
+The target is re-validated before destructive SQL. `TEST_DATABASE_URL` never falls back to the hosted runtime `DATABASE_URL`; without it the harness launches its own temporary embedded PostgreSQL 18 instance. E2E setup validates `DATABASE_URL` with the same rules before migrating/writing. Unit regression tests prove unsafe targets are rejected without opening a connection.
+
+### Owner provisioning serialization & integrity [W3.1 hardening]
+
+- `provisionOwner`/`resetOwnerPassword` take a transaction-scoped PostgreSQL advisory lock (`pg_advisory_xact_lock(hashtext('nokmel.website.owner_provisioning'))`) **before** reading owner state, so concurrent operator processes cannot both see an empty database. No process-local mutex is used.
+- An existing matching email is not accepted as proof of a valid owner: provisioning requires exactly one credential account whose `account.user_id = account.account_id = user.id`, with a usable Better Auth password hash. Incomplete, duplicate, inconsistent, or unusable records are refused and never silently overwritten.
+- A partial unique index (`account_user_credential_unique` on `account(user_id) WHERE provider_id = 'credential'`, migration `drizzle/0001_*.sql`) provides database-level defense in depth.
+- Password recovery rehashes in the same transaction that deletes all sessions for the owner. Previously issued sessions stop authorizing immediately (verified). A sign-in that starts with the old hash concurrently with recovery can still complete after the reset transaction commits — an unresolved narrow race documented in `CURRENT_STATE.md`; it requires no change to current scope.
 
 #### Authentication schema (W3.1 — actual)
 
@@ -99,14 +119,19 @@ Future schema boundaries (NOT in W3.1, no tables created): `content_sections`, `
 
 ### Login abuse prevention & CSRF (W3.1)
 
-- Better Auth rate limiting backed by the `rate_limit` table (survives serverless instance restarts): ~5 sign-in attempts / minute / trusted request identity; generic 429 response with `Retry-After`. Window-based expiry means no permanent account lockout. `RATE_LIMIT_SIGNIN_MAX` exists only to raise the ceiling inside disposable automated e2e environments.
-- Better Auth origin checks + Fetch-Metadata CSRF checks remain enabled; trusted origins come from `BETTER_AUTH_URL` + `TRUSTED_ORIGINS` (exact hosts only, no wildcards). Unknown origins are rejected with 403 for sign-in and sign-out (verified).
+- Better Auth rate limiting backed by the `rate_limit` table (survives serverless instance restarts): 5 sign-in attempts / minute / resolved request identity; generic 429 response with `Retry-After`. Window-based expiry means no permanent account lockout.
+- `RATE_LIMIT_SIGNIN_MAX` is honored only when `NOKMEL_DISPOSABLE_TEST_ENV=1` is also set and `VERCEL_ENV` is not `production`/`preview`. Invalid, zero, negative, or excessive values are ignored and the default 5 remains. Hosted Vercel environments therefore cannot weaken the limit through environment configuration (unit + DB integration tests).
+- Better Auth origin checks + Fetch-Metadata CSRF checks remain enabled. `BETTER_AUTH_URL` is mandatory and must be an exact absolute origin: HTTPS for hosted deployments, HTTP only for explicit loopback development/tests. `TRUSTED_ORIGINS` adds exact immutable aliases (for example one preview URL) with no wildcards, credentials, paths, queries, or fragments. `BETTER_AUTH_TRUSTED_ORIGINS` is rejected because Better Auth would merge it without validation. Unknown origins are rejected with 403 for sign-in and sign-out (verified), including arbitrary `*.vercel.app` hosts.
 - `callbackURL`/redirect parameters are validated against trusted origins (open-redirect protection, verified). Middleware redirects target fixed app paths only.
 - Login errors are generic (identical response for unknown email and wrong password — verified); no owner email appears in page source.
 
-### W3.1 rate-limit identity caveat
+### W3.1 request-identity evidence (Vercel)
 
-Better Auth derives the rate-limit identity from `X-Forwarded-For` by default. On Vercel the edge sets/appends this header; configuring `advanced.ipAddress.trustedProxies` / `ipAddressHeaders` for the actual edge behavior is an infrastructure-configuration item for the external lead (see handoff below). Auth security does not depend on IP; only rate-limit granularity does.
+Pinned Better Auth 1.7.28 resolves the rate-limit identity only from single-value configured headers unless `trustedProxies` is set; a multi-value chain resolves to no IP and falls back to one shared per-path bucket rather than trusting the leftmost value. The official Vercel request-header documentation states that Vercel overwrites `X-Forwarded-For` and does not forward externally supplied IPs ("This restriction is in place to prevent IP spoofing"), and documents `x-real-ip`/`x-vercel-forwarded-for` as identical. `src/lib/auth.ts` therefore configures `advanced.ipAddress.ipAddressHeaders = ['x-forwarded-for']` explicitly and does not trust a proxy chain. Automated tests cover single-value buckets, spoofed multi-value chains, and shared-bucket fallback. Live header behavior on the protected Vercel preview still requires an authorized deployment check (see CURRENT_STATE). If an external proxy is placed in front of Vercel, this decision must be re-evaluated.
+
+### W3.1 authentication error boundary
+
+`src/app/api/auth/[...all]/route.ts` awaits `auth.handler()` inside the error boundary, converts asynchronous database/adapter failures to a generic 500, keeps missing configuration at 503, and logs only a fixed message plus the error class name (no stack traces, SQL, credentials, tokens, or paths). Database failures never grant access. The public website does not depend on this route.
 
 ### Route groups
 
@@ -121,28 +146,29 @@ Environment variables (Vercel; per environment — preview values separate from 
 | Variable | Scope | Notes |
 |---|---|---|
 | `DATABASE_URL` | runtime, **secret** | Pooled Neon URL (`-pooler` host), runtime role |
-| `DATABASE_URL_DIRECT` | migration/provisioning only, **secret** | Direct Neon URL, migration role; never used by the app runtime |
+| `DATABASE_URL_DIRECT` | operator machine only, **secret** | Direct Neon URL, migration role. Must **not** be configured in Vercel or exposed to the deployed runtime; the app never falls back to it |
 | `BETTER_AUTH_SECRET` | runtime, **secret** | ≥32 random chars; unique per environment; never reused across preview/production |
 | `BETTER_AUTH_URL` | runtime | Exact deployment origin (production: `https://nokmel.tech`) |
-| `TRUSTED_ORIGINS` | runtime | Comma-separated exact authorized origins incl. the specific preview URL — no wildcards |
+| `TRUSTED_ORIGINS` | runtime | Comma-separated exact authorized origins incl. the specific preview URL — no wildcards; `BETTER_AUTH_TRUSTED_ORIGINS` is not supported |
 | `OWNER_EMAIL` | runtime | The single authorized owner identity (not a secret, but never published in UI) |
-| `RATE_LIMIT_SIGNIN_MAX` | optional, disposable test environments only | Raises the sign-in rate-limit ceiling for automated e2e; do not set in preview/production |
+| `RATE_LIMIT_SIGNIN_MAX` | optional, disposable test environments only | Ignored unless `NOKMEL_DISPOSABLE_TEST_ENV=1`; always ignored when `VERCEL_ENV` is `production`/`preview`. Never set in deployed environments |
+| `NOKMEL_DISPOSABLE_TEST_ENV` | disposable local/CI test runtime only | Explicit opt-in marker required for the rate-limit test override; never set in preview/production |
 
-Neon role separation (least privilege, configured by the lead):
-- **Runtime role** (`DATABASE_URL`): SELECT/INSERT/UPDATE/DELETE on the auth tables only; **no** CREATE/ALTER/DROP. The runtime never migrates.
-- **Migration/provisioning role** (`DATABASE_URL_DIRECT`): CREATE/ALTER on the public schema (used only for `pnpm db:migrate`) + the same DML as runtime (used only for owner provisioning). Never used by deployed app instances.
+Neon role separation (least privilege; exact reviewed SQL in `docs/DATABASE_PERMISSIONS.md`):
+- **Runtime role** (`DATABASE_URL`): USAGE on `public` + SELECT/INSERT/UPDATE/DELETE on the five auth tables only; **no** CREATE/ALTER/DROP/TRUNCATE, does not own the database/schema/tables. The runtime never migrates or provisions.
+- **Migration/provisioning role** (`DATABASE_URL_DIRECT`): owns the auth tables (for future `ALTER`), has CREATE on `public` for migrations, and DML for owner provisioning/recovery. Never used by deployed app instances and never configured in Vercel.
 
-Commands (operator machine; secrets via env — never argv, never committed):
+Commands (operator machine; secrets via env — never argv, never committed). `DATABASE_URL_DIRECT` is required for both migration and provisioning; the runtime `DATABASE_URL` is never accepted as a fallback:
 ```bash
-pnpm db:generate           # generate migration SQL after schema edits (Drizzle Kit, DATABASE_URL_DIRECT)
+pnpm db:generate           # generate migration SQL after schema edits (Drizzle Kit; no DB connection)
 pnpm db:check              # validate migration metadata
-pnpm db:migrate            # apply migrations to DATABASE_URL_DIRECT (never to production without explicit approval)
+pnpm db:migrate            # validates DATABASE_URL_DIRECT, then applies migrations (never production without explicit approval)
 pnpm owner:provision       # interactive, hidden input, repeated confirmation; or:
 printf '%s' "$OWNER_PASSWORD" | pnpm owner:provision --yes   # non-interactive (stdin, not argv)
 pnpm owner:reset-password  # recovery: rehash + invalidate all existing sessions
 ```
 
-Provisioning behavior: refuses a second owner (only one credential user may exist); idempotent for the same identity (re-run reports "already provisioned" and changes nothing); validates that migrations were applied; exit codes 0/1/2. The operator CLI is a local process, never mounted as an HTTP handler.
+Provisioning behavior: refuses a second owner (only one credential user may exist); idempotent for the same identity (re-run reports "already provisioned" and changes nothing); rejects incomplete/duplicate/inconsistent credential records without overwriting; serializes concurrent runs with a database advisory lock; validates that migrations were applied; exit codes 0/1/2. The operator CLI is a local process, never mounted as an HTTP handler and never prints credentials.
 
 Verification without printing secrets:
 

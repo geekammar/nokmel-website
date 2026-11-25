@@ -1,4 +1,5 @@
-import { bigint, boolean, index, integer, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { bigint, boolean, index, integer, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 
 /**
  * Better Auth core schema (W3.1).
@@ -59,7 +60,18 @@ export const account = pgTable(
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
-  (table) => [index('account_user_id_idx').on(table.userId), index('account_provider_idx').on(table.providerId, table.accountId)],
+  (table) => [
+    index('account_user_id_idx').on(table.userId),
+    index('account_provider_idx').on(table.providerId, table.accountId),
+    /**
+     * Single-owner defense in depth: at most one credential account per user.
+     * Better Auth's email+password flow never creates a second credential
+     * account for the same user, and account linking is disabled in this app.
+     */
+    uniqueIndex('account_user_credential_unique')
+      .on(table.userId)
+      .where(sql`${table.providerId} = 'credential'`),
+  ],
 );
 
 export const verification = pgTable(

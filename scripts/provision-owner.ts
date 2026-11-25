@@ -16,7 +16,10 @@
  *
  * Requirements:
  *   - Migrations applied first (`pnpm db:migrate` with DATABASE_URL_DIRECT).
- *   - OWNER_EMAIL and a database target must be set.
+ *   - DATABASE_URL_DIRECT must be set (a direct, non-pooled endpoint). The
+ *     pooled runtime DATABASE_URL is never used as a fallback for operator
+ *     writes.
+ *   - OWNER_EMAIL must be set.
  *   - Public sign-up stays disabled; no plaintext password is inserted,
  *     printed, or committed.
  *   - Refuses to create a second owner; safe to re-run (idempotent).
@@ -33,6 +36,10 @@ import {
   provisionOwner,
   resetOwnerPassword,
 } from '../src/lib/admin-provisioning';
+import {
+  describeDatabaseTarget,
+  resolveOperatorDatabaseTarget,
+} from '../src/lib/db/connection-policy';
 import * as schema from '../src/lib/db/schema';
 
 type Args = {
@@ -59,29 +66,36 @@ async function readPasswordInteractive(label: string): Promise<string> {
   stdin.resume();
   stdin.setEncoding('utf8');
   process.stdout.write(label);
-  let value = '';
-  for await (const chunk of stdin) {
-    for (const char of chunk) {
-      if (char === '\r' || char === '\n') {
-        stdin.setRawMode(false);
-        stdin.pause();
-        process.stdout.write(EOL);
-        return value;
-      }
-      if (char === '\u0003') {
-        stdin.setRawMode(false);
-        throw new Error('Cancelled.');
-      }
-      if (char === '\u007f' || char === '\b') {
-        value = value.slice(0, -1);
-        continue;
-      }
-      value += char;
-      process.stdout.write('*');
+  return new Promise<string>((resolve, reject) => {
+    let value = '';
+    function cleanup(): void {
+      stdin.removeListener('data', onData);
+      stdin.setRawMode(false);
+      stdin.pause();
     }
-  }
-  stdin.setRawMode(false);
-  return value;
+    function onData(chunk: string): void {
+      for (const char of chunk) {
+        if (char === '\r' || char === '\n') {
+          cleanup();
+          process.stdout.write(EOL);
+          resolve(value);
+          return;
+        }
+        if (char === '\u0003') {
+          cleanup();
+          reject(new Error('Cancelled.'));
+          return;
+        }
+        if (char === '\u007f' || char === '\b') {
+          value = value.slice(0, -1);
+          continue;
+        }
+        value += char;
+        process.stdout.write('*');
+      }
+    }
+    stdin.on('data', onData);
+  });
 }
 
 async function readPasswordStdin(): Promise<string> {
@@ -100,37 +114,19 @@ async function main(): Promise<number> {
   const args = parseArgs(process.argv.slice(2));
   const isTTY = process.stdin.isTTY === true;
 
-  const targetUrl = readEnv('DATABASE_URL_DIRECT') ?? readEnv('DATABASE_URL');
-  if (!targetUrl) {
-    console.error('Missing database target: set DATABASE_URL_DIRECT (migrations/provisioning only).');
+  let databaseTarget;
+  try {
+    databaseTarget = resolveOperatorDatabaseTarget(process.env.DATABASE_URL_DIRECT);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : 'Invalid DATABASE_URL_DIRECT.');
     return 1;
   }
+  const target = describeDatabaseTarget(databaseTarget);
   const ownerEmail = readEnv('OWNER_EMAIL');
   if (!ownerEmail) {
     console.error('Missing OWNER_EMAIL.');
     return 1;
   }
-
-  let url: URL;
-  try {
-    url = new URL(targetUrl);
-  } catch {
-    console.error('Database target is not a valid postgres URL.');
-    return 1;
-  }
-  if (url.protocol !== 'postgres:' && url.protocol !== 'postgresql:') {
-    console.error('Database target must use the postgresql:// scheme.');
-    return 1;
-  }
-
-  const isLoopback = ['localhost', '127.0.0.1', '::1'].includes(url.hostname);
-  const sslmode = url.searchParams.get('sslmode');
-  if (sslmode === 'disable' && !isLoopback) {
-    console.error('Refusing sslmode=disable for a non-loopback database target.');
-    return 1;
-  }
-  const ssl = sslmode === 'disable' ? undefined : { rejectUnauthorized: true as const };
-  const target = `${url.host} database=${url.pathname.replace(/^\//, '')}`;
 
   process.stdout.write(`Target: ${target} (schema migrations must already be applied)\n`);
   if (isTTY) {
@@ -170,7 +166,11 @@ async function main(): Promise<number> {
     }
   }
 
-  const pool = new Pool({ connectionString: targetUrl, ssl, max: 1 });
+  const pool = new Pool({
+    connectionString: databaseTarget.connectionString,
+    ssl: databaseTarget.tls,
+    max: 1,
+  });
   try {
     const db = drizzle(pool, { schema });
     if (args.resetPassword) {

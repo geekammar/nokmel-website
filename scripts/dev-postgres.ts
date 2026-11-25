@@ -4,7 +4,7 @@
  * Stores its data under the OS temp directory; never hosted data.
  *
  *   pnpm dev:postgres
- *   DATABASE_URL="postgresql://nokmel_test:nokmel_test@127.0.0.1:55432/postgres?sslmode=disable"
+ *   DATABASE_URL="postgresql://nokmel_test:nokmel_test@127.0.0.1:55432/nokmel_test?sslmode=disable"
  */
 
 import { randomUUID } from 'node:crypto';
@@ -25,7 +25,8 @@ async function main(): Promise<void> {
   });
   await pg.initialise();
   await pg.start();
-  console.log(`PostgreSQL 18 ready: postgresql://nokmel_test:nokmel_test@127.0.0.1:${port}/postgres?sslmode=disable`);
+  await pg.createDatabase('nokmel_test');
+  console.log(`PostgreSQL 18 ready: postgresql://nokmel_test:nokmel_test@127.0.0.1:${port}/nokmel_test?sslmode=disable`);
   const shutdown = async () => {
     await pg.stop().catch(() => undefined);
     process.exit(0);

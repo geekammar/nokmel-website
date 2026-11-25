@@ -6,7 +6,6 @@ const webServerEnv = adminE2eEnabled
   ? {
       ...process.env,
       DATABASE_URL: process.env.DATABASE_URL ?? '',
-      DATABASE_URL_DIRECT: process.env.DATABASE_URL_DIRECT ?? process.env.DATABASE_URL ?? '',
       BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ?? 'e2e-only-secret-0123456789abcdef012345',
       BETTER_AUTH_URL: process.env.BETTER_AUTH_URL ?? 'http://127.0.0.1:3100',
       TRUSTED_ORIGINS: process.env.TRUSTED_ORIGINS ?? 'http://127.0.0.1:3100',

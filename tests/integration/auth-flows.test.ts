@@ -14,14 +14,15 @@ import {
   type DisposablePostgres,
 } from './helpers';
 import { account, session, user } from '@/lib/db/schema';
+import { resetOwnerPassword } from '@/lib/admin-provisioning';
 import { isOwnerEmail } from '@/lib/owner-identity';
 
 const pg = await getDisposablePostgres() as DisposablePostgres;
 const auth = createTestAuth(pg.db);
 
 beforeAll(async () => {
-  await applyMigrations(pg.db);
-  await emptyDatabase(pg.pool);
+  await applyMigrations(pg);
+  await emptyDatabase(pg);
   await provisionOwnerFixture();
 });
 
@@ -255,6 +256,57 @@ describe('authorization: owner-only', () => {
     const body = (await rejected.json()) as { message?: string };
     expect(body.message ?? '').not.toContain('attacker');
   });
+
+  test('an arbitrary vercel.app origin is not trusted by default', async () => {
+    const previousBaseURL = process.env.BETTER_AUTH_URL;
+    const previousTrusted = process.env.TRUSTED_ORIGINS;
+    process.env.BETTER_AUTH_URL = 'https://nokmel.example';
+    process.env.TRUSTED_ORIGINS = 'https://nokmel.example';
+    try {
+      const configuredAuth = createTestAuth(pg.db);
+      const response = await configuredAuth.handler(
+        new Request('https://nokmel.example/api/auth/sign-in/email', {
+          method: 'POST',
+          body: JSON.stringify({ email: TEST_OWNER_EMAIL, password: TEST_OWNER_PASSWORD }),
+          headers: {
+            'content-type': 'application/json',
+            origin: 'https://random-attacker.vercel.app',
+            'sec-fetch-site': 'cross-site',
+            'sec-fetch-mode': 'cors',
+          },
+        }),
+      );
+      expect(response.status).toBe(403);
+    } finally {
+      process.env.BETTER_AUTH_URL = previousBaseURL;
+      process.env.TRUSTED_ORIGINS = previousTrusted;
+    }
+  });
+
+  test('an explicitly configured immutable preview alias is trusted', async () => {
+    const previousBaseURL = process.env.BETTER_AUTH_URL;
+    const previousTrusted = process.env.TRUSTED_ORIGINS;
+    const previewOrigin = 'https://nokmel-website-git-w31-owner-auth-ammarjaberd.vercel.app';
+    process.env.BETTER_AUTH_URL = previewOrigin;
+    process.env.TRUSTED_ORIGINS = `https://nokmel.example,${previewOrigin}`;
+    try {
+      const previewAuth = createTestAuth(pg.db);
+      const response = await previewAuth.handler(
+        new Request(`${previewOrigin}/api/auth/sign-in/email`, {
+          method: 'POST',
+          body: JSON.stringify({ email: TEST_OWNER_EMAIL, password: TEST_OWNER_PASSWORD }),
+          headers: {
+            'content-type': 'application/json',
+            origin: previewOrigin,
+          },
+        }),
+      );
+      expect(response.status).toBe(200);
+    } finally {
+      process.env.BETTER_AUTH_URL = previousBaseURL;
+      process.env.TRUSTED_ORIGINS = previousTrusted;
+    }
+  });
 });
 
 describe('session lifecycle and revocation', () => {
@@ -305,5 +357,46 @@ describe('session lifecycle and revocation', () => {
 
     const after = await authRequest(auth, '/get-session', { method: 'GET', cookie });
     expect(await after.json()).toBeNull();
+  });
+
+  test('password recovery revokes previously issued sessions and rotates the password', async () => {
+    const signIn = await authRequest(auth, '/sign-in/email', {
+      method: 'POST',
+      body: { email: TEST_OWNER_EMAIL, password: TEST_OWNER_PASSWORD },
+    });
+    expect(signIn.status).toBe(200);
+    const cookie = sessionCookieFrom(signIn);
+
+    try {
+      const recovery = await resetOwnerPassword({
+        db: pg.db,
+        email: TEST_OWNER_EMAIL,
+        password: 'recovered-password-value-1',
+      });
+      expect(recovery.outcome).toBe('password-reset');
+      expect(recovery.invalidatedSessions).toBeGreaterThanOrEqual(1);
+
+      const after = await authRequest(auth, '/get-session', { method: 'GET', cookie });
+      expect(await after.json()).toBeNull();
+
+      const oldPassword = await authRequest(auth, '/sign-in/email', {
+        method: 'POST',
+        body: { email: TEST_OWNER_EMAIL, password: TEST_OWNER_PASSWORD },
+      });
+      expect(oldPassword.status).toBe(401);
+
+      const newPassword = await authRequest(auth, '/sign-in/email', {
+        method: 'POST',
+        body: { email: TEST_OWNER_EMAIL, password: 'recovered-password-value-1' },
+      });
+      expect(newPassword.status).toBe(200);
+      await newPassword.json();
+    } finally {
+      await resetOwnerPassword({
+        db: pg.db,
+        email: TEST_OWNER_EMAIL,
+        password: TEST_OWNER_PASSWORD,
+      });
+    }
   });
 });

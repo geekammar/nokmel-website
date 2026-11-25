@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { hashPassword } from 'better-auth/crypto';
 import type { Db } from '@/lib/db/types';
 import { account, session, user } from '@/lib/db/schema';
@@ -12,14 +12,25 @@ import { account, session, user } from '@/lib/db/schema';
  * never mounted as a public HTTP handler. Production owner creation remains
  * the responsibility of the external lead and owner after review.
  *
+ * Concurrency: a transaction-scoped PostgreSQL advisory lock serializes all
+ * provisioning/recovery transactions before existing owner state is read, so
+ * two concurrent runs cannot both observe an empty database and create two
+ * owners. This is database-backed (not a process-local mutex), so it holds
+ * across serverless instances and operator processes.
+ *
+ * Identity integrity: an existing matching email is not by itself proof that
+ * the owner is correctly provisioned. Provisioning requires exactly one
+ * credential account in the correct account-to-user relationship with a
+ * usable password hash; incomplete, duplicate, or inconsistent relationships
+ * are refused rather than silently overwritten.
+ *
  * Password hashing uses Better Auth's supported `hashPassword` (same
  * algorithm and format its sign-in verification expects) — no custom
  * cryptography, no plaintext inserts, nothing logged.
- *
- * Second-owner refusal: at most one credential (email+password) user may
- * exist. Provisioning is idempotent for the same owner email; a different
- * email is refused.
  */
+
+const OWNER_PROVISIONING_LOCK_SQL = sql`select pg_advisory_xact_lock(hashtext('nokmel.website.owner_provisioning'))`;
+const PASSWORD_HASH_PATTERN = /^[0-9a-f]{32}:[0-9a-f]{128}$/i;
 
 export type ProvisionOwnerResult =
   | { outcome: 'created'; userId: string }
@@ -37,6 +48,16 @@ export class ProvisioningRefusedError extends Error {
   }
 }
 
+export function isUsablePasswordHash(value: string | null | undefined): boolean {
+  return typeof value === 'string' && PASSWORD_HASH_PATTERN.test(value);
+}
+
+type ProvisioningTransaction = Parameters<Parameters<Db['transaction']>[0]>[0];
+
+async function lockOwnerProvisioning(tx: ProvisioningTransaction): Promise<void> {
+  await tx.execute(OWNER_PROVISIONING_LOCK_SQL);
+}
+
 export async function provisionOwner(input: {
   db: Db;
   email: string;
@@ -47,6 +68,8 @@ export async function provisionOwner(input: {
   const passwordHash = await hashPassword(input.password);
 
   return input.db.transaction(async (tx) => {
+    await lockOwnerProvisioning(tx);
+
     const credentialOwners = await tx
       .select({ id: user.id, email: user.email })
       .from(user)
@@ -59,9 +82,54 @@ export async function provisionOwner(input: {
         );
       }
     }
-    const existing = await tx.select({ id: user.id }).from(user).where(eq(user.email, email));
-    if (existing.length > 0) {
-      return { outcome: 'already-provisioned' as const, userId: existing[0].id };
+
+    const existingUsers = await tx
+      .select({ id: user.id, email: user.email })
+      .from(user)
+      .where(eq(user.email, email));
+    if (existingUsers.length > 1) {
+      throw new ProvisioningRefusedError(
+        'Multiple user records exist for the configured identity. Refusing to guess which one is the owner.',
+      );
+    }
+
+    if (existingUsers.length === 1) {
+      const existingUser = existingUsers[0];
+      const credentialAccounts = await tx
+        .select({
+          id: account.id,
+          accountId: account.accountId,
+          userId: account.userId,
+          password: account.password,
+        })
+        .from(account)
+        .where(and(eq(account.userId, existingUser.id), eq(account.providerId, 'credential')));
+
+      if (credentialAccounts.length === 0) {
+        throw new ProvisioningRefusedError(
+          'A user exists for the configured identity but has no credential account. Refusing to modify an incomplete owner record.',
+        );
+      }
+      if (credentialAccounts.length > 1) {
+        throw new ProvisioningRefusedError(
+          'Multiple credential accounts exist for the configured identity. Refusing to choose or overwrite one.',
+        );
+      }
+      const credentialAccount = credentialAccounts[0];
+      if (
+        credentialAccount.userId !== existingUser.id ||
+        credentialAccount.accountId !== existingUser.id
+      ) {
+        throw new ProvisioningRefusedError(
+          'The existing credential account has an inconsistent account-to-user relationship. Refusing to modify it.',
+        );
+      }
+      if (!isUsablePasswordHash(credentialAccount.password)) {
+        throw new ProvisioningRefusedError(
+          'The existing credential account has no usable password hash. Refusing to silently overwrite it.',
+        );
+      }
+      return { outcome: 'already-provisioned' as const, userId: existingUser.id };
     }
 
     const ownerUserId = randomUUID();
@@ -91,23 +159,45 @@ export async function resetOwnerPassword(input: {
   const passwordHash = await hashPassword(input.password);
 
   return input.db.transaction(async (tx) => {
+    await lockOwnerProvisioning(tx);
+
     const owners = await tx
       .select({ id: user.id })
       .from(user)
-      .innerJoin(account, eq(account.userId, user.id))
-      .where(and(eq(user.email, email), eq(account.providerId, 'credential')));
+      .where(eq(user.email, email));
     if (owners.length === 0) {
       throw new ProvisioningRefusedError('No owner account exists for the configured identity.');
     }
+    if (owners.length > 1) {
+      throw new ProvisioningRefusedError(
+        'Multiple user records exist for the configured identity. Refusing password recovery.',
+      );
+    }
     const ownerUserId = owners[0].id;
-    const updated = await tx
+
+    const credentialAccounts = await tx
+      .select({ id: account.id, accountId: account.accountId, userId: account.userId })
+      .from(account)
+      .where(and(eq(account.userId, ownerUserId), eq(account.providerId, 'credential')));
+    if (credentialAccounts.length !== 1) {
+      throw new ProvisioningRefusedError(
+        'The owner identity does not have exactly one credential account. Refusing password recovery.',
+      );
+    }
+    const credentialAccount = credentialAccounts[0];
+    if (
+      credentialAccount.userId !== ownerUserId ||
+      credentialAccount.accountId !== ownerUserId
+    ) {
+      throw new ProvisioningRefusedError(
+        'The owner credential account has an inconsistent account-to-user relationship. Refusing password recovery.',
+      );
+    }
+
+    await tx
       .update(account)
       .set({ password: passwordHash, updatedAt: new Date() })
-      .where(and(eq(account.userId, ownerUserId), eq(account.providerId, 'credential')))
-      .returning({ id: account.id });
-    if (updated.length === 0) {
-      throw new ProvisioningRefusedError('No owner account exists for the configured identity.');
-    }
+      .where(eq(account.id, credentialAccount.id));
     const revoked = await tx
       .delete(session)
       .where(eq(session.userId, ownerUserId))

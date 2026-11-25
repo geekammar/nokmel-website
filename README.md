@@ -32,7 +32,7 @@ A simple, professional, mobile-first SaaS marketing website with a lightweight o
 
 ## Development
 
-Requirements: Node.js 22 (developed on v22.23.5; `engines: >=20.9.0`) and pnpm 10.34.6 (`packageManager` field + committed `pnpm-lock.yaml`).
+Requirements: Node.js 22 (`engines: >=22.0.0 <23`) and pnpm 10.34.6 (`packageManager` field + committed `pnpm-lock.yaml`).
 
 ```bash
 pnpm install --frozen-lockfile
@@ -42,21 +42,25 @@ pnpm test          # vitest unit tests (brand tokens, WCAG contrast, components)
 pnpm build         # next build (production)
 pnpm test:e2e      # Playwright browser tests at 320/360/390/768/1280/1440px
 pnpm verify        # lint + typecheck + test + build
-pnpm test:db       # Better Auth integration tests against a disposable PostgreSQL 18
-pnpm db:generate   # Drizzle Kit: generate auth-schema migrations (DATABASE_URL_DIRECT)
+pnpm test:db       # Better Auth integration tests against a disposable loopback PostgreSQL 18
+pnpm db:generate   # Drizzle Kit: generate auth-schema migrations (no DB connection)
 pnpm db:check      # Drizzle Kit: validate migration metadata
-pnpm db:migrate    # Drizzle Kit: apply migrations (DATABASE_URL_DIRECT — never prod without approval)
+pnpm db:migrate    # validates DATABASE_URL_DIRECT, then applies migrations (never prod without approval)
 pnpm owner:provision       # operator-only owner provisioning (interactive or stdin; never a web route)
 pnpm owner:reset-password  # operator-only password recovery (rehash + session invalidation)
 pnpm dev:postgres  # start a disposable local PostgreSQL 18 for DB tests/e2e
 ```
 
+`DATABASE_URL_DIRECT` is operator-only (migrations, owner provisioning/recovery). It must never be configured in Vercel or exposed to the deployed runtime; the runtime uses the pooled `DATABASE_URL` role. Least-privilege role SQL: `docs/DATABASE_PERMISSIONS.md`.
+
+Integration/e2e databases are refused unless they are loopback, use an approved disposable database name, and explicitly set `sslmode=disable`. Without `TEST_DATABASE_URL` the integration harness starts its own temporary embedded PostgreSQL 18. Never point tests at a hosted Neon database.
+
 Local e2e with the admin suite (disposable DB only — synthetic identities):
 
 ```bash
 pnpm dev:postgres &
-DATABASE_URL=... DATABASE_URL_DIRECT=... OWNER_EMAIL=owner@nokmel-e2e.test \
-E2E_OWNER_PASSWORD=... pnpm test:e2e
+DATABASE_URL=postgresql://nokmel_test:nokmel_test@127.0.0.1:55432/nokmel_test?sslmode=disable \
+OWNER_EMAIL=owner@nokmel-e2e.test E2E_OWNER_PASSWORD=... pnpm test:e2e
 ```
 
 CI (`.github/workflows/ci.yml`) runs the same checks on every PR to `main`, including the Playwright e2e suite.

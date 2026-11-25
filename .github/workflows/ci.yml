@@ -97,7 +97,12 @@ jobs:
       - name: Drizzle migration metadata check
         run: pnpm db:check
 
-      - name: Authentication DB integration tests (migrations from empty schema + auth flows + provisioning)
+      - name: Apply migrations through the operator wrapper (disposable DB)
+        run: pnpm db:migrate
+        env:
+          DATABASE_URL_DIRECT: postgresql://postgres:postgres@127.0.0.1:5432/nokmel_ci_test?sslmode=disable
+
+      - name: Authentication DB integration tests (migrations from empty schema + auth flows + provisioning + runtime role)
         run: pnpm test:db
 
   e2e-auth:
@@ -119,13 +124,14 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/nokmel_ci_e2e?sslmode=disable
-      DATABASE_URL_DIRECT: postgresql://postgres:postgres@127.0.0.1:5432/nokmel_ci_e2e?sslmode=disable
       BETTER_AUTH_SECRET: ci-disposable-e2e-secret-0123456789abcdef0123456789
       BETTER_AUTH_URL: http://127.0.0.1:3100
       TRUSTED_ORIGINS: http://127.0.0.1:3100
       OWNER_EMAIL: owner@nokmel-ci-e2e.test
       E2E_OWNER_PASSWORD: ci-disposable-e2e-owner-password-123
       RATE_LIMIT_SIGNIN_MAX: '50'
+      NOKMEL_DISPOSABLE_TEST_ENV: '1'
+
     steps:
       - name: Checkout
         uses: actions/checkout@v6

@@ -17,7 +17,7 @@
     "test:e2e": "playwright test",
     "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "tsx scripts/db-migrate.ts",
     "db:check": "drizzle-kit check",
     "test:db": "vitest run --config vitest.integration.config.ts",
     "owner:provision": "tsx scripts/provision-owner.ts",
