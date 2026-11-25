@@ -1,8 +1,25 @@
-# CURRENT_STATE.md — Nokmel Website
+Last updated: W3.1 (admin foundation & secure owner authentication), 2026-11-25. Keep concise.
 
-Last updated: W2 (public marketing website), 2026-11-24. Keep concise.
+## Status: W3.1 — draft PR on branch `vibe/w31-owner-auth-ff98b7` (awaiting review)
 
-## Status: W2 + PR #3 focused repair — draft PR on branch `vibe/w2-public-website-cf85c7` (awaiting review)
+### W3.1 (this phase)
+- Admin foundation implemented: self-hosted Better Auth (`better-auth@1.7.28`), email+password, single owner, public sign-up disabled server-side (`disableSignUp`), no social login, no anonymous/guest sessions, no roles.
+- Owner-only authorization enforced server-side (`getOwnerSession`/`requireOwner`/`enforceOwnerForMutation` + `OWNER_EMAIL` normalization); missing config fails closed.
+- Neon PostgreSQL + Drizzle: auth schema (user, session, account, verification, rate_limit) via Drizzle Kit migration `drizzle/0000_w31-auth-foundation.sql`; migrations never run at build/startup; pooled runtime connection (`DATABASE_URL`) vs direct migration connection (`DATABASE_URL_DIRECT`); TLS with certificate validation for hosted DBs.
+- Sessions: 7-day expiry, daily refresh, HTTP-only SameSite=Lax cookies (Secure on HTTPS), server-side revocation enforced.
+- Login rate limiting persisted in the `rate_limit` table (≈5 sign-in attempts/min with window expiry; no permanent lockout); Better Auth origin/CSRF checks kept; generic login errors; open-redirect protection.
+- Routes: public website unchanged under `src/app/(public)/` (same 7 routes, layout, CTA, SEO, robots); new `/admin/login` (Arabic-first RTL) and protected `/admin` shell (honest structure: Overview available; Content & SEO, Plans & Pricing, Join Requests, Settings shown as unavailable; no fake data).
+- Owner provisioning: operator CLI `pnpm owner:provision` (interactive hidden input or stdin; refuses second owner; idempotent; never mounted as HTTP handler) + `pnpm owner:reset-password` recovery (rehash + session invalidation).
+- Tests: 24 DB integration tests (disposable PostgreSQL 18 locally via `pnpm dev:postgres` / CI service), auth config fail-closed unit tests, admin e2e suite (runs in CI where browser system deps exist; local browser e2e unavailable in this sandbox — no root for missing shared libraries).
+- CI: added `db-integration` (postgres:18 service, `pnpm db:check` + `pnpm test:db`) and `e2e-auth` (postgres:18 + full Playwright) jobs on top of the existing `verify` job.
+
+## Blockers / pending approvals
+
+- W3.1 live acceptance is NOT done and must not be claimed: the external lead must configure the isolated development database (pooled + direct URLs), trusted origins for the preview URL, a unique `BETTER_AUTH_SECRET`, `OWNER_EMAIL`, and provision the owner with the documented CLI before independently verifying the protected preview. No production migration and no production owner creation happen in W3.1.
+- Remaining release coverage carried over: physical Android acceptance and deployed SEO metadata verification (unverified from this environment; protected-preview inspection requires authorized Vercel access). A separate visual-polish workstream is planned and was not executed here.
+- Do not start W3.2 (CMS) before independent review of W3.1.
+
+### W2 snapshot (accepted baseline)
 
 ### PR #3 focused repair (deployed-QA fixes)
 - **P0 (NKW-W2-001)**: `/join` returned HTTP 500 in the deployed runtime (`ENOENT ... src/styles/brand-tokens.css`). Root cause: the runtime dependency graph read source CSS via `node:fs` (`readTokens()` in `src/app/layout.tsx`). Fix: removed all runtime `node:fs` reads from application modules — layout now imports build-safe `src/lib/viewport-theme.ts` (static color, test-locked to the canonical CSS token value); token inspection moved to test-only tooling (`src/lib/__tests__/brand-tokens.testing.ts`); production-runtime e2e smoke (`next start`) covers all seven routes and all `/join?plan=` variations with zero 500s.

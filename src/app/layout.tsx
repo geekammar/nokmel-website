@@ -2,13 +2,9 @@ import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
 import '@/styles/brand-tokens.css';
 import './globals.css';
-import { Footer } from '@/components/layout/Footer';
-import { Header } from '@/components/layout/Header';
-import { defaultLocale, dirByLocale } from '@/i18n/config';
-import { ar } from '@/i18n/messages/ar';
-import { home } from '@/content/ar/home';
 import { THEME_COLOR_LIGHT } from '@/lib/viewport-theme';
 import { site, siteUrl } from '@/lib/site';
+import { home } from '@/content/ar/home';
 
 const plexSansArabic = localFont({
   src: [
@@ -56,8 +52,6 @@ const alexandria = localFont({
   display: 'swap',
 });
 
-
-
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
@@ -91,18 +85,11 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html
-      lang={defaultLocale}
-      dir={dirByLocale[defaultLocale]}
+      lang="ar"
+      dir="rtl"
       className={`${plexSansArabic.variable} ${geist.variable} ${alexandria.variable}`}
     >
-      <body className="flex min-h-screen flex-col antialiased">
-        <a href="#main-content" className="skip-link rounded-control bg-action-primary-bg px-4 py-2 text-sm font-semibold" style={{ color: 'var(--action-primary-fg)' }}>
-          {ar.common.skipLink}
-        </a>
-        <Header />
-        <main id="main-content" className="flex-1">{children}</main>
-        <Footer />
-      </body>
+      <body className="flex min-h-screen flex-col antialiased">{children}</body>
     </html>
   );
 }
