@@ -23,7 +23,7 @@ export function Footer() {
             <p className="max-w-sm leading-relaxed text-text-secondary">{ar.footer.description}</p>
             <p className="text-brand-highlight">{ar.footer.tagline}</p>
           </div>
-          <nav aria-label={ar.nav.primary}>
+          <nav aria-label={ar.nav.footerExplore}>
             <h2 className="text-sm font-bold">{ar.footer.exploreTitle}</h2>
             <ul className="mt-3 flex list-none flex-col gap-2 p-0 text-sm">
               {ar.footer.explore.map((item) => (

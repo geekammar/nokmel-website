@@ -48,11 +48,12 @@ describe('page metadata and pre-launch indexing safety', () => {
     expect(metadata.openGraph?.images).toHaveLength(1);
   });
 
-  it('disallows crawlers in robots.txt while pre-launch and documents the launch step', () => {
+  it('disallows crawlers in robots.txt while pre-launch without exposing internal paths', () => {
     const robots = readFileSync(path.join(process.cwd(), 'public/robots.txt'), 'utf8');
     expect(robots).toContain('User-agent: *');
     expect(robots).toContain('Disallow: /');
-    expect(robots).toContain('PRE_LAUNCH');
+    expect(robots).not.toContain('src/lib');
+    expect(robots).not.toContain('PRE_LAUNCH');
   });
 
   it('documents how future indexing becomes an intentional launch step', () => {

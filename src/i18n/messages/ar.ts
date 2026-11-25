@@ -9,6 +9,7 @@ export const ar = {
     home: 'نكمّل — الصفحة الرئيسية',
     menu: 'القائمة',
     closeMenu: 'إغلاق القائمة',
+    footerExplore: 'روابط الاستكشاف',
     items: [
       { href: '/', label: 'الرئيسية' },
       { href: '/features', label: 'الميزات' },

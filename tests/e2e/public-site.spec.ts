@@ -32,6 +32,7 @@ const titleByRoute: Record<string, string> = {
 const joinPlanQueries = [
   '?plan=starter',
   '?plan=starter&plan=pro',
+  '?plan=starter&plan=starter',
   '?plan=',
   '?plan=INVALID',
   '?plan=very-long-invalid-value-exceeding-any-reasonable-limit-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
@@ -201,6 +202,16 @@ test.describe('navigation coverage', () => {
       await expect(link).toHaveAttribute('aria-current', 'page');
       await page.goBack();
     }
+  });
+
+  test('header main nav and footer explore nav have distinct accessible labels', async ({ page }) => {
+    await page.goto('/');
+    const headerNav = page.getByRole('navigation', { name: 'التنقل الرئيسي' });
+    const footerNav = page.locator('footer').getByRole('navigation', { name: 'روابط الاستكشاف' });
+    await expect(headerNav).toHaveCount(1);
+    await expect(footerNav).toHaveCount(1);
+    await expect(headerNav).toHaveAttribute('aria-label', 'التنقل الرئيسي');
+    await expect(footerNav).toHaveAttribute('aria-label', 'روابط الاستكشاف');
   });
 
   test('footer navigation reaches legal and public pages', async ({ page }) => {
@@ -375,12 +386,16 @@ test.describe('production runtime smoke (packaged build via next start)', () => 
     }
   });
 
-  test('all join plan-query variations render without HTTP 500', async ({ request }) => {
+  test('all join plan-query variations render normally with no selected-plan context', async ({
+    request,
+  }) => {
     for (const query of joinPlanQueries) {
       const response = await request.get(`/join${query}`);
       expect(response.status()).toBe(200);
       const body = await response.text();
       expect(body).toContain('اطلب الانضمام');
+      expect(body).not.toContain('سياق الخطة المحددة');
+      expect(body).not.toContain('<script>alert(1)</script>');
     }
   });
 

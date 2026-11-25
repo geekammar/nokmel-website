@@ -8,10 +8,6 @@ const joinContentSchema = z.object({
   }),
   formTitle: z.string().min(1),
   fields: z.array(joinFieldSchema).length(4),
-  planContext: z.object({
-    label: z.string().min(1),
-    description: z.string().min(1),
-  }),
   disabledNotice: z.object({
     title: z.string().min(1),
     body: z.string().min(1),
@@ -72,11 +68,6 @@ export const join: JoinContent = joinContentSchema.parse({
       placeholder: 'اشرح بإيجاز ماذا تبيع ووين تدير متجرك',
     },
   ],
-  planContext: {
-    label: 'سياق الخطة المحددة',
-    description:
-      'سياق اختياري يُسجَّل مع طلبك لاحقاً عند تفعيل استلام الطلبات — لا يؤثر على أي شيء تجاري الآن.',
-  },
   disabledNotice: {
     title: 'استلام الطلبات غير متاح بعد',
     body: 'نُجهّز الآن استقبال طلبات الانضمام وتخزينها بأمان. في هذه المرحلة، الحقول أدناه معروضة للمعاينة فقط ومعطّلة — لن نطلب منك إرسال بياناتك، ولن تُنقل أي معلومات.',

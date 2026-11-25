@@ -16,31 +16,7 @@ export const metadata: Metadata = pageMetadata({
   path: '/join',
 });
 
-const planPattern = /^[a-z0-9][a-z0-9-]{0,39}$/;
-
-function PlanContext({ plan }: { plan?: string }) {
-  if (!plan || !planPattern.test(plan)) return null;
-  return (
-    <p
-      role="note"
-      className="rounded-card border-s-4 border-status-info bg-page p-4 text-sm leading-relaxed"
-    >
-      <span className="font-semibold">{join.planContext.label}:</span>{' '}
-      <span dir="ltr" className="font-en inline-block">
-        {plan}
-      </span>
-      <span className="mt-1 block text-text-secondary">{join.planContext.description}</span>
-    </p>
-  );
-}
-
-export default async function JoinPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ plan?: string }>;
-}) {
-  const { plan } = await searchParams;
-
+export default function JoinPage() {
   return (
     <>
       <PageHero title={join.hero.title} lead={join.hero.lead} />
@@ -61,8 +37,6 @@ export default async function JoinPage({
 
           <Card className="flex flex-col gap-5" data-testid="join-form">
             <h2 className="text-xl font-bold sm:text-2xl">{join.formTitle}</h2>
-
-            <PlanContext plan={plan} />
 
             <div role="group" aria-label={join.formTitle} className="grid gap-5 sm:grid-cols-2">
               {join.fields.map((field) =>
