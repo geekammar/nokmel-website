@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ctaLinkSchema, joinFieldSchema } from '../schema';
 
-const joinContentSchema = z.object({
+export const joinContentSchema = z.object({
   hero: z.object({
     title: z.string().min(1),
     lead: z.string().min(1),

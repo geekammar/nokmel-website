@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ctaLinkSchema } from '../schema';
 
-const contactContentSchema = z.object({
+export const contactContentSchema = z.object({
   hero: z.object({
     title: z.string().min(1),
     lead: z.string().min(1),

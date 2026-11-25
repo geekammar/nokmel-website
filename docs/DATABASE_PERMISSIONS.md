@@ -5,10 +5,11 @@ Status: reviewed plan for W3.1 hardening. Execute only on the dedicated
 approval. Never run against `Nokmel_prod`, `Nokmel_dev`, or any other project.
 
 Current development state (2026-11-25, external configuration): roles
-`nokmel_migrator` and `nokmel_runtime` exist; two migrations are applied; the QA
-owner is provisioned; the runtime role has no database/schema CREATE; the
-migrator retains `public`/`drizzle` schema privileges and its temporary
-database-level CREATE was revoked after migration. No credentials are recorded
+`nokmel_migrator` and `nokmel_runtime` exist; W3.1 migrations `0000`/`0001` are
+applied; the QA owner is provisioned; the runtime role has no database/schema
+CREATE; the migrator retains `public`/`drizzle` schema privileges and its
+temporary database-level CREATE was revoked after migration. W3.2 adds
+`0002_w32-content-cms` (external operator task). No credentials are recorded
 here.
 
 ## Roles
@@ -94,9 +95,12 @@ REVOKE CREATE ON DATABASE nokmel_website FROM nokmel_migrator;
 - **Revoke it immediately after the migration.** It is not needed for normal
   runtime traffic, owner provisioning, password recovery, or day-to-day
   operation.
-- The current development branch has this grant revoked after the two applied
-  migrations; future migrations require the temporary grant/re-grant and revoke
-  sequence above.
+- The current development branch has this grant revoked after the two W3.1
+  migrations; the W3.2 `0002_w32-content-cms` migration requires the temporary
+  grant/re-grant and revoke sequence above. Run `pnpm db:check` first, then the
+  reviewed `pnpm db:migrate` with `DATABASE_URL_DIRECT` pointing at the direct
+  development endpoint (never the pooled runtime URL, never in Vercel), then
+  revoke immediately.
 - Provisioning/recovery uses DML + advisory locks only and works with the grant
   revoked.
 
@@ -143,6 +147,40 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
 TO nokmel_migrator;
 ```
 
+## 3a. W3.2 CMS table privileges
+
+After `0002_w32-content-cms` is applied, grant only the DML the CMS uses. The
+runtime reads published content on public requests and performs owner-authorized
+draft/publication writes:
+
+```sql
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
+  public.content_sections,
+  public.faq_items
+TO nokmel_runtime;
+```
+
+No `TRUNCATE`, `REFERENCES`, `TRIGGER`, ownership, or DDL grants are added. Both
+tables use text primary keys; **no sequences exist** for the CMS, so no sequence
+privileges are required. `nokmel_migrator` owns tables created by its migration
+run (so future `ALTER`s remain possible); do not transfer ownership to the
+runtime role.
+
+Public-site fallback before the migration: if the CMS tables are absent, public
+pages render the approved content defaults; the admin editor reports that CMS
+tables are not migrated and refuses writes. No explicit seed/initialization is
+required — defaults live in code and rows are created only by the first owner
+draft save.
+
+Verification after migration (no secrets printed):
+
+```sql
+SELECT has_table_privilege('nokmel_runtime', 'public.content_sections', 'SELECT') AS cms_select, -- true
+       has_table_privilege('nokmel_runtime', 'public.content_sections', 'TRUNCATE') AS cms_truncate, -- false
+       has_table_privilege('nokmel_runtime', 'public.faq_items', 'SELECT') AS faq_select, -- true
+       has_table_privilege('nokmel_runtime', 'public.faq_items', 'DELETE') AS faq_delete; -- true
+```
+
 ## 4. Default privileges for future objects
 
 Migration-created objects must not inherit PUBLIC access, and the runtime must
@@ -175,8 +213,9 @@ SELECT has_schema_privilege('nokmel_runtime', 'public', 'USAGE')  AS runtime_sch
 
 Automated evidence: `tests/integration/runtime-role.test.ts` creates a
 restricted synthetic role on a **disposable loopback PostgreSQL 18**, applies
-this plan, and verifies login, sign-in, session access, logout, database-backed
-rate limiting, and refusal of `CREATE`/`ALTER`/`DROP`. It is part of
+this plan (including the two CMS tables), and verifies login, sign-in, session
+access, logout, database-backed rate limiting, CMS DML, and refusal of
+`CREATE`/`ALTER`/`DROP`/`TRUNCATE`. It is part of
 `pnpm test:db` and runs in CI. The plan itself is never executed against hosted
 Neon in this workstream.
 

@@ -91,7 +91,7 @@ export function applyMigrations(pg: DisposablePostgres): Promise<void> {
 export async function emptyDatabase(pg: DisposablePostgres): Promise<void> {
   assertDestructiveTestTargetIsStillSafe(pg.target);
   await pg.pool.query(
-    'truncate table "session", "account", "user", "verification", "rate_limit" cascade',
+    'truncate table "session", "account", "user", "verification", "rate_limit", "content_sections", "faq_items" cascade',
   );
 }
 

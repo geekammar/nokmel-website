@@ -60,12 +60,20 @@ async function ownerPasswordHash(): Promise<string | null> {
 }
 
 describe('migrations from empty schema', () => {
-  test('creates all Better Auth tables', async () => {
+  test('creates all authentication and CMS tables', async () => {
     const { rows } = await pg.pool.query(
       "select table_name from information_schema.tables where table_schema = 'public'",
     );
     const tables = rows.map((row) => row.table_name).sort();
-    expect(tables).toEqual(['account', 'rate_limit', 'session', 'user', 'verification']);
+    expect(tables).toEqual([
+      'account',
+      'content_sections',
+      'faq_items',
+      'rate_limit',
+      'session',
+      'user',
+      'verification',
+    ]);
   });
 
   test('enforces identity and relationship constraints', async () => {

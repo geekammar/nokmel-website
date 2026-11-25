@@ -26,9 +26,11 @@ A simple, professional, mobile-first SaaS marketing website with a lightweight o
 
 ## Status
 
-- **W3.1 (Admin Foundation & Secure Owner Authentication): final acceptance closure on draft PR #4** (`vibe/w31-owner-auth-ff98b7`). Self-hosted Better Auth (`better-auth@1.7.28`), single owner (email+password, public sign-up disabled server-side), Neon PostgreSQL + Drizzle auth schema/migrations, hardened sessions, DB-backed login rate limiting, owner provisioning CLI (`pnpm owner:provision`) and recovery (`pnpm owner:reset-password`), protected Arabic-first `/admin` shell. Password-recovery race, password visibility, Overview duplication, and rate-limit UX closures are implemented; physical Android 7/7 passed (owner-reported) and Muse returned conditional Preview acceptance. Authorized live Preview retesting remains outstanding. See `docs/ARCHITECTURE.md` and `docs/CURRENT_STATE.md`.
+- **W3.2 (Lightweight CMS, content publishing & mobile admin navigation): implemented** on `feature/w32-content-management` (draft PR). Owner-only Content & SEO section with predefined page editors, validated drafts, atomic page publication, protected preview, homepage FAQ management, stale-write protection, safe public defaults, and a compact mobile admin drawer. Additive migration `0002_w32-content-cms`. Hosted migration/Preview activation remains an external operator task; production is deferred to W6. See `docs/ARCHITECTURE.md` and `docs/CURRENT_STATE.md`.
+- **W3.1 (Admin Foundation & Secure Owner Authentication): merged** via PR #4 (accepted PR HEAD `494fc037341772e6aec0592c076c748a78f0d9ac`, merge commit `09a63d3db6ef69ffecd238b408a733d7fdc53c07`). Self-hosted Better Auth, single owner, Neon/Drizzle auth schema, hardened sessions, rate limiting, provisioning/recovery CLI, protected Arabic-first admin shell. Production readiness not granted; hosted security verification remains W6.
 - **W0 (Project Context & Repository Setup): merged** via PR #1 on `main` (base SHA `24171ba6805becc7a45fab51c6123b4248185080`).
-- **W1 (Application Foundation & Brand Design System): implemented** on branch `vibe/w1-app-foundation-c7fe34` (draft PR). Brand Kit v2.0 verified in-environment — archive SHA-256 `7c04840fc335daff52048f27b13ff3ac1e0159a3dc0d9299fbe8bf55b6931ff9`; canonical tokens from `04_DESIGN_TOKENS/nokmel.css` committed as `src/styles/brand-tokens.css`. See `docs/DESIGN_SYSTEM.md` and `docs/CURRENT_STATE.md`.
+- **W1 (Application Foundation & Brand Design System): merged.** Brand Kit v2.0 verified — archive SHA-256 `7c04840fc335daff52048f27b13ff3ac1e0159a3dc0d9299fbe8bf55b6931ff9`; canonical tokens committed as `src/styles/brand-tokens.css`.
+- **W2 (Public Website): merged.** Seven public routes remain the CMS rendering target; layout, brand, CTA and pre-launch noindex policy are preserved.
 
 ## Development
 
@@ -75,9 +77,11 @@ src/components/ui/     # Button, TextLink, Card, Input, Textarea, Container, Sec
 src/components/brand/  # Logo (Completion Mark variants), Wordmark (temporary text)
 src/components/layout/ # Header, Footer
 src/i18n/              # locale config + ar messages (English-ready, no switcher yet)
-src/lib/               # site config (Zod), brand token parser, WCAG contrast utils, db/auth/owner modules
+src/lib/               # site config, brand/SEO utils, db/auth/owner modules, CMS service
+src/content/           # Arabic default content + admin strings
+src/content/cms/       # predefined page/section registry, editable fields, defaults, validation
 public/brand/logos/    # Completion Mark SVG variants + PNG fallbacks (from kit, unmodified)
 public/brand/icons/    # favicon + app icons
 licenses/fonts/        # OFL license notices for the self-hosted fonts
-tests/e2e/ + tests/integration/  # Playwright specs + PostgreSQL-backed auth integration specs
+tests/e2e/ + tests/integration/  # Playwright specs + PostgreSQL-backed auth/CMS integration specs
 ```

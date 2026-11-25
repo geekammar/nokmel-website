@@ -104,9 +104,10 @@ test.describe('login flows', () => {
     await signIn(page);
     await page.waitForURL(/\/admin$/);
     await expect(page.locator('main#admin-content h1')).toHaveText('نظرة عامة');
-    await expect(page.getByRole('navigation', { name: 'التنقل في لوحة الإدارة' })).toBeVisible();
-    await expect(page.getByText('المحتوى والـSEO').first()).toBeVisible();
-    await expect(page.locator('span', { hasText: 'غير متاح — في مرحلة لاحقة' }).first()).toBeVisible();
+    const desktopNav = page.getByRole('navigation', { name: 'التنقل في لوحة الإدارة' });
+    await expect(desktopNav).toBeVisible();
+    await expect(desktopNav.getByText('المحتوى والـSEO')).toBeVisible();
+    await expect(desktopNav.locator('span', { hasText: 'غير متاح — في مرحلة لاحقة' }).first()).toBeVisible();
     const overview = page.locator('main#admin-content');
     await expect(overview.getByRole('heading', { name: 'لا توجد بيانات لعرضها بعد' })).toBeVisible();
     await expect(overview.getByText('المحتوى والـSEO')).toHaveCount(0);

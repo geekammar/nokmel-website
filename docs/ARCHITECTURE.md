@@ -204,3 +204,62 @@ pnpm test:db
 ```
 
 Neon projects in scope: `nokmel-website` (production branch `br-noisy-fire-bdkl5wa4`, development branch `br-winter-hat-bdqgatki`). Out of scope: `Nokmel_prod`, `Nokmel_dev`, any other Neon project.
+
+## W3.2 — Lightweight CMS, content publishing & mobile admin navigation [IMPLEMENTED; pending independent acceptance]
+
+Status: implementation complete on `feature/w32-content-management` (base `main` `09a63d3db6ef69ffecd238b408a733d7fdc53c07`). Production activation and hosted acceptance remain deferred to W6; see `CURRENT_STATE.md`.
+
+### Scope and boundaries
+
+The CMS edits only the existing seven predefined public pages and the homepage FAQ. It does not create pages, sections, layouts, media, plans, SEO metadata, join-request storage, analytics, or contact-channel configuration. SEO editing remains W3.3, plans/join requests W4, analytics/settings W5, and launch activation W6.
+
+### Content inventory (implementation source of truth)
+
+| Public page | Stored section keys | Editable fields | Code-controlled / not editable |
+|---|---|---|---|
+| `/` home | `hero`, `showcase`, `problems`, `capabilities`, `steps`, `pricingTeaser`, `faq`, `finalCta` | Headlines, descriptions, CTA labels, problem/step/capability titles and bodies, showcase copy, pricing teaser, FAQ title | All CTA destinations, capability statuses and group titles, showcase structure/illustration, section order, FAQ item management (separate table), header/footer |
+| `/features` | `hero`, `workflows`, `planned`, `cta` | Page heading/lead/status note, workflow/planned titles and bodies, CTA copy | CTA destination, capability statuses and groups, item counts |
+| `/pricing` | `hero`, `earlyAccess`, `transparency`, `noPurchase`, `cta` | Introductory/explanatory copy, early-access points, CTA labels | Plan prices/CRUD, billing, CTA destinations, warning placement |
+| `/join` | `hero`, `form` | Marketing heading/lead, form title, disabled notice, submit copy, privacy-note copy | Disabled state, field IDs/names/types/requiredness/autocomplete/placeholders, submission, link destinations |
+| `/contact` | `hero`, `channels`, `joinSuggestion` | Heading/lead, channel-section title, empty-state copy, join suggestion, CTA label | Contact channels/destinations (empty; W5), CTA destination |
+| `/privacy` | `legal` | Page title/intro, six predefined legal section headings/bodies | Draft-status banner, pre-launch legal policy, section count, no invented claims |
+| `/terms` | `legal` | Page title/intro, six predefined legal section headings/bodies | Draft-status banner, pre-launch legal policy, section count, no invented claims |
+
+Images: no existing public component has a meaningful owner-editable image field. W3.2 therefore provides no image selector/uploads/media library; brand logo assets remain code-controlled. This is an intentional limitation.
+
+### Persistence model
+
+- `content_sections` — identity `(page_key, section_key, locale)` with deterministic text `id`; separate `draft_payload`/`published_payload` JSONB, `draft_revision`, `published_revision`, `updated_at`, `published_at`. Unique index `content_sections_page_section_locale_unique`; nothing is stored for unregistered pages/sections/locales.
+- `faq_items` — stable text `id`, locale, draft question/answer/order/visibility, nullable published question/answer/order/visibility, `draft_deleted`, timestamps and `published_at`. Draft-only additions are deleted physically; removals of published items are flagged in the draft and deleted on publication/discard accordingly.
+- No revision history, generic blocks, custom fields, sequences, workflow engine, or page-level table. Page revision is the maximum `draft_revision` across the page's section rows.
+- All payloads are validated against the typed registry before storage and before rendering. The payload is always rebuilt from the approved structural default plus the registry's editable fields, so unknown/extra fields (links, statuses, form structure, images) are rejected rather than persisted.
+
+### Draft, preview and publication semantics
+
+- Saving a draft never changes published payloads.
+- Publication is explicit, owner-authorized, and atomic for one page; homepage publication also publishes homepage FAQ changes in the same transaction.
+- Publication validates the complete effective page (draft where present, otherwise published/default) and refuses an empty FAQ or an item without a question/answer. A failed publication preserves the previous published state.
+- Discard clears section drafts and restores FAQ drafts from published values; it never deletes published content and increments the page revision.
+- Page-scoped PostgreSQL advisory locks serialize save/publish/discard. Every mutation checks the expected page revision; stale writes/publication/discard return a controlled Arabic conflict error.
+- Protected preview: `/admin/content/[pageKey]/preview` is inside the admin shell, calls `requireOwner()` both in its page and the admin layout, is `force-dynamic`, noindex, and renders the saved draft with the same page view components as the public routes. No token or query parameter selects draft mode.
+
+### Defaults and database-failure behavior
+
+- `src/content/ar/*` remains the authoritative default content; the registry in `src/content/cms/registry.ts` is deterministic and side-effect-free.
+- The public site renders approved defaults when `DATABASE_URL` is absent, the CMS tables are missing/not migrated, no published record exists, stored published data is invalid, or the database is temporarily unavailable. Invalid stored payloads never trigger draft exposure. Operational logging is sanitized (page + reason class only).
+- The admin editor distinguishes: no stored override, draft exists, published override exists, not migrated, unconfigured, temporarily unavailable, invalid stored data. It never reports a save/publication success before the server confirms persistence.
+- No seed/bootstrap is required. Initial content is served from code; rows are materialized only when the owner saves a draft. There is no startup/build table creation.
+
+### Public loading and caching
+
+Public routes keep their paths, header/footer, and visual layout. `src/app/(public)/layout.tsx` sets `dynamic = 'force-dynamic'`: each public request reads published sections (one query) and, for home, published FAQ (one query). There is no cross-request content cache, so publication is visible on the next request without a deployment and database-failure fallbacks are never cached indefinitely. Admin/preview content is never shared through public caches. `revalidatePath` is still called after publication for route-cache hygiene. This deliberately simple strategy avoids a bespoke invalidation service; a bounded shared cache can be added later if traffic warrants it.
+
+### Authorization and mobile admin navigation
+
+- Every editor page, preview, and server action independently calls `requireOwner()`/`getOwnerSession()`; the admin layout and middleware are not security boundaries. Server actions are POST-only with Next.js origin/CSRF checks preserved. Unauthorized/non-owner requests write nothing and receive controlled errors.
+- Mobile admin navigation is a closed-by-default disclosure panel anchored under a compact header: 44px menu/logout targets, current-section state, Escape close with focus restoration, outside-click close, close on navigation, desktop sidebar preserved. Future sections remain non-interactive with concise labels.
+- The `Content & SEO` section is active for content editing only; a clear note states SEO metadata editing arrives in W3.3.
+
+### W3.2 migrations and infrastructure handoff
+
+Additive migration: `drizzle/0002_w32-content-cms.sql` (tables + indexes + checks). It applies from an empty database and upgrades a W3.1 database without touching auth tables/rows (verified against synthetic user/account/session/verification/rate-limit records). Runtime grants and the temporary migrator database-level CREATE requirement are documented in `docs/DATABASE_PERMISSIONS.md`; the runtime receives only SELECT/INSERT/UPDATE/DELETE on the two CMS tables. There are no application sequences. The hosted development migration and new branch Preview configuration are external operator tasks; the coding agent never connects to hosted Neon, never runs hosted migrations, rotates credentials, revokes QA sessions, or touches production.
