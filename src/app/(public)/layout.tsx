@@ -2,6 +2,14 @@ import { Footer } from '@/components/layout/Footer';
 import { Header } from '@/components/layout/Header';
 import { ar } from '@/i18n/messages/ar';
 
+/**
+ * Public pages render per request so a published CMS change is visible
+ * immediately without a deployment. The published loader performs at most two
+ * small queries per page and always falls back to approved defaults; no
+ * cross-request content cache is maintained.
+ */
+export const dynamic = 'force-dynamic';
+
 export default function PublicLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <>

@@ -15,6 +15,13 @@
       "when": 1795616798839,
       "tag": "0001_parallel_skin",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795632167568,
+      "tag": "0002_w32-content-cms",
+      "breakpoints": true
     }
   ]
 }

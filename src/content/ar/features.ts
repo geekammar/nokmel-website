@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { capabilityItemSchema, ctaLinkSchema, textItemSchema } from '../schema';
 
-const featuresContentSchema = z.object({
+export const featuresContentSchema = z.object({
   hero: z.object({
     title: z.string().min(1),
     lead: z.string().min(1),

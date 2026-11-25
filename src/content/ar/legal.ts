@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { legalSectionSchema } from '../schema';
 
-const legalContentSchema = z.object({
+export const legalContentSchema = z.object({
   draftStatus: z.object({
     label: z.string().min(1),
     body: z.string().min(1),

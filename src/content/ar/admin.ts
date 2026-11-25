@@ -35,8 +35,8 @@ export const adminUi = {
     unavailableNote: 'غير متاح — في مرحلة لاحقة',
   },
   nav: [
-    { id: 'overview', label: 'نظرة عامة', available: true },
-    { id: 'content-seo', label: 'المحتوى والـSEO', available: false },
+    { id: 'overview', label: 'نظرة عامة', available: true, href: '/admin' },
+    { id: 'content-seo', label: 'المحتوى والـSEO', available: true, href: '/admin/content' },
     { id: 'plans-pricing', label: 'الباقات والأسعار', available: false },
     { id: 'join-requests', label: 'طلبات الانضمام', available: false },
     { id: 'settings', label: 'الإعدادات', available: false },

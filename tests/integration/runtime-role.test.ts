@@ -57,7 +57,7 @@ beforeAll(async () => {
   );
   await pg.pool.query('revoke all on all tables in schema public from public');
   await pg.pool.query(
-    `grant select, insert, update, delete on table "user", "session", "account", "verification", "rate_limit" to ${quoteIdentifier(roleName)}`,
+    `grant select, insert, update, delete on table "user", "session", "account", "verification", "rate_limit", "content_sections", "faq_items" to ${quoteIdentifier(roleName)}`,
   );
 });
 
@@ -145,8 +145,30 @@ describe('restricted runtime database role', () => {
       });
       expect(await afterLogout.json()).toBeNull();
 
+      // Intended CMS data operations are allowed with the explicit grants.
+      await runtimePool.query(
+        `insert into content_sections (id, page_key, section_key, locale, draft_payload, draft_revision)
+         values ('home:hero:ar', 'home', 'hero', 'ar', '{"title":"x"}'::jsonb, 1)`,
+      );
+      const cmsRead = await runtimePool.query(
+        "select draft_revision from content_sections where id = 'home:hero:ar'",
+      );
+      expect(cmsRead.rows[0].draft_revision).toBe(1);
+      await runtimePool.query(
+        "update content_sections set draft_revision = 2 where id = 'home:hero:ar'",
+      );
+      await runtimePool.query("delete from content_sections where id = 'home:hero:ar'");
+      await runtimePool.query(
+        `insert into faq_items (id, locale, draft_question, draft_answer, draft_sort_order, draft_visible)
+         values ('faq-runtime-probe', 'ar', 'q', 'a', 0, true)`,
+      );
+      await runtimePool.query("delete from faq_items where id = 'faq-runtime-probe'");
+
       await expect(
         runtimePool.query('create table "runtime_ddl_probe" (id integer)'),
+      ).rejects.toThrow(/permission denied/i);
+      await expect(
+        runtimePool.query('truncate table content_sections'),
       ).rejects.toThrow(/permission denied/i);
       await expect(
         runtimePool.query('alter table "user" add column "runtime_probe" integer'),
