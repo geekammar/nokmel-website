@@ -89,6 +89,7 @@ export function PublicationReviewPanel({
         {review.hasChanges ? (
           <p className="text-sm font-semibold text-text-primary">
             {adminContentUi.review.changedSections}: {review.sections.length}
+            {review.seo?.changed ? ` · ${adminContentUi.review.seoTitle}` : ''}
             {review.faq?.changed ? ` · ${adminContentUi.review.faqTitle}` : ''}
           </p>
         ) : (
@@ -134,6 +135,46 @@ export function PublicationReviewPanel({
         </div>
       ) : null}
 
+      {review.seo?.changed ? (
+        <details
+          className="mt-3 rounded-card border border-border-subtle bg-surface"
+          open
+          data-testid="review-seo-summary"
+        >
+          <summary className="flex min-h-control cursor-pointer items-center justify-between gap-3 px-4 py-2 text-sm font-semibold text-text-primary">
+            <span>{adminContentUi.review.seoTitle}</span>
+            <span className="text-xs font-normal text-text-secondary">
+              {adminContentUi.review.seoFieldsCount.replace(
+                '{count}',
+                String(review.seo.fields.length),
+              )}
+            </span>
+          </summary>
+          <ul className="flex list-none flex-col gap-3 border-t border-border-subtle p-4">
+            {review.seo.fields.map((field) => (
+              <li key={field.key} className="text-sm">
+                <p className="font-semibold text-text-primary">
+                  {field.label}
+                  {field.inheritedBefore || field.inheritedAfter ? (
+                    <span className="ms-2 rounded-control bg-background px-2 py-0.5 text-xs font-normal text-text-secondary">
+                      {adminContentUi.review.seoInherited}
+                    </span>
+                  ) : null}
+                </p>
+                <p className="mt-1 whitespace-pre-wrap break-words text-text-secondary">
+                  <span className="font-semibold">{adminContentUi.review.before}: </span>
+                  {field.before}
+                </p>
+                <p className="mt-1 whitespace-pre-wrap break-words text-text-secondary">
+                  <span className="font-semibold">{adminContentUi.review.after}: </span>
+                  {field.after}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+
       {review.faq?.changed ? (
         <details
           className="mt-3 rounded-card border border-border-subtle bg-surface"
@@ -151,7 +192,17 @@ export function PublicationReviewPanel({
                 </p>
                 <ul className="mt-1 list-disc ps-5 text-text-secondary">
                   {review.faq.added.map((item) => (
-                    <li key={item.id}>{item.question}</li>
+                    <li key={item.id}>
+                      {item.question}{' '}
+                      <span className="text-xs text-text-secondary">
+                        ({adminContentUi.review.faqAddedPosition.replace('{position}', String(item.position))})
+                      </span>
+                      {!item.visible ? (
+                        <span className="ms-1 text-xs text-status-warning">
+                          — {adminContentUi.review.hidden}
+                        </span>
+                      ) : null}
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -163,7 +214,12 @@ export function PublicationReviewPanel({
                 </p>
                 <ul className="mt-1 list-disc ps-5 text-text-secondary">
                   {review.faq.removed.map((item) => (
-                    <li key={item.id}>{item.question}</li>
+                    <li key={item.id}>
+                      {item.question}{' '}
+                      <span className="text-xs text-text-secondary">
+                        ({adminContentUi.review.faqRemovedPosition.replace('{position}', String(item.position))})
+                      </span>
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -225,6 +281,49 @@ export function PublicationReviewPanel({
               <p className="font-semibold text-text-primary">
                 {adminContentUi.review.faqOrder}
               </p>
+            ) : null}
+            {review.faq.added.length > 0 ||
+            review.faq.removed.length > 0 ||
+            review.faq.visibilityChanged.length > 0 ||
+            review.faq.reordered ? (
+              <div data-testid="review-faq-final-order">
+                <p className="font-semibold text-text-primary">
+                  {adminContentUi.review.faqFinalOrder}
+                </p>
+                {review.faq.finalVisibleOrder.length > 0 ? (
+                  <ol
+                    className="mt-1 list-decimal ps-5 text-text-secondary"
+                    data-testid="review-faq-final-order-list"
+                  >
+                    {review.faq.finalVisibleOrder.map((item) => (
+                      <li key={item.id} data-testid="review-faq-final-order-item">
+                        {item.question}
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="mt-1 text-status-warning">
+                    {adminContentUi.review.faqEmptyVisible}
+                  </p>
+                )}
+                {review.faq.hidden.length > 0 ? (
+                  <div className="mt-3" data-testid="review-faq-hidden">
+                    <p className="font-semibold text-text-primary">
+                      {adminContentUi.review.faqHidden}
+                    </p>
+                    <ul className="mt-1 list-disc ps-5 text-text-secondary">
+                      {review.faq.hidden.map((item) => (
+                        <li key={item.id}>
+                          {item.question}{' '}
+                          <span className="text-xs">
+                            ({adminContentUi.review.faqHiddenPosition.replace('{position}', String(item.position))})
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
             ) : null}
           </div>
         </details>

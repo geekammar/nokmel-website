@@ -1,16 +1,14 @@
 import type { Metadata } from 'next';
 import { PricingView } from '@/components/pages/PricingView';
-import { pricing } from '@/content/ar/pricing';
-import { getPublishedPageContent } from '@/lib/cms/service';
-import { pageMetadata } from '@/lib/seo';
+import { getPublicPageBundle } from '@/lib/cms/public-page';
+import { pageMetadataForSeo } from '@/lib/seo';
 
-export const metadata: Metadata = pageMetadata({
-  title: 'الأسعار — نكمّل',
-  description: pricing.hero.lead,
-  path: '/pricing',
-});
+export async function generateMetadata(): Promise<Metadata> {
+  const bundle = await getPublicPageBundle('pricing');
+  return pageMetadataForSeo('pricing', bundle.seo);
+}
 
 export default async function PricingPage() {
-  const content = await getPublishedPageContent('pricing', 'ar');
+  const { content } = await getPublicPageBundle('pricing');
   return <PricingView content={content} />;
 }

@@ -1,12 +1,31 @@
 # CURRENT_STATE.md — Nokmel Website
 
-Last updated: W3.2 final acceptance closure, 2026-11-25. Keep concise.
+Last updated: W3.3 page-level SEO implementation, 2026-11-25. Keep concise.
 
-## Status: W3.2 — lightweight CMS implemented on `feature/w32-content-management` (draft PR, not merged; no production claim)
+## Status: W3.3 — page-level SEO and social metadata implemented on `feature/w33-seo-management` (draft PR pending; no production claim)
 
-- W3.1 (PR #4) is merged and accepted for continued development. `main` baseline: `09a63d3db6ef69ffecd238b408a733d7fdc53c07` (accepted PR HEAD `494fc037341772e6aec0592c076c748a78f0d9ac`).
-- W3.2 adds the owner-only Content & SEO section for the seven existing public pages plus homepage FAQ. No SEO metadata editing (W3.3), plans (W4), join-request submission/storage (W4), analytics, contact-channel configuration or settings (W5) were implemented.
-- Production readiness is **not** granted. Production branch, Production deployment, DNS, credentials, QA account/password/sessions, historical deployments and existing environment variables are untouched. Production activation remains W6.
+- W3.1 (PR #4) and W3.2 (PR #5) are merged and accepted for continued development. W3.2 merge baseline `main`: `5c976db56331ba2077b4a32c1e05a580e9c5689a` (accepted HEAD `fb677dabc82f2c60a6301d862314142805fba0f8`).
+- W3.3 adds owner-only page-level SEO/social metadata editing to the existing Content & SEO section for all seven public pages. No plans/pricing admin, join submission/storage (W4), analytics/settings (W5), indexing activation or launch work was implemented.
+- Production readiness is **not** granted. Production branch, Production deployment, DNS, credentials, QA account/password/sessions, historical deployments and existing environment variables are untouched. Production activation and all W6 gates remain outstanding; physical Android acceptance is deferred.
+
+### W3.3 implemented scope
+
+- SEO stored as a predefined typed `content_sections` row (`section_key='seo'`, id `<page>:seo:ar`) with the same draft/published JSONB, page revision, advisory lock and owner-only actions as W3.2. **No migration, seed or new database grant is required**; existing W3.2 rows without SEO remain valid. Content composition skips the SEO row.
+- Fields: required title (hard limit 200) and meta description (500), optional social title/description and approved image id. Strict Zod schemas reject unknown fields, arbitrary URLs/unsafe ids; whitespace-only optional values normalize to unset. Editorial length guidance is non-blocking. Fallbacks: missing published override → approved W2 defaults; missing social title/description → effective SEO values; missing image → approved default.
+- Saving SEO preserves content/FAQ drafts; saving content/FAQ preserves SEO drafts. Page revision remains one page-level counter including the SEO row. Publication validates the complete page and atomically applies content + SEO + homepage FAQ; discard clears all saved drafts; stale save/review protection is unchanged. Publication review shows section, FAQ and SEO before/after changes plus inherited-social notes.
+- Public routes (`/`, `/features`, `/pricing`, `/join`, `/contact`, `/privacy`, `/terms`) generate metadata from published-only SEO via one request-scoped published bundle (published sections/SEO + homepage FAQ in a read-only repeatable-read snapshot). Open Graph/Twitter values use the effective social fields; canonical `nokmel.tech` URLs, `noindex, nofollow`, admin/preview non-indexability and `robots.txt Disallow: /` are unchanged. Drafts are never selected on public paths; failures fall back to approved defaults.
+- Approved social images use an explicit registry of existing PNG brand assets (transparent marks 1024/512, light/dark app icons 512) with real dimensions/alt text; no upload/media library/external fetch/arbitrary URL. No new artwork was invented.
+- NKW-W32-005 corrected in publication review: added FAQ items show one-based intended positions, removals show published positions, hidden items are separated, and the final visible public order is displayed when additions/removals/visibility/reordering affect it. Computed from existing persisted state; no FAQ schema change.
+
+### W3.3 verification (local, 2026-11-25)
+
+- Unit: 136/136 (adds SEO schema/defaults/metadata/asset and FAQ final-order review tests).
+- PostgreSQL integration: 104/104 on disposable loopback PostgreSQL 18 (87 W3.2 + 17 SEO: defaults, W3.2 compatibility, draft/publish, inheritance, content/SEO/FAQ coexistence, atomic publication, stale save/review, discard, invalid-data/DB fallbacks, published-only privilege probe, publication interleaving).
+- Playwright: 92/92 with synthetic owner + disposable DB (86 existing + 6 W3.3 workflows; includes full SEO draft/reload/review/publish head verification, combined stale review, all-route default metadata, NKW-W32-005 final order at 390px, 320–1440 responsive SEO editor). Screenshots: `w33-seo-editor-390/1440`, `w33-faq-final-order-review-390` under CI artifacts.
+- `pnpm lint` (0 errors; 3 pre-existing warnings), `pnpm typecheck`, `pnpm build` and `pnpm db:check` pass locally on Node 22. Exact remote CI and Preview identity are recorded in the draft PR/handoff and must be checked on the exact final HEAD.
+- No schema migration: `drizzle/0000`–`0002` untouched; no hosted Neon access, no Vercel configuration, no production action. W3.3 branch Preview requires its own `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `TRUSTED_ORIGINS`, `OWNER_EMAIL`.
+
+## W3.2 historical state (merged and accepted for continued development)
 
 ### W3.2 implemented scope
 
@@ -50,6 +69,7 @@ Last updated: W3.2 final acceptance closure, 2026-11-25. Keep concise.
 
 ### Outstanding live checks (must not be claimed as done)
 
+- W3.3 branch-specific Vercel Preview variables and authorized Preview origin (external operator); independent hosted retest of SEO draft/publish, actual head metadata on all seven routes, canonical/noindex preservation, combined stale review, and NKW-W32-005 final order. W3.2 Preview settings are not assumed to inherit.
 - Independent hosted retest of this closure on the configured W3.2 Preview: publication review, published FAQ/unchanged-section preservation, stale publish rejection, mobile review layout.
 - Official mobile acceptance for the review UI (Playwright evidence is supplementary; no physical Android claim). Hosted mobile viewport coverage was blocked by Muse tooling.
 - Authorized live retest of W3.1 closure items retained from the prior state (sign-in/recovery lock through Neon's pooled endpoint, hosted request headers, password visibility, Overview, rate-limit UX).

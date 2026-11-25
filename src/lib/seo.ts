@@ -1,4 +1,10 @@
 import type { Metadata } from 'next';
+import {
+  getSocialImage,
+  type SocialImageId,
+} from '@/content/cms/social-images';
+import { getPageDefinition, type CmsPageKey } from '@/content/cms/registry';
+import type { EffectiveSeo } from '@/content/cms/seo';
 import { siteUrl } from '@/lib/site';
 
 /**
@@ -14,33 +20,69 @@ import { siteUrl } from '@/lib/site';
  */
 export const PRE_LAUNCH = true;
 
-const openGraphImage = {
-  url: '/brand/logos/nokmel-mark-transparent-1024.png',
-  width: 1024,
-  height: 785,
-  alt: 'Nokmel Completion Mark',
-} as const;
-
 type PageMetadataInput = {
   title: string;
   description: string;
   path: `/${string}`;
+  socialTitle?: string;
+  socialDescription?: string;
+  socialImage?: SocialImageId;
 };
 
-export function pageMetadata({ title, description, path }: PageMetadataInput): Metadata {
+function socialImageUrl(id: SocialImageId | undefined): string {
+  return new URL(getSocialImage(id).path, siteUrl).toString();
+}
+
+export function pageMetadata({
+  title,
+  description,
+  path,
+  socialTitle,
+  socialDescription,
+  socialImage,
+}: PageMetadataInput): Metadata {
+  const image = getSocialImage(socialImage);
+  const effectiveSocialTitle = socialTitle?.trim() || title;
+  const effectiveSocialDescription = socialDescription?.trim() || description;
+  const imageUrl = socialImageUrl(image.id);
   return {
     title: { absolute: title },
     description,
     alternates: { canonical: path },
     robots: PRE_LAUNCH ? { index: false, follow: false } : { index: true, follow: true },
     openGraph: {
-      title,
-      description,
+      title: effectiveSocialTitle,
+      description: effectiveSocialDescription,
       url: `${siteUrl}${path === '/' ? '' : path}`,
       siteName: 'Nokmel',
       locale: 'ar_AR',
       type: 'website',
-      images: [openGraphImage],
+      images: [
+        {
+          url: imageUrl,
+          width: image.width,
+          height: image.height,
+          alt: image.alt,
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: effectiveSocialTitle,
+      description: effectiveSocialDescription,
+      images: [imageUrl],
     },
   };
+}
+
+export function pageMetadataForSeo(pageKey: CmsPageKey, seo: EffectiveSeo): Metadata {
+  const page = getPageDefinition(pageKey);
+  return pageMetadata({
+    title: seo.title,
+    description: seo.description,
+    path: page.path,
+    socialTitle: seo.socialTitle,
+    socialDescription: seo.socialDescription,
+    socialImage: seo.socialImageId,
+  });
 }

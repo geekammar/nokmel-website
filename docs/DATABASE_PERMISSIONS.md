@@ -174,6 +174,14 @@ temporary synthetic role with only published-column privileges to prove public
 queries never select draft columns; that probe role is disposable test tooling
 and not part of hosted provisioning.
 
+W3.3 reuses the same tables without a migration: page SEO is stored as an
+additional predefined `content_sections` row (`section_key='seo'`, id
+`<page>:seo:<locale>`) under the same existing table-level runtime DML grants.
+No new table, sequence, column grant or migration is required, and existing
+W3.2 rows without an SEO row remain valid. Public reads continue to use the
+published-only column projection (`section_key`/`published_payload`); the
+published-only privilege probe also covers the SEO record.
+
 Public-site fallback before the migration: if the CMS tables are absent, public
 pages render the approved content defaults; the admin editor reports that CMS
 tables are not migrated and refuses writes. No explicit seed/initialization is

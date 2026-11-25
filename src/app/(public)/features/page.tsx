@@ -1,16 +1,14 @@
 import type { Metadata } from 'next';
 import { FeaturesView } from '@/components/pages/FeaturesView';
-import { features } from '@/content/ar/features';
-import { getPublishedPageContent } from '@/lib/cms/service';
-import { pageMetadata } from '@/lib/seo';
+import { getPublicPageBundle } from '@/lib/cms/public-page';
+import { pageMetadataForSeo } from '@/lib/seo';
 
-export const metadata: Metadata = pageMetadata({
-  title: 'الميزات — نكمّل',
-  description: features.hero.lead,
-  path: '/features',
-});
+export async function generateMetadata(): Promise<Metadata> {
+  const bundle = await getPublicPageBundle('features');
+  return pageMetadataForSeo('features', bundle.seo);
+}
 
 export default async function FeaturesPage() {
-  const content = await getPublishedPageContent('features', 'ar');
+  const { content } = await getPublicPageBundle('features');
   return <FeaturesView content={content} />;
 }

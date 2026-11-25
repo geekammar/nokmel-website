@@ -205,9 +205,9 @@ pnpm test:db
 
 Neon projects in scope: `nokmel-website` (production branch `br-noisy-fire-bdkl5wa4`, development branch `br-winter-hat-bdqgatki`). Out of scope: `Nokmel_prod`, `Nokmel_dev`, any other Neon project.
 
-## W3.2 — Lightweight CMS, content publishing & mobile admin navigation [IMPLEMENTED; pending independent acceptance]
+## W3.2 — Lightweight CMS, content publishing & mobile admin navigation [MERGED; accepted for continued development]
 
-Status: implementation complete on `feature/w32-content-management` (base `main` `09a63d3db6ef69ffecd238b408a733d7fdc53c07`). Production activation and hosted acceptance remain deferred to W6; see `CURRENT_STATE.md`.
+Status: merged via PR #5 (accepted HEAD `fb677dabc82f2c60a6301d862314142805fba0f8`, merge commit `5c976db56331ba2077b4a32c1e05a580e9c5689a`). Production activation remains deferred to W6; see `CURRENT_STATE.md`.
 
 ### Scope and boundaries
 
@@ -288,3 +288,36 @@ Confirmation submits the exact reviewed revision to the existing publish action.
 ### W3.2 migrations and infrastructure handoff
 
 Additive migration: `drizzle/0002_w32-content-cms.sql` (tables + indexes + checks). It applies from an empty database and upgrades a W3.1 database without touching auth tables/rows (verified against synthetic user/account/session/verification/rate-limit records). Runtime grants and the temporary migrator database-level CREATE requirement are documented in `docs/DATABASE_PERMISSIONS.md`; the runtime receives only SELECT/INSERT/UPDATE/DELETE on the two CMS tables. There are no application sequences. The external lead reports that hosted development migration 0002, CMS runtime grants and the new branch Preview configuration are complete; independent hosted acceptance remains external. The coding agent never connects to hosted Neon, never runs hosted migrations, rotates credentials, revokes QA sessions, or touches production.
+
+## W3.3 — Page-level SEO and social metadata management [IMPLEMENTED; pending independent acceptance]
+
+Status: implementation complete on `feature/w33-seo-management` (base `main` `5c976db56331ba2077b4a32c1e05a580e9c5689a`). No schema migration. Hosted activation and acceptance remain external gates.
+
+### Storage and publication boundary
+
+- Page SEO is a predefined typed record stored in the existing `content_sections` table with `section_key = 'seo'` and deterministic id `<page>:seo:<locale>`. It uses the same `draft_payload`/`published_payload`, `draft_revision`/`published_revision`, timestamps and page advisory lock as W3.2. No SEO table, migration, seed, sequence or second revision system exists; existing W3.2 rows without an SEO row remain valid and editable.
+- The SEO row is deliberately not part of the content registry's section list: content composition, section editing and content-save payload validation skip it. Page revision remains the maximum `draft_revision` across all rows on the page, including SEO.
+- Saving SEO updates only the SEO row at the next page revision; it never deletes or rewrites content/FAQ drafts. Saving content or FAQ updates only content rows/FAQ state and preserves the SEO draft. Publication validates the complete page and atomically publishes every saved draft row (content, SEO, homepage FAQ) in one transaction. Discard clears every saved draft row/restores FAQ drafts without touching published values. Reviews include all pending changes, and stale saves/reviews are rejected by the existing lock and revision check.
+
+### SEO model, defaults and fallbacks
+
+- Supported public routes are the seven W3.2 pages. Fields are SEO title (required, 200 chars), meta description (required, 500), optional social title (200), optional social description (500) and optional approved social-image id. Schemas are strict, trim/normalize whitespace, reject unknown fields, arbitrary URLs and unsafe image ids, and enforce storage safety limits. Editorial 50–60/120–160 guidance is non-blocking and not a ranking guarantee.
+- Approved defaults live in `src/content/ar/seo.ts` and preserve the existing W2 titles/descriptions exactly. If no published SEO override exists, or the stored published record is invalid, public metadata uses those defaults. Missing social title/description inherit the effective SEO title/description; a missing image uses the approved default (`mark-transparent-1024`).
+- Approved social images are an explicit registry (`src/content/cms/social-images.ts`) of existing PNG brand assets with id, local `/brand/...` path, label, real dimensions and alt text. There is no upload, media library, external fetching or arbitrary URL field. Additional artwork choices are deferred until approved assets exist.
+- Owner-editable metadata cannot change canonical domain/path, `metadataBase`, robots/noindex policy, sitemap policy, redirects, Open Graph URL, locale, scripts, HTML metadata, verification tokens, structured data or security headers. Canonical URLs continue to use `nokmel.tech` + the actual route; robots.txt remains `Disallow: /`; pre-launch `noindex, nofollow` remains in force. Publishing SEO never enables indexing.
+
+### Public metadata generation and read safety
+
+- Every public route uses `generateMetadata` backed by a request-scoped cached published bundle (`src/lib/cms/public-page.ts`). The bundle loader reads published-only section and SEO payloads and homepage FAQ in one short read-only `REPEATABLE READ` transaction; metadata and page body in the same request share the memoized result. React `cache` is request-scoped; no cross-request content/metadata cache exists.
+- Public metadata never selects draft payloads and never exposes draft SEO through head tags, RSC output, JSON or query parameters. The first request after publication observes the new metadata. Failures (missing `DATABASE_URL`, unmigrated tables, unavailable DB, invalid stored data) fall back to approved defaults without caching the failure.
+- Metadata preserves absolute page titles (no accidental site-name suffix), canonical paths, `metadataBase`, Open Graph site name/locale/type, absolute approved image URLs, and pre-launch robots. Open Graph and Twitter/X card values derive from the same validated effective social fields. Admin and protected preview remain non-indexable.
+- The owner editor adds a second tab inside the existing Content & SEO page: Arabic RTL SEO fields, character counts, inheritance indicators, approved-image selector, approximate search/social previews, save/review/discard against the same page revision. Publication review adds SEO before/after fields and inherited-social notes alongside body/FAQ changes.
+
+### NKW-W32-005 correction
+
+Publication review now includes one-based intended positions for added questions, published positions for removals, hidden-question separation, and a concise final visible public FAQ order whenever additions, removals, visibility changes or reordering affect the list. It is computed from persisted draft/published FAQ state; no schema or revision-history change.
+
+### Verification and external gates
+
+- W3.3 adds focused unit coverage for SEO validation/fallbacks/metadata and FAQ final-order review, disposable-PostgreSQL coverage for SEO drafts/publication/coexistence/concurrency/fallbacks/published-only projection, and Playwright coverage for the full owner SEO workflow, combined/stale review, all-route metadata, NKW-W32-005 and responsive layouts. Local counts are recorded in `CURRENT_STATE.md`; exact CI is checked on the final HEAD.
+- Hosted requirements: no migration and no new database grants (existing `content_sections` runtime DML suffices), but the new W3.3 Vercel Preview branch requires its own `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `TRUSTED_ORIGINS` and `OWNER_EMAIL` configuration. W4 pricing/join-request submission, W5 analytics/settings and all W6 launch gates remain out of scope.
