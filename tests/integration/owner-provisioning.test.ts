@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { getDisposablePostgres, applyMigrations, TEST_OWNER_EMAIL } from './helpers';
+import { getDisposablePostgres, applyMigrations, emptyDatabase, TEST_OWNER_EMAIL } from './helpers';
 import {
   ProvisioningRefusedError,
   provisionOwner,
@@ -10,6 +10,7 @@ const pg = await getDisposablePostgres();
 
 beforeAll(async () => {
   await applyMigrations(pg.db);
+  await emptyDatabase(pg.pool);
 });
 
 afterAll(async () => {

@@ -5,6 +5,7 @@ import {
   applyMigrations,
   authRequest,
   createTestAuth,
+  emptyDatabase,
   getDisposablePostgres,
   sessionCookieFrom,
   TEST_BAD_ORIGIN,
@@ -20,6 +21,7 @@ const auth = createTestAuth(pg.db);
 
 beforeAll(async () => {
   await applyMigrations(pg.db);
+  await emptyDatabase(pg.pool);
   await provisionOwnerFixture();
 });
 

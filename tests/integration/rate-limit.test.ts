@@ -3,6 +3,7 @@ import {
   applyMigrations,
   authRequest,
   createTestAuth,
+  emptyDatabase,
   getDisposablePostgres,
   TEST_OWNER_EMAIL,
   TEST_OWNER_PASSWORD,
@@ -13,6 +14,7 @@ const pg = await getDisposablePostgres();
 
 beforeAll(async () => {
   await applyMigrations(pg.db);
+  await emptyDatabase(pg.pool);
   try {
     await provisionOwner({
       db: pg.db,
