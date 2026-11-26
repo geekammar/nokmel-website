@@ -19,6 +19,7 @@ const config: Config = {
           secondary: 'var(--action-secondary)',
         },
         page: 'var(--color-background)',
+        background: 'var(--color-background)',
         surface: 'var(--color-surface)',
         text: {
           primary: 'var(--color-text-primary)',
