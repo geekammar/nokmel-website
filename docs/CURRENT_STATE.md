@@ -31,9 +31,9 @@ Status: **W2-S IMPLEMENTED on `feature/w2s-marketing-design-showcase` (draft PR;
 - Implementation screenshots at 390 and 1440 include the full homepage and focused showcase states. These are synthetic browser evidence; no physical Android acceptance is claimed.
 - Exact remote CI on the final HEAD is checked separately and recorded in the draft PR/handoff.
 
-## Remaining external/W5-I/W6 work
+## Remaining W5-I integration/hosted activation and W6 work
 
-- W5-I (hosted activation/independent acceptance): apply migration 0005 with temporary migrator CREATE/revoke, grant runtime DML on `site_settings`, configure scoped Preview variables, GA4 property/stream/service-account and timezone, reduce/verify enhanced measurement, register/verify the join key event, prepare the dedicated website Telegram bot and owner destination, run test-before-enable and accept reversible consent/notification/settings behavior.
+- W5-I (hosted integration activation and hosted evidence): apply migration 0005 with temporary migrator CREATE/revoke, grant runtime DML on `site_settings`, configure scoped Preview variables, GA4 property/stream/service-account and timezone, reduce/verify enhanced measurement, register/verify the join key event, prepare the dedicated website Telegram bot and owner destination, run test-before-enable and verify reversible consent/notification/settings behavior in the activated hosted environment.
 - W6 launch gates remain: raw hosted metadata/headers, canonical/noindex, forwarded request identity, exact-token hosted replay and raw 429/Retry-After, hosted auth recovery/pooler behavior, Production isolation, approved final privacy/consent/retention policy and controlled deletion, physical Android acceptance (including NKW-W41-002), NKW-W5-004 protected deployment identity display, and explicit launch approval.
 - Hosted Development and Production were not accessed or mutated by W2-S. No DNS, Vercel, indexing, GA4 or Telegram activation was performed. The merchant repository was inspected read-only and not modified.
 

@@ -76,7 +76,7 @@ event-specific key-event conversion (or truthful unavailable state) and masked
 private-settings readback without a schema change. Local unit 274/274,
 PostgreSQL 187/187 and Playwright 117/117 pass; exact CI is checked on the
 final HEAD. Hosted migration 0005, runtime grant, Preview configuration,
-GA4/Telegram external activation and independent acceptance remain external.
+GA4/Telegram external activation remains external; the owner-supplied independent acceptance record reports 20/20 PASS.
 NKW-W41-002 stays deferred to physical Android evaluation in W6. Production
 readiness is not claimed.
 

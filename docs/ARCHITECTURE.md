@@ -457,7 +457,7 @@ W4.1 is merged via PR #8 (accepted HEAD `7d33ab734cc84cb51f17d67aa972390559c71e8
 
 ## W5 — Business overview, external analytics, owner notifications and settings [MERGED & ACCEPTED; hosted activation external]
 
-Status: implemented on `feature/w5-analytics-notifications-settings` from merged W4.1 `main` (`d50f7d555859b5f0ee4dc5b7075127f9e02eafde`). Additive migration `drizzle/0005_w5-settings-notifications.sql`. Hosted migration 0005, new Preview environment configuration, provider activation (GA4/Telegram) and independent acceptance remain external. No Production action, real analytics tracking, real Telegram message or hosted database mutation was performed by the coding agent.
+Status: implemented on `feature/w5-analytics-notifications-settings` from merged W4.1 `main` (`d50f7d555859b5f0ee4dc5b7075127f9e02eafde`). Additive migration `drizzle/0005_w5-settings-notifications.sql`. Hosted migration 0005, new Preview environment configuration, provider activation (GA4/Telegram) remains external; the owner-supplied independent acceptance record reports 20/20 PASS. No Production action, real analytics tracking, real Telegram message or hosted database mutation was performed by the coding agent.
 
 ### Boundaries and admin information architecture
 
