@@ -14,6 +14,10 @@ import {
   updateJoinRequestStatus,
   type JoinRequestDetail,
 } from '@/lib/join/service';
+import {
+  retryJoinRequestNotification,
+  type NotificationDeliveryOutcome,
+} from '@/lib/notifications/service';
 import { getOwnerSession } from '@/lib/owner';
 
 /**
@@ -118,5 +122,22 @@ export async function saveRequestNotesAction(input: {
     return { ok: true, data };
   } catch (error) {
     return mapError('notes-save', error);
+  }
+}
+
+export async function retryRequestNotificationAction(input: {
+  id: string;
+}): Promise<RequestActionResult<NotificationDeliveryOutcome>> {
+  const unauthorized = await ensureOwner();
+  if (unauthorized) return unauthorized;
+  if (typeof input.id !== 'string' || input.id.length > 80) {
+    return failure('validation', adminRequestsUi.messages.validation);
+  }
+  try {
+    const data = await retryJoinRequestNotification(input.id);
+    revalidateRequest(input.id);
+    return { ok: true, data };
+  } catch {
+    return failure('unexpected', adminRequestsUi.messages.unexpected);
   }
 }

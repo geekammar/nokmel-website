@@ -321,6 +321,16 @@ test('owner configures, previews, publishes, and disables scheduled promotions',
 
     await page.goto(activeEditorUrl);
     await page.getByTestId('plan-promotion-enabled').uncheck();
+    // NKW-W41-001: a disabled promotion must show ordinary current prices and
+    // must not render hypothetical strikethrough/discount values.
+    await expect(page.getByTestId('plan-promotion-preview')).toHaveAttribute(
+      'data-preview-kind',
+      'current_disabled',
+    );
+    await expect(page.getByTestId('plan-promotion-preview').locator('s')).toHaveCount(0);
+    await expect(page.getByTestId('plan-promotion-preview-note')).toContainText(
+      'العرض معطّل',
+    );
     await page.getByTestId('plan-save').click();
     await expect(page.getByTestId('plan-banner')).toContainText(
       'تم حفظ المسودة. لم يتغيّر العرض العام بعد.',

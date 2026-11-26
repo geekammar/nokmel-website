@@ -11,6 +11,10 @@ import {
   type OfferSnapshot,
 } from './snapshot';
 import {
+  joinNotificationStatus,
+  type JoinNotificationStatus,
+} from '@/lib/notifications/service';
+import {
   JoinPlanChangedError,
   JoinPlanUnavailableError,
   JoinRequestConflictError,
@@ -65,6 +69,7 @@ export type JoinRequestDetail = JoinRequestSummary & {
   notes: string | null;
   revision: number;
   updatedAt: string;
+  notification: JoinNotificationStatus;
 };
 
 export type JoinRequestStorageStatus =
@@ -199,6 +204,12 @@ function detailFromRow(row: JoinRequestRow): JoinRequestDetail {
     notes: row.notes,
     revision: row.revision,
     updatedAt: row.updatedAt.toISOString(),
+    notification: joinNotificationStatus({
+      notificationState: row.notificationState,
+      notificationAttemptedAt: row.notificationAttemptedAt,
+      notificationDeliveredAt: row.notificationDeliveredAt,
+      notificationErrorCode: row.notificationErrorCode,
+    }),
   };
 }
 
@@ -363,6 +374,13 @@ export async function createJoinRequest(
           notes: null,
           submissionToken: submission.submissionToken,
           revision: 0,
+          /**
+           * Post-commit delivery is attempted by the intake route. `pending`
+           * is durable, so a process interruption before delivery leaves an
+           * honest, owner-retryable state instead of a silent legacy `null`.
+           * Disabled notifications become `skipped` immediately.
+           */
+          notificationState: 'pending',
           createdAt: now,
           updatedAt: now,
         })

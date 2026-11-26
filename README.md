@@ -17,6 +17,8 @@ A simple, professional, mobile-first SaaS marketing website with a lightweight o
 - [Design System](docs/DESIGN_SYSTEM.md) — brand and UI rules (source: Brand Kit v2.0)
 - [Roadmap](docs/ROADMAP.md) — W0–W6 workstreams
 - [Current State](docs/CURRENT_STATE.md) — concise live status
+- [W5 Integrations](docs/W5_INTEGRATIONS.md) — GA4 and Telegram external setup handoff
+- [Database Permissions](docs/DATABASE_PERMISSIONS.md) — least-privilege roles and per-migration grants
 
 ## Working copy (subject to owner approval)
 
@@ -26,7 +28,8 @@ A simple, professional, mobile-first SaaS marketing website with a lightweight o
 
 ## Status
 
-- **W4.1 (Scheduled promotional pricing & historical offer integrity): IMPLEMENTED** on `feature/w41-scheduled-promotional-pricing` (draft PR). One optional scheduled percentage/fixed discount per plan (monthly/yearly/both), Cairo scheduling, automatic activation/expiration, draft/published lifecycle, owner preview, shared effective-offer resolver/version, stale-offer recovery and expanded historical snapshots. Additive migration `0004_w41-scheduled-promotional-pricing`; no new runtime grant expected. Local unit 210/210, PostgreSQL 160/160, Playwright 101/101; hosted activation/acceptance external. See `docs/ARCHITECTURE.md` W4.1.
+- **W5 (Business overview, external analytics, owner notifications & settings): IMPLEMENTED** on `feature/w5-analytics-notifications-settings` (draft PR; hosted activation/acceptance external). Database-backed Overview with Cairo periods, all-time follow-up backlog, source/plan/historical-promotion breakdowns and latest protected links; disabled-by-default consent-gated GA4 reporting/tracking through a server-only adapter; optional owner Telegram notifications with durable delivery state and safe manual retry; typed owner settings with explicit public/private projection; NKW-W41-001 corrected. Additive migration `0005_w5-settings-notifications` adds `site_settings` and nullable notification columns (no analytics-events table). Local unit 267/267, PostgreSQL 180/180, Playwright 111/111; exact CI/hosted activation external. See `docs/ARCHITECTURE.md` W5 and `docs/W5_INTEGRATIONS.md`.
+- **W4.1 (Scheduled promotional pricing & historical offer integrity): MERGED & ACCEPTED** via PR #8 (accepted HEAD `7d33ab734cc84cb51f17d67aa972390559c71e86`, merge commit `d50f7d555859b5f0ee4dc5b7075127f9e02eafde`; independent live acceptance 18/18, 0 FAIL/PARTIAL/BLOCKED). One optional scheduled percentage/fixed discount per plan, Cairo scheduling, draft/published lifecycle, shared effective-offer resolver/version, stale-offer recovery and expanded historical snapshots. Additive migration `0004_w41-scheduled-promotional-pricing` is applied on hosted Development. NKW-W4-006 closed; FAQ Q6 preserved.
 - **W4 (Marketing plans, pricing & early-access join requests): CONDITIONAL ACCEPT for Preview** on `feature/w4-plans-join-requests` (draft PR; hosted Development activated; final product-consistency closure). Owner-only Plans & Pricing with draft/publish/hide lifecycle, exact minor-unit monthly/yearly prices (or an explicit unpriced state), accessible feature/order editing, owner preview, public pricing cards, `/join?plan=<slug>` preselection, and a fail-closed (`JOIN_INTAKE_ENABLED`) durable join-request intake with rate limiting, idempotency and historical offer snapshots. Owner-only Join Requests includes filters, bounded pagination, search, status and internal notes. Additive migration `0003_w4-plans-join-requests` is applied on hosted Development; Production intake, privacy/retention approval and all W6 launch gates remain external.
 - **W3.3 (Page-level SEO & social metadata): merged** via PR #6 (accepted HEAD `dcf1f8d9ede739a29bd48d036df1a1d5cd9f28bf`, merge commit `0020ddacdd54b3c23471b58b17b54fda1c1a0ae1`). No migration.
 - **W3.2 (Lightweight CMS, content publishing & mobile admin navigation): merged** via PR #5 (accepted HEAD `fb677dabc82f2c60a6301d862314142805fba0f8`). Owner-only Content & SEO section with predefined page editors, validated drafts, atomic page publication, protected preview, homepage FAQ management, stale-write protection, safe public defaults, and a compact mobile admin drawer. Additive migration `0002_w32-content-cms`. Hosted migration was completed by the external lead; production is deferred to W6. See `docs/ARCHITECTURE.md` and `docs/CURRENT_STATE.md`.
@@ -61,6 +64,8 @@ pnpm dev:postgres  # start a disposable local PostgreSQL 18 for DB tests/e2e
 
 Early-access join intake is fail-closed behind `JOIN_INTAKE_ENABLED` (`1`/`true` only; missing/invalid keeps it disabled). Enabled intake also requires a valid `BETTER_AUTH_SECRET` (32+ chars) and valid exact `BETTER_AUTH_URL`/`TRUSTED_ORIGINS`; otherwise the API returns a controlled 503 and stores nothing, even for requests without `Origin`. W4 enables it only on the isolated development Preview for acceptance. `JOIN_RATE_LIMIT_MAX` and `NOKMEL_DISPOSABLE_TEST_ENV` are disposable-test-only and must never weaken a hosted environment. QA cleanup is operator-only by exact request IDs/marker per `docs/DATABASE_PERMISSIONS.md` §3d.
 
+W5 integrations are optional and disabled by default. GA4 reporting uses server-only `GA4_PROPERTY_ID`, `GA4_CLIENT_EMAIL`, `GA4_PRIVATE_KEY`; public tracking additionally needs `GA4_MEASUREMENT_ID` and an explicit visitor consent. Owner notifications use the server-only `TELEGRAM_BOT_TOKEN` plus a numeric private chat destination saved in owner Settings. No credential belongs in `NEXT_PUBLIC_*`, public settings, client bundles or logs. Endpoint overrides are disposable-test-only. Exact external setup, property timezone, consent/conversion requirements and activation limits: `docs/W5_INTEGRATIONS.md`. Neither integration activates because a migration runs.
+
 Integration/e2e databases are refused unless they are loopback, use an approved disposable database name, and explicitly set `sslmode=disable`. Without `TEST_DATABASE_URL` the integration harness starts its own temporary embedded PostgreSQL 18. Never point tests at a hosted Neon database.
 
 Local e2e with the admin/intake suite (disposable DB only — synthetic identities):
@@ -74,7 +79,7 @@ RATE_LIMIT_SIGNIN_MAX=50 NOKMEL_DISPOSABLE_TEST_ENV=1 \
 JOIN_INTAKE_ENABLED=1 JOIN_RATE_LIMIT_MAX=100 pnpm test:e2e
 ```
 
-Playwright starts two packaged servers: `3100` (admin fixture; intake enabled only when the admin e2e environment is configured) and `3200` (deliberately intake-disabled coverage). `pnpm build` must run first. Without the admin environment, the admin/intake specs skip and the public disabled-state coverage still runs.
+Playwright starts two packaged servers: `3100` (admin fixture; intake enabled only when the admin e2e environment is configured) and `3200` (deliberately intake-disabled coverage), plus loopback GA4 and Telegram stubs on `3300`/`3301`. The W5 provider tests never call real Google or Telegram endpoints. `pnpm build` must run first. Without the admin environment, the admin/intake specs skip and the public disabled-state coverage still runs.
 
 CI (`.github/workflows/ci.yml`) runs the same checks on every PR to `main`, including the Playwright e2e suite.
 
@@ -90,10 +95,14 @@ src/i18n/              # locale config + ar messages (English-ready, no switcher
 src/lib/               # site config, brand/SEO, db/auth/owner, CMS, plan and join-intake services
 src/lib/plans/         # plan model/currencies/validation, promotion resolver, owner/public DB service
 src/lib/join/          # intake gate, join validation/phone, origin/identity, rate limit, request service
+src/lib/overview/      # Cairo reporting ranges + owner request aggregates
+src/lib/analytics/     # server-only GA4 config/adapter, consent/tracking contract
+src/lib/notifications/ # Telegram adapter, message builder, durable notification state machine
+src/lib/settings/      # typed site settings model, validation, public projection and owner service
 src/content/           # Arabic default content + admin/public operational strings
 src/content/cms/       # predefined page/section registry, editable fields, defaults, validation
 public/brand/logos/    # Completion Mark SVG variants + PNG fallbacks (from kit, unmodified)
 public/brand/icons/    # favicon + app icons
 licenses/fonts/        # OFL license notices for the self-hosted fonts
-tests/e2e/ + tests/integration/  # Playwright specs + PostgreSQL-backed auth/CMS/plans/join integration specs
+tests/e2e/ + tests/integration/  # Playwright specs + PostgreSQL-backed auth/CMS/plans/join/W5 integration specs
 ```

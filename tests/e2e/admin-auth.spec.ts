@@ -107,9 +107,11 @@ test.describe('login flows', () => {
     const desktopNav = page.getByRole('navigation', { name: 'التنقل في لوحة الإدارة' });
     await expect(desktopNav).toBeVisible();
     await expect(desktopNav.getByText('المحتوى والـSEO')).toBeVisible();
-    await expect(desktopNav.locator('span', { hasText: 'غير متاح — في مرحلة لاحقة' }).first()).toBeVisible();
+    await expect(desktopNav.getByRole('link', { name: 'الإعدادات' })).toBeVisible();
     const overview = page.locator('main#admin-content');
-    await expect(overview.getByRole('heading', { name: 'لا توجد بيانات لعرضها بعد' })).toBeVisible();
+    await expect(overview.getByRole('heading', { name: 'نظرة عامة', level: 1 })).toBeVisible();
+    await expect(overview.getByTestId('overview-received')).toBeVisible();
+    await expect(overview.getByTestId('overview-backlog')).toBeVisible();
     await expect(overview.getByText('المحتوى والـSEO')).toHaveCount(0);
     await expect(overview).not.toContainText('W3.1');
     await page.screenshot({ path: 'test-results/screenshots/admin-shell-1280.png', fullPage: true });

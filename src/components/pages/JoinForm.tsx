@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
@@ -146,6 +146,7 @@ export function JoinForm({
   const [planUnavailable, setPlanUnavailable] = useState(false);
   const [retryAfter, setRetryAfter] = useState(0);
   const [intakeClosed, setIntakeClosed] = useState(false);
+  const successEventTokenRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (retryAfter <= 0) return;
@@ -239,6 +240,21 @@ export function JoinForm({
         setSuccess(true);
         setBanner(null);
         setErrors({});
+        /**
+         * Browser-observed analytics event only. It is dispatched regardless
+         * of analytics consent/enablement; the consent-gated tracker decides
+         * whether anything is sent. It is not the authoritative request count.
+         * A lost-response retry with the same submission token must not count
+         * as a second conversion.
+         */
+        if (successEventTokenRef.current !== submissionToken) {
+          successEventTokenRef.current = submissionToken;
+          window.dispatchEvent(
+            new CustomEvent('nokmel:analytics', {
+              detail: { name: 'join_request_success' },
+            }),
+          );
+        }
         return;
       }
 

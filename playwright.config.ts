@@ -1,6 +1,14 @@
+import { generateKeyPairSync } from 'node:crypto';
 import { defineConfig, devices } from '@playwright/test';
 
 const adminE2eEnabled = Boolean(process.env.E2E_OWNER_PASSWORD && process.env.DATABASE_URL);
+const e2eGaPrivateKey = adminE2eEnabled
+  ? generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+    }).privateKey
+  : '';
 const joinIntakeEnabled = adminE2eEnabled
   ? (process.env.JOIN_INTAKE_ENABLED ?? '1')
   : (process.env.JOIN_INTAKE_ENABLED ?? '');
@@ -17,6 +25,14 @@ const webServerEnv = adminE2eEnabled
       JOIN_INTAKE_ENABLED: joinIntakeEnabled,
       NOKMEL_DISPOSABLE_TEST_ENV: process.env.NOKMEL_DISPOSABLE_TEST_ENV ?? '1',
       JOIN_RATE_LIMIT_MAX: process.env.JOIN_RATE_LIMIT_MAX ?? '100',
+      GA4_PROPERTY_ID: '123456789',
+      GA4_CLIENT_EMAIL: 'e2e-reporter@nokmel-e2e.test',
+      GA4_PRIVATE_KEY: e2eGaPrivateKey,
+      GA4_API_BASE_URL: 'http://127.0.0.1:3300',
+      GA4_TOKEN_ENDPOINT: 'http://127.0.0.1:3300/token',
+      GA4_MEASUREMENT_ID: '',
+      TELEGRAM_BOT_TOKEN: '123456:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij',
+      TELEGRAM_API_BASE_URL: 'http://127.0.0.1:3301',
     }
   : { ...process.env, JOIN_INTAKE_ENABLED: joinIntakeEnabled };
 
@@ -25,6 +41,14 @@ const disabledWebServerEnv = {
   BETTER_AUTH_URL: 'http://127.0.0.1:3200',
   TRUSTED_ORIGINS: 'http://127.0.0.1:3200',
   JOIN_INTAKE_ENABLED: '',
+  GA4_PROPERTY_ID: '',
+  GA4_CLIENT_EMAIL: '',
+  GA4_PRIVATE_KEY: '',
+  GA4_API_BASE_URL: '',
+  GA4_TOKEN_ENDPOINT: '',
+  GA4_MEASUREMENT_ID: '',
+  TELEGRAM_BOT_TOKEN: '',
+  TELEGRAM_API_BASE_URL: '',
 };
 
 /**
@@ -75,6 +99,18 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       timeout: 240_000,
       env: disabledWebServerEnv as Record<string, string>,
+    },
+    {
+      command: 'node tests/e2e/setup/ga-stub-server.mjs',
+      url: 'http://127.0.0.1:3300/__health',
+      reuseExistingServer: !process.env.CI,
+      timeout: 30_000,
+    },
+    {
+      command: 'node tests/e2e/setup/telegram-stub-server.mjs',
+      url: 'http://127.0.0.1:3301/__health',
+      reuseExistingServer: !process.env.CI,
+      timeout: 30_000,
     },
   ],
 });

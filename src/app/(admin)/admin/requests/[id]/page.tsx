@@ -10,6 +10,7 @@ import {
   formatSavedPercent,
 } from '@/lib/plans/promotion';
 import { pageMetadata } from '@/lib/seo';
+import { NotificationStatusPanel } from './NotificationStatusPanel';
 import { RequestActions } from './RequestActions';
 
 export const metadata: Metadata = pageMetadata({
@@ -332,6 +333,8 @@ export default async function AdminRequestDetailPage({
           </dl>
         </section>
       ) : null}
+
+      <NotificationStatusPanel id={request.id} notification={request.notification} />
 
       <div className="mt-5">
         <RequestActions

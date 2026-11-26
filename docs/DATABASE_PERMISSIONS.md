@@ -4,18 +4,20 @@ Status: reviewed plan for W3.1 hardening. Execute only on the dedicated
 `nokmel-website` Neon project (development branch first) with explicit owner
 approval. Never run against `Nokmel_prod`, `Nokmel_dev`, or any other project.
 
-Current development state (2026-11-25, external configuration): roles
+Current development state (2026-11-26, external configuration): roles
 `nokmel_migrator` and `nokmel_runtime` exist; W3.1 migrations `0000`/`0001` are
 applied; the QA owner is provisioned; the runtime role has no database/schema
 CREATE; the migrator retains `public`/`drizzle` schema privileges and its
 temporary database-level CREATE was revoked after migration. The external lead
-reports W3.2 `0002_w32-content-cms` applied on hosted development, CMS runtime
-grants configured, and database-level CREATE revoked. W4 migration
-`0003_w4-plans-join-requests`, runtime grants and branch Preview intake
-configuration were activated externally; the coding agent did not connect to
-hosted Neon. W4.1 migration `0004_w41-scheduled-promotional-pricing` is
-**pending** hosted application; it adds nullable columns to existing tables, so
-no new runtime grant is expected. No credentials are recorded here.
+reports W3.2 `0002_w32-content-cms`, W4 `0003_w4-plans-join-requests` and W4.1
+`0004_w41-scheduled-promotional-pricing` applied on hosted Development with the
+documented runtime grants and revoke-after-migration sequence. W4.1 is merged
+and accepted for continued development. W5 migration
+`0005_w5-settings-notifications` is **not applied on hosted Development**; it
+adds one new table (`site_settings`) plus nullable columns/checks on the
+existing `join_requests` table, so it requires one new runtime table grant.
+The coding agent did not connect to hosted Neon. No credentials are recorded
+here.
 
 ## Roles
 
@@ -348,6 +350,78 @@ references, including historical snapshots, and must never use `TRUNCATE` or an
 unscoped delete. The final production retention and personal-data deletion
 policy still requires owner approval before launch.
 
+## 3e. W5 website settings and notification state
+
+Migration `0005_w5-settings-notifications` is additive:
+
+- creates `public.site_settings` (one typed row, public/private columns, checks);
+- adds nullable `notification_state`, `notification_attempted_at`,
+  `notification_delivered_at` and `notification_error_code` to
+  `public.join_requests`, plus two checks.
+
+There is **no** first-party analytics table. Telegram bot tokens and GA4
+credentials remain server environment secrets and are never stored in the
+database.
+
+After the migration, grant only the DML the application uses:
+
+```sql
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
+  public.site_settings
+TO nokmel_runtime;
+```
+
+The existing table-level `SELECT, INSERT, UPDATE, DELETE` on
+`public.join_requests` from §3b already covers the new notification columns; no
+column-level grant is needed. No `TRUNCATE`, `REFERENCES`, `TRIGGER`,
+ownership, schema/database `CREATE`, sequence (none exist) or migration-history
+privilege is granted to the runtime. `nokmel_migrator` owns the new table from
+its migration run; do not transfer ownership to the runtime role.
+
+Apply the migration with the same temporary database-level CREATE procedure as
+prior migrations:
+
+```sql
+-- as the project owner, before migration 0005:
+GRANT CREATE ON DATABASE nokmel_website TO nokmel_migrator;
+-- run the reviewed migration as nokmel_migrator (direct connection only):
+--   pnpm db:check
+--   DATABASE_URL_DIRECT=<direct development URL> pnpm db:migrate
+-- immediately afterward:
+REVOKE CREATE ON DATABASE nokmel_website FROM nokmel_migrator;
+```
+
+Do not run this against Production without explicit W6 launch approval. The
+coding agent did not apply 0005 to hosted Neon.
+
+Verification (no secrets printed):
+
+```sql
+SELECT has_table_privilege('nokmel_runtime', 'public.site_settings', 'SELECT') AS settings_select, -- true
+       has_table_privilege('nokmel_runtime', 'public.site_settings', 'INSERT') AS settings_insert, -- true
+       has_table_privilege('nokmel_runtime', 'public.site_settings', 'UPDATE') AS settings_update, -- true
+       has_table_privilege('nokmel_runtime', 'public.site_settings', 'DELETE') AS settings_delete, -- true
+       has_table_privilege('nokmel_runtime', 'public.site_settings', 'TRUNCATE') AS settings_truncate, -- false
+       has_table_privilege('nokmel_runtime', 'public.join_requests', 'UPDATE') AS requests_update, -- true
+       has_table_privilege('nokmel_runtime', 'public.join_requests', 'TRUNCATE') AS requests_truncate; -- false
+
+SELECT column_name, is_nullable, data_type
+  FROM information_schema.columns
+ WHERE table_schema = 'public'
+   AND table_name = 'join_requests'
+   AND column_name LIKE 'notification_%'
+ ORDER BY column_name;
+```
+
+Only one `site_settings` row with `id = 'default'` is allowed by a check
+constraint. Public reads use an explicit column projection; private chat IDs
+and integration flags are never selected by public loaders. The disposable
+runtime probe in `tests/integration/runtime-role.test.ts` performs intended
+`site_settings`/notification-column DML with a restricted synthetic role and
+confirms DDL/`TRUNCATE` refusal. The W5 migration-upgrade test proves a
+populated W4.1 database keeps all existing data and that settings start empty
+(no row) with integrations disabled.
+
 ## 4. Default privileges for future objects
 
 Migration-created objects must not inherit PUBLIC access, and the runtime must
@@ -380,11 +454,11 @@ SELECT has_schema_privilege('nokmel_runtime', 'public', 'USAGE')  AS runtime_sch
 
 Automated evidence: `tests/integration/runtime-role.test.ts` creates a
 restricted synthetic role on a **disposable loopback PostgreSQL 18**, applies
-this plan (including the two CMS tables), and verifies login, sign-in, session
-access, logout, database-backed rate limiting, CMS DML, and refusal of
-`CREATE`/`ALTER`/`DROP`/`TRUNCATE`. It is part of
-`pnpm test:db` and runs in CI. The plan itself is never executed against hosted
-Neon in this workstream.
+this plan (including the CMS, plan/join/limiter and W5 `site_settings` tables),
+and verifies login, sign-in, session access, logout, database-backed rate
+limiting, CMS/plan/join/settings DML, notification-column updates, and refusal
+of `CREATE`/`ALTER`/`DROP`/`TRUNCATE`. It is part of `pnpm test:db` and runs in
+CI. The plan itself is never executed against hosted Neon in this workstream.
 
 ## 6. Rotation
 

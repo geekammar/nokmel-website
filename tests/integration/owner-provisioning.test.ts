@@ -74,6 +74,7 @@ describe('migrations from empty schema', () => {
       'plans',
       'rate_limit',
       'session',
+      'site_settings',
       'user',
       'verification',
     ]);

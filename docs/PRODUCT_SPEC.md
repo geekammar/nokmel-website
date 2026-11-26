@@ -30,11 +30,11 @@ Pages:
 ## 4. Admin scope [APPROVED]
 
 Exactly five primary sections:
-1. **Overview** — essential visitor analytics, traffic sources, pricing-page interest, join requests, conversion metrics.
+1. **Overview** — authoritative database-backed early-access request metrics (period KPIs, current follow-up backlog, source/plan/promotion breakdowns, latest protected request links) plus optional owner-only Google Analytics 4 aggregate reporting. No revenue, ARR, MRR or subscription metrics. See §10–§12.
 2. **Content & SEO** — editable page content, images, predefined sections, FAQ, and page-level editable SEO metadata (titles, descriptions, social sharing metadata per page).
 3. **Plans & Pricing** — owner-managed marketing plans: immutable URL-safe slug, name, short description, ordered features, optional monthly and yearly prices in an explicit supported currency (or an honest unannounced-price state), display order, draft/publish/hide visibility, optional featured flag and editable early-access CTA. New plans are unpublished by default; editing a live plan never changes the public offer before explicit publication. One optional scheduled promotional discount per plan (W4.1): percentage or fixed, monthly/yearly/both, custom label, Africa/Cairo scheduled start/end, manual enable/disable, draft/published separation, protected preview, automatic time-based activation/expiration and a historical offer snapshot on new planned join requests.
-4. **Requests** — owner-only join-request list/detail: name, normalized phone, optional email/business activity, optional selected plan, server-generated historical offer snapshot, acquisition source, status (`new` / `contacted` / `closed`), optional internal notes, filters, bounded pagination, search. Public submissions are write-only and always start as `new`.
-5. **Settings** — website, contact, social, CTA, notification, and owner account settings. Owner authentication data is stored separately from general website settings.
+4. **Requests** — owner-only join-request list/detail: name, normalized phone, optional email/business activity, optional selected plan, server-generated historical offer snapshot, acquisition source, status (`new` / `contacted` / `closed`), optional internal notes, filters, bounded pagination, search, and optional Telegram notification delivery state/manual retry. Public submissions are write-only and always start as `new`.
+5. **Settings** — public contact/social links, private integration preferences (analytics and owner notifications), and owner account information. Owner authentication data is stored separately; the owner email/password are not editable from general settings.
 
 Lightweight CMS with predefined components only. No generic website builder.
 
@@ -70,12 +70,41 @@ Live demo, demo management, media library dashboard, security & activity dashboa
 - W2: all approved public pages render RTL-first, mobile-first, with visible CTA.
 - W3: owner-only admin auth works; content/SEO editable via predefined components.
 - W4: plans editable as marketing data only; join requests captured and listed. Implemented on `feature/w4-plans-join-requests` with additive migration `0003_w4-plans-join-requests`; hosted activation and independent acceptance remain external. No billing/payment/entitlement code.
-- W4.1: one optional scheduled promotional discount per plan, shared effective-offer resolver/version, stale-offer recovery at activation/expiration, and expanded historical offer snapshots. Implemented on `feature/w41-scheduled-promotional-pricing` with additive migration `0004_w41-scheduled-promotional-pricing`; hosted activation and independent acceptance remain external.
-- W5: overview analytics and settings functional.
+- W4.1: one optional scheduled promotional discount per plan, shared effective-offer resolver/version, stale-offer recovery at activation/expiration, and expanded historical offer snapshots. Merged via PR #8 (accepted HEAD `7d33ab734cc84cb51f17d67aa972390559c71e86`, merge commit `d50f7d555859b5f0ee4dc5b7075127f9e02eafde`); independent live acceptance 18/18, 0 FAIL/PARTIAL/BLOCKED. W4.1 is accepted for continued development.
+- W5: business overview, external website analytics, optional owner Telegram notifications and website settings. Implemented on `feature/w5-analytics-notifications-settings` with additive migration `0005_w5-settings-notifications`; independent acceptance and hosted activation remain external. W5 does not add billing, CRM, marketing automation or a first-party analytics pipeline.
 - W6: launch acceptance by owner; no deployment without explicit approval.
 
-## 10. Open questions [OPEN]
+## 10. W5 metric definitions and data-source boundaries [APPROVED for W5 implementation]
+
+- **Period:** “last 7/30/90 days” means that many Africa/Cairo calendar dates including today. The database range starts at the first instant of the first Cairo date and ends exclusively at the first instant of tomorrow in Cairo. Metric labels state whether a value is period-scoped or an all-time backlog.
+- **Received in period:** accepted, persisted `join_requests` created inside the period. Rejected/failed validation attempts and same-token replays do not create additional requests. Hidden-plan impressions are not plan interest.
+- **Needs attention now:** all-time count of `status = 'new'`, deliberately independent of the selected period so older unattended requests are never hidden.
+- **Contacted/closed:** current status of the period cohort (requests created in the period), labelled accordingly.
+- **Source breakdown:** the stored bounded acquisition hint (`direct | pricing | join`). UTM values are shown separately. This is attribution context, not proof of actual browser navigation.
+- **Plan interest:** grouped by the historical plan name captured at submission (`offer_snapshot` for W4.1 rows, legacy `plan_name_snapshot` otherwise). Renaming or hiding a plan never rewrites this metric.
+- **Promotion context:** derived only from the immutable historical `offer_snapshot` (`active`, no active promotion, legacy unknown, invalid/unknown, no plan). Current plan promotion status is never used.
+- **Latest requests:** the five newest accepted requests overall, explicitly labelled all-time, linking to existing owner-protected detail pages.
+- **No commercial metrics:** no revenue, ARR, MRR, subscription conversion or billing metric is derived from early-access leads.
+
+## 11. W5 external analytics and notifications [APPROVED for W5 implementation]
+
+- **Provider:** Google Analytics 4 is the initial external analytics provider. Aggregate reporting uses the Google Analytics Data API server-side with a read-only service account and the minimum `analytics.readonly` scope. No Universal Analytics API, custom analytics database, `analytics_events` table, warehouse or session replay is introduced.
+- **Enablement/privacy:** analytics is disabled by default. Tracking loads only when the owner preference is enabled, the server measurement configuration exists, and the visitor explicitly consents. No script, tracking cookie or event is sent before consent or when disabled. Admin, login, protected previews, request details and API routes are never tracked. Only the seven public routes are sent, with sanitized `page_location`/`page_referrer`; query strings and personal data are excluded. Google Ads, remarketing, Google Signals and ad personalization are disabled.
+- **Event vocabulary:** manual `page_view` (no duplicate initial pageview), `join_cta_click`, and `join_request_success` only after a successfully completed intake response. Same-token attempts do not add another browser conversion. Browser event counts are distinct from authoritative accepted-request counts and may be missing because of consent, blockers, network or reporting delay.
+- **Provider failures:** disabled, not configured, unavailable and partial states are shown honestly; unavailable is never rendered as zero. Provider calls are bounded, timed out, server-cached briefly, validated before rendering, and mocked in automated tests.
+- **Owner notifications:** optional Telegram Bot API notification to one fixed private owner destination. This is a separate website notification bot, not a commerce/store bot. The bot token is a server environment secret; the numeric chat destination is private owner configuration. The message is plain text, contains no name/phone/email/business/notes/tokens, and links to the protected owner request page. Delivery is attempted only after the accepted request commits; failures never invalidate the request. States are durable, retries are owner-triggered and database-guarded, and exactly-once delivery is not claimed.
+
+## 12. W5 settings ownership [APPROVED for W5 implementation]
+
+- One typed `site_settings` row with an allowlist of known fields. No generic key/value configuration editor.
+- **Public values:** business contact email/phone, explicit Telegram/WhatsApp and social profile links. Public loaders select only these approved fields; unsupported hosts, unsafe schemes, credentials, queries and fragments are rejected. Empty means not configured.
+- **Private values:** notification enablement, private Telegram destination, analytics enablement and owner-only integration status. Bot tokens and GA credentials remain server environment secrets and are never stored in settings or returned to clients/logs.
+- **Ownership:** CMS remains authoritative for editable page copy, FAQ and SEO. Settings own contact/social destinations and integration preferences. Existing code-controlled CTA destinations are unchanged; no competing global CTA setting is introduced in W5.
+- **Persistence:** owner-authorized server actions, strict server-side validation, independent optimistic revisions per settings group, atomic database updates, and visible success only after commit. Public settings changes are immediately effective; CMS content keeps its separate draft/published workflow.
+
+## 13. Open questions [OPEN]
 
 - ~~Delivery of `Nokmel_Deep_Brand_Kit_v2.0.zip`~~ — **RESOLVED 2026-11-24**: supplied and verified (SHA-256 match); W1 prerequisite met.
 - Final approval of headline/tagline copy.
-- Choice of authentication library (decided at the auth implementation phase) and external analytics provider (decided at the analytics phase).
+- ~~Choice of authentication library and external analytics provider~~ — **RESOLVED**: Better Auth 1.7.28 (W3.1) and Google Analytics 4 (W5).
+- Final W6 privacy/consent/retention approval for the analytics provider and owner notifications.

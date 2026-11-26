@@ -1,6 +1,9 @@
+import { AnalyticsConsent } from '@/components/analytics/AnalyticsConsent';
+import { AnalyticsTracker } from '@/components/analytics/AnalyticsTracker';
 import { Footer } from '@/components/layout/Footer';
 import { Header } from '@/components/layout/Header';
 import { ar } from '@/i18n/messages/ar';
+import { loadPublicTrackingGate } from '@/lib/analytics/service';
 
 /**
  * Public pages render per request so a published CMS change is visible
@@ -10,7 +13,10 @@ import { ar } from '@/i18n/messages/ar';
  */
 export const dynamic = 'force-dynamic';
 
-export default function PublicLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function PublicLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
+  const tracking = await loadPublicTrackingGate();
   return (
     <>
       <a
@@ -25,6 +31,15 @@ export default function PublicLayout({ children }: Readonly<{ children: React.Re
         {children}
       </main>
       <Footer />
+      {tracking.enabled && tracking.measurementId && tracking.tagBase ? (
+        <>
+          <AnalyticsConsent />
+          <AnalyticsTracker
+            measurementId={tracking.measurementId}
+            tagBase={tracking.tagBase}
+          />
+        </>
+      ) : null}
     </>
   );
 }
