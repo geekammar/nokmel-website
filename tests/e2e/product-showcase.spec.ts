@@ -1,3 +1,4 @@
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 
 async function scrollToShowcase(page: import('@playwright/test').Page) {
@@ -18,109 +19,154 @@ async function prepareFocusedScreenshot(
   await page.evaluate(() => window.scrollBy(0, -16));
 }
 
+async function trackShowcaseEvents(page: import('@playwright/test').Page) {
+  await page.evaluate(() => {
+    const target = window as Window & { __nokmelShowcaseEvents?: unknown[] };
+    target.__nokmelShowcaseEvents = [];
+    window.addEventListener('nokmel:analytics', (event) => {
+      target.__nokmelShowcaseEvents?.push((event as CustomEvent).detail);
+    });
+  });
+}
+
+async function readShowcaseEvents(page: import('@playwright/test').Page) {
+  return page.evaluate(
+    () => (window as Window & { __nokmelShowcaseEvents?: unknown[] }).__nokmelShowcaseEvents,
+  );
+}
+
 test.describe('interactive product showcase', () => {
-  test('steps through verified customer and merchant states without commerce mutations', async ({
+  test('direct actions advance the guided simulation with consistent totals', async ({
     page,
   }) => {
     const commerceRequests: string[] = [];
     page.on('request', (request) => {
-      if (request.url().includes('/api/join') && request.method() === 'POST') {
-        commerceRequests.push(request.url());
+      if (request.url().includes('/api/') && request.method() !== 'GET') {
+        commerceRequests.push(`${request.method()} ${request.url()}`);
       }
     });
 
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/');
+    await trackShowcaseEvents(page);
     const showcase = await scrollToShowcase(page);
+    const customer = showcase.getByTestId('showcase-customer-panel');
+    const merchant = showcase.getByTestId('showcase-merchant-panel');
+    const title = showcase.getByTestId('showcase-step-title');
 
-    await expect(showcase.locator('[data-testid="showcase-customer-panel"]')).toBeVisible();
-    await expect(showcase.locator('[data-testid="showcase-merchant-panel"]')).toBeVisible();
-    await expect(showcase.getByTestId('showcase-step-title')).toContainText(
-      'تصفح المنتجات',
-    );
-
-    const next = showcase.getByTestId('showcase-next');
-    for (let step = 1; step < 5; step += 1) {
-      await next.click();
-    }
-    await expect(showcase.getByTestId('showcase-step-title')).toContainText(
-      'تسجيل الطلب',
-    );
+    await expect(customer).toBeVisible();
+    await expect(merchant).toBeVisible();
+    await expect(title).toContainText('تصفح المنتجات');
+    const productAction = showcase.getByTestId('showcase-action-product');
     await expect(
-      showcase.locator('[data-testid="showcase-customer-order"]'),
-    ).toHaveText('NW-1042');
+      showcase.getByRole('button', {
+        name: 'اختيار المنتج التجريبي: عبوة تغليف كرتونية',
+      }),
+    ).toBeVisible();
+    expect(await productAction.evaluate((element) => element.tagName)).toBe('BUTTON');
+    expect(
+      await productAction.evaluate((element) => element.closest('[aria-hidden="true"]')),
+    ).toBeNull();
 
-    await next.click();
-    await expect(showcase.getByTestId('showcase-step-title')).toContainText(
-      'ظهور الطلب',
-    );
-    await expect(
-      showcase.locator('[data-testid="showcase-merchant-order"]'),
-    ).toHaveText('NW-1042');
-    await expect(showcase.getByTestId('showcase-merchant-status')).toHaveText(
-      'تم الطلب',
-    );
+    await productAction.click();
+    await expect(title).toContainText('اختيار المنتج والكمية');
+    await expect(showcase.getByText('الكمية المحددة: قطعتان')).toBeVisible();
+    await showcase.getByTestId('showcase-action-quantity').click();
 
-    await next.click();
-    await expect(showcase.getByTestId('showcase-step-title')).toContainText(
-      'قبول الطلب',
+    await expect(title).toContainText('إضافة المنتج إلى السلة');
+    await expect(customer.getByTestId('showcase-cart-line-total')).toHaveText('50.00 ر.س');
+    await expect(customer.getByTestId('showcase-subtotal')).toHaveText('50.00 ر.س');
+    await expect(customer.getByTestId('showcase-delivery-fee')).toHaveText('10.00 ر.س');
+    await expect(customer.getByTestId('showcase-total')).toHaveText('60.00 ر.س');
+    await expect(customer.getByText('عبوة تغليف كرتونية × 2')).toBeVisible();
+
+    await showcase.getByTestId('showcase-action-checkout').click();
+    await expect(title).toContainText('إتمام الطلب');
+    await expect(customer.getByTestId('showcase-subtotal')).toHaveText('50.00 ر.س');
+    await expect(customer.getByTestId('showcase-delivery-fee')).toHaveText('10.00 ر.س');
+    await expect(customer.getByTestId('showcase-total')).toHaveText('60.00 ر.س');
+    await expect(customer.getByText('عند الاستلام', { exact: true })).toBeVisible();
+    await expect(showcase.getByTestId('showcase-action-confirm-cod')).toBeVisible();
+
+    await showcase.getByTestId('showcase-action-confirm-cod').click();
+    await expect(title).toContainText('تسجيل الطلب');
+    await expect(customer.getByTestId('showcase-customer-order')).toHaveText('NW-1042');
+    await expect(showcase.getByTestId('showcase-action-open-merchant')).toBeVisible();
+
+    await showcase.getByTestId('showcase-action-open-merchant').click();
+    await expect(title).toContainText('ظهور الطلب');
+    await expect(merchant.getByTestId('showcase-merchant-order')).toHaveText('NW-1042');
+    await expect(merchant.getByTestId('showcase-merchant-status')).toHaveText('تم الطلب');
+    await expect(merchant.getByTestId('showcase-merchant-total')).toHaveText('60.00 ر.س');
+    await expect(showcase.getByTestId('showcase-action-accept-order')).toBeVisible();
+
+    await showcase.getByTestId('showcase-action-accept-order').click();
+    await expect(title).toContainText('قبول الطلب');
+    await expect(merchant.getByTestId('showcase-merchant-status')).toHaveText('مقبول');
+    await expect(merchant.getByTestId('showcase-merchant-order')).toHaveText('NW-1042');
+    await expect(customer.getByTestId('showcase-customer-order')).toHaveText('NW-1042');
+    await expect(showcase.getByTestId('showcase-next-action-prepare')).toHaveText(
+      'بدء التجهيز',
     );
-    await expect(showcase.getByTestId('showcase-merchant-status')).toHaveText('مقبول');
-    await expect(
-      showcase.locator('[data-testid="showcase-merchant-panel"]'),
-    ).toContainText('بدء التجهيز');
-    await expect(next).toBeDisabled();
+    expect(
+      await showcase
+        .getByTestId('showcase-next-action-prepare')
+        .evaluate((element) => element.tagName),
+    ).toBe('P');
+    await expect(showcase.getByTestId('showcase-next')).toBeDisabled();
+    await expect(showcase.getByText('أضف قطعتين')).toHaveCount(0);
+    await expect(page.locator('#product-showcase form')).toHaveCount(0);
+
+    expect(commerceRequests).toEqual([]);
+    expect(await readShowcaseEvents(page)).toEqual([]);
 
     await prepareFocusedScreenshot(page, showcase);
     await showcase.screenshot({
       path: 'test-results/screenshots/w2s-showcase-1440.png',
     });
-    expect(commerceRequests).toEqual([]);
   });
 
-  test('uses one compact viewport on mobile and switches to the merchant side', async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
+  test('manual direct action pauses autoplay', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/');
-    await page.screenshot({
-      path: 'test-results/screenshots/w2s-home-390.png',
-      fullPage: true,
-    });
-
     const showcase = await scrollToShowcase(page);
-    const customer = showcase.locator('[data-testid="showcase-customer-panel"]');
-    const merchant = showcase.locator('[data-testid="showcase-merchant-panel"]');
-    await expect(customer).toBeVisible();
-    await expect(merchant).toBeHidden();
+    const autoplay = showcase.getByTestId('showcase-autoplay');
+    const title = showcase.getByTestId('showcase-step-title');
 
-    await showcase.getByTestId('showcase-mobile-merchant').click();
-    await expect(customer).toBeHidden();
-    await expect(merchant).toBeVisible();
-    await expect(merchant).toContainText('لا طلبات جديدة بعد');
-    await showcase.getByTestId('showcase-mobile-customer').click();
-    await expect(customer).toBeVisible();
-
-    for (let step = 1; step < 6; step += 1) {
-      await showcase.getByTestId('showcase-next').click();
-    }
-    await expect(customer).toBeHidden();
-    await expect(merchant).toBeVisible();
-    await expect(showcase.getByTestId('showcase-merchant-status')).toHaveText(
-      'تم الطلب',
-    );
-
-    const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    );
-    expect(overflow).toBeLessThanOrEqual(1);
-    await prepareFocusedScreenshot(page, showcase);
-    await showcase.screenshot({
-      path: 'test-results/screenshots/w2s-showcase-390.png',
-    });
+    await autoplay.click();
+    await expect(autoplay).toHaveText('إيقاف مؤقت');
+    await showcase.getByTestId('showcase-action-product').click();
+    await expect(autoplay).toHaveText('تشغيل تلقائي');
+    await expect(title).toContainText('اختيار المنتج');
+    await page.waitForTimeout(2400);
+    await expect(title).toContainText('اختيار المنتج');
   });
 
-  test('disables autoplay and keeps manual steps available with reduced motion', async ({
+  test('keyboard interaction activates direct actions', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+    const showcase = await scrollToShowcase(page);
+    const title = showcase.getByTestId('showcase-step-title');
+
+    const productAction = showcase.getByTestId('showcase-action-product');
+    await productAction.focus();
+    await page.keyboard.press('Enter');
+    await expect(title).toContainText('اختيار المنتج');
+
+    const quantityAction = showcase.getByTestId('showcase-action-quantity');
+    await quantityAction.focus();
+    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.press('Tab');
+    await expect(quantityAction).toBeFocused();
+    const outline = await quantityAction.evaluate(
+      (element) => getComputedStyle(element).outlineStyle,
+    );
+    expect(outline).not.toBe('none');
+    await page.keyboard.press('Space');
+    await expect(title).toContainText('إضافة المنتج');
+  });
+
+  test('reduced motion disables autoplay and keeps direct actions available', async ({
     page,
   }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -136,7 +182,7 @@ test.describe('interactive product showcase', () => {
     await expect(showcase.getByTestId('showcase-step-title')).toContainText(
       'تصفح المنتجات',
     );
-    await showcase.getByTestId('showcase-next').click();
+    await showcase.getByTestId('showcase-action-product').click();
     await expect(showcase.getByTestId('showcase-step-title')).toContainText(
       'اختيار المنتج',
     );
@@ -164,7 +210,95 @@ test.describe('interactive product showcase', () => {
     await expect(showcase.getByTestId('showcase-prev')).toBeDisabled();
   });
 
-  test('captures the desktop homepage and focused showcase', async ({ page }) => {
+  test('mobile keeps one panel and captures initial, checkout and accepted states', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+    await page.screenshot({
+      path: 'test-results/screenshots/w2s-home-390.png',
+      fullPage: true,
+    });
+
+    const showcase = await scrollToShowcase(page);
+    const customer = showcase.getByTestId('showcase-customer-panel');
+    const merchant = showcase.getByTestId('showcase-merchant-panel');
+    await expect(customer).toBeVisible();
+    await expect(merchant).toBeHidden();
+    const productActionBox = await showcase
+      .getByTestId('showcase-action-product')
+      .boundingBox();
+    expect(productActionBox!.height).toBeGreaterThanOrEqual(44);
+    const customerTabBox = await showcase
+      .getByTestId('showcase-mobile-customer')
+      .boundingBox();
+    expect(customerTabBox!.height).toBeGreaterThanOrEqual(44);
+
+    await showcase.getByTestId('showcase-mobile-merchant').click();
+    await expect(customer).toBeHidden();
+    await expect(merchant).toBeVisible();
+    await expect(merchant).toContainText('لا طلبات جديدة بعد');
+    await showcase.getByTestId('showcase-mobile-customer').click();
+    await expect(customer).toBeVisible();
+
+    mkdirSync('test-results/screenshots', { recursive: true });
+    const measurements: Record<string, number | null> = {};
+    await prepareFocusedScreenshot(page, showcase);
+    measurements.initial = (await showcase.boundingBox())?.height
+      ? Math.round((await showcase.boundingBox())!.height)
+      : null;
+    await showcase.screenshot({
+      path: 'test-results/screenshots/w2s-showcase-390-initial.png',
+    });
+
+    await showcase.getByTestId('showcase-action-product').click();
+    await showcase.getByTestId('showcase-action-quantity').click();
+    await showcase.getByTestId('showcase-action-checkout').click();
+    await expect(showcase.getByTestId('showcase-step-title')).toContainText(
+      'إتمام الطلب',
+    );
+    await expect(customer.getByTestId('showcase-subtotal')).toHaveText('50.00 ر.س');
+    await expect(customer.getByTestId('showcase-delivery-fee')).toHaveText('10.00 ر.س');
+    await expect(customer.getByTestId('showcase-total')).toHaveText('60.00 ر.س');
+    await prepareFocusedScreenshot(page, showcase);
+    measurements.checkout = (await showcase.boundingBox())?.height
+      ? Math.round((await showcase.boundingBox())!.height)
+      : null;
+    await showcase.screenshot({
+      path: 'test-results/screenshots/w2s-showcase-390-checkout.png',
+    });
+
+    await showcase.getByTestId('showcase-action-confirm-cod').click();
+    await showcase.getByTestId('showcase-action-open-merchant').click();
+    await showcase.getByTestId('showcase-action-accept-order').click();
+    await expect(customer).toBeHidden();
+    await expect(merchant).toBeVisible();
+    await expect(showcase.getByTestId('showcase-step-title')).toContainText(
+      'قبول الطلب',
+    );
+    await expect(merchant.getByTestId('showcase-merchant-status')).toHaveText('مقبول');
+    await prepareFocusedScreenshot(page, showcase);
+    measurements.accepted = (await showcase.boundingBox())?.height
+      ? Math.round((await showcase.boundingBox())!.height)
+      : null;
+    await showcase.screenshot({
+      path: 'test-results/screenshots/w2s-showcase-390-merchant.png',
+    });
+
+    for (const width of [320, 360, 390, 430, 768, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflow, `showcase overflow at ${width}px`).toBeLessThanOrEqual(1);
+    }
+    writeFileSync(
+      'test-results/screenshots/w2s-showcase-390-measurements.json',
+      JSON.stringify(measurements, null, 2),
+    );
+  });
+
+  test('captures the desktop homepage and showcase evidence', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/');
     await page.screenshot({
@@ -174,7 +308,7 @@ test.describe('interactive product showcase', () => {
     const showcase = await scrollToShowcase(page);
     await prepareFocusedScreenshot(page, showcase);
     await showcase.screenshot({
-      path: 'test-results/screenshots/w2s-showcase-initial-1440.png',
+      path: 'test-results/screenshots/w2s-showcase-1440-initial.png',
     });
   });
 });

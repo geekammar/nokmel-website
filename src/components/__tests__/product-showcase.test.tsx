@@ -3,9 +3,13 @@ import path from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import {
+  PRODUCT_SHOWCASE_ORDER_REFERENCE,
+  PRODUCT_SHOWCASE_PRICES,
+  PRODUCT_SHOWCASE_QUANTITY,
   PRODUCT_SHOWCASE_SCENES,
   PRODUCT_SHOWCASE_STEP_MS,
   ProductShowcase,
+  formatShowcaseMoney,
 } from '@/components/sections/ProductShowcase';
 import { home } from '@/content/ar/home';
 
@@ -48,13 +52,57 @@ describe('interactive product showcase', () => {
     expect(seconds).toBeLessThanOrEqual(18);
   });
 
+  it('uses a deterministic two-unit order with consistent totals', () => {
+    expect(PRODUCT_SHOWCASE_QUANTITY).toBe(2);
+    expect(PRODUCT_SHOWCASE_ORDER_REFERENCE).toBe('NW-1042');
+    expect(PRODUCT_SHOWCASE_PRICES).toEqual({
+      unitMinor: 2500,
+      quantity: 2,
+      subtotalMinor: 5000,
+      deliveryMinor: 1000,
+      totalMinor: 6000,
+    });
+    expect(formatShowcaseMoney(2500)).toBe('25.00 ر.س');
+    expect(formatShowcaseMoney(5000)).toBe('50.00 ر.س');
+    expect(formatShowcaseMoney(1000)).toBe('10.00 ر.س');
+    expect(formatShowcaseMoney(6000)).toBe('60.00 ر.س');
+    const source = readFileSync(
+      path.join(process.cwd(), 'src/components/sections/ProductShowcase.tsx'),
+      'utf8',
+    );
+    expect(source).not.toContain('أضف قطعتين');
+    expect(source).not.toContain('UserBubble');
+    expect(source).toContain('الكمية المحددة: قطعتان');
+  });
+
   it('labels the demo as synthetic and does not create a real order', () => {
     const html = renderToStaticMarkup(<ProductShowcase {...showcaseProps} />);
     expect(html).toContain('بيانات اصطناعية');
-    expect(html).toContain('لا يتم إرسال أي طلب أو بيانات من هذا العرض');
-    expect(html).toContain('لا يُنشئ طلباً حقيقياً');
+    expect(html).toContain('لا يُنشئ طلباً حقيقياً أو يرسل بيانات');
+    expect(html).toContain('ولا يمثل واجهة الإنتاج النهائية');
     expect(html).not.toContain('<form');
     expect(html).not.toContain('join_request_success');
+  });
+
+  it('renders real action buttons with accessible names', () => {
+    const html = renderToStaticMarkup(<ProductShowcase {...showcaseProps} />);
+    expect(html).toMatch(/<button[^>]*data-testid="showcase-action-product"/);
+    expect(html).toContain('aria-label="اختيار المنتج التجريبي: عبوة تغليف كرتونية"');
+    const source = readFileSync(
+      path.join(process.cwd(), 'src/components/sections/ProductShowcase.tsx'),
+      'utf8',
+    );
+    for (const testId of [
+      'showcase-action-product',
+      'showcase-action-quantity',
+      'showcase-action-checkout',
+      'showcase-action-confirm-cod',
+      'showcase-action-open-merchant',
+      'showcase-action-accept-order',
+    ]) {
+      expect(source).toContain(`testId="${testId}"`);
+    }
+    expect(source).toContain('type="button"');
   });
 
   it('does not advertise unverified channels or automation', () => {

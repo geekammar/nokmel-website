@@ -24,6 +24,20 @@ export type ShowcaseScene = {
 };
 
 export const PRODUCT_SHOWCASE_STEP_MS = 2000;
+export const PRODUCT_SHOWCASE_QUANTITY = 2;
+export const PRODUCT_SHOWCASE_ORDER_REFERENCE = 'NW-1042';
+
+export const PRODUCT_SHOWCASE_PRICES = {
+  unitMinor: 2500,
+  quantity: PRODUCT_SHOWCASE_QUANTITY,
+  subtotalMinor: 2500 * PRODUCT_SHOWCASE_QUANTITY,
+  deliveryMinor: 1000,
+  totalMinor: 2500 * PRODUCT_SHOWCASE_QUANTITY + 1000,
+} as const;
+
+export function formatShowcaseMoney(minor: number): string {
+  return `${(minor / 100).toFixed(2)} ر.س`;
+}
 
 export const PRODUCT_SHOWCASE_SCENES: readonly ShowcaseScene[] = [
   {
@@ -31,8 +45,7 @@ export const PRODUCT_SHOWCASE_SCENES: readonly ShowcaseScene[] = [
     side: 'customer',
     phase: 0,
     title: 'تصفح المنتجات داخل المحادثة',
-    detail:
-      'يفتح العميل متجر تيليجرام ويستعرض المنتجات كأزرار واضحة داخل المحادثة.',
+    detail: 'اضغط زر المنتج التجريبي للبدء.',
     customer: 'browse',
     merchant: 'waiting',
   },
@@ -41,8 +54,7 @@ export const PRODUCT_SHOWCASE_SCENES: readonly ShowcaseScene[] = [
     side: 'customer',
     phase: 0,
     title: 'اختيار المنتج والكمية',
-    detail:
-      'يفتح العميل المنتج ويختار الكمية من أزرار جاهزة قبل الإضافة إلى السلة.',
+    detail: 'اضغط زر إضافة قطعتين لاختيار الكمية وإضافتها إلى السلة.',
     customer: 'product',
     merchant: 'waiting',
   },
@@ -51,7 +63,7 @@ export const PRODUCT_SHOWCASE_SCENES: readonly ShowcaseScene[] = [
     side: 'customer',
     phase: 0,
     title: 'إضافة المنتج إلى السلة',
-    detail: 'تظهر السلة بالمنتج والكمية والمجموع، مع زر إتمام الطلب.',
+    detail: 'راجع السلة والكمية والمجموع، ثم ابدأ إتمام الطلب.',
     customer: 'cart',
     merchant: 'waiting',
   },
@@ -60,8 +72,7 @@ export const PRODUCT_SHOWCASE_SCENES: readonly ShowcaseScene[] = [
     side: 'customer',
     phase: 1,
     title: 'إتمام الطلب وجمع بيانات التوصيل',
-    detail:
-      'يراجع العميل بيانات الاسم والهاتف والعنوان، ثم يختار الدفع عند الاستلام.',
+    detail: 'راجع بيانات التوصيل وأكّد الطلب بالدفع عند الاستلام.',
     customer: 'review',
     merchant: 'waiting',
   },
@@ -70,8 +81,7 @@ export const PRODUCT_SHOWCASE_SCENES: readonly ShowcaseScene[] = [
     side: 'customer',
     phase: 1,
     title: 'تسجيل الطلب ووصوله إلى المتجر',
-    detail:
-      'يظهر مرجع الطلب للعميل، وينتقل الطلب نفسه إلى لوحة إدارة الطلبات.',
+    detail: 'افتح إدارة الطلبات لمتابعة نفس الطلب التجريبي.',
     customer: 'placed',
     merchant: 'waiting',
   },
@@ -80,8 +90,7 @@ export const PRODUCT_SHOWCASE_SCENES: readonly ShowcaseScene[] = [
     side: 'merchant',
     phase: 2,
     title: 'ظهور الطلب في إدارة المتجر',
-    detail:
-      'يظهر الطلب الجديد في لوحة الطلبات بالحالة «تم الطلب» مع الإجراء التالي «قبول الطلب».',
+    detail: 'يظهر الطلب الجديد بالحالة «تم الطلب» مع الإجراء التالي «قبول الطلب».',
     customer: 'placed',
     merchant: 'new',
   },
@@ -90,8 +99,7 @@ export const PRODUCT_SHOWCASE_SCENES: readonly ShowcaseScene[] = [
     side: 'merchant',
     phase: 2,
     title: 'قبول الطلب من لوحة المتجر',
-    detail:
-      'يقبل التاجر الطلب فتتغير حالته إلى «مقبول» ويصبح الإجراء التالي «بدء التجهيز».',
+    detail: 'تم قبول الطلب، وأصبح الإجراء التالي المتاح هو بدء التجهيز.',
     customer: 'placed',
     merchant: 'accepted',
   },
@@ -110,127 +118,156 @@ function PanelHeader({
   tone: 'customer' | 'merchant';
 }) {
   return (
-    <div className="flex items-start justify-between gap-3 border-b border-border-subtle px-4 py-3">
-      <div className="flex items-center gap-2.5">
-        <span
-          aria-hidden="true"
-          className={`flex h-8 w-8 items-center justify-center rounded-control text-xs font-bold ${
-            tone === 'customer'
-              ? 'bg-action-primary-bg text-action-primary-fg'
-              : 'bg-brand-highlight text-brand-primary'
-          }`}
-        >
-          {tone === 'customer' ? 'ع' : 'ت'}
-        </span>
-        <div>
-          <p className="text-sm font-bold text-text-primary">{label}</p>
-          <p className="text-xs text-text-secondary">{caption}</p>
-        </div>
-      </div>
-      <span className="rounded-control border border-border-subtle px-2 py-0.5 text-[11px] font-semibold text-text-secondary">
-        بيانات اصطناعية
+    <div className="flex items-center gap-2.5 border-b border-border-subtle px-3 py-2.5">
+      <span
+        aria-hidden="true"
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-control text-xs font-bold ${
+          tone === 'customer'
+            ? 'bg-action-primary-bg text-action-primary-fg'
+            : 'bg-brand-highlight text-brand-primary'
+        }`}
+      >
+        {tone === 'customer' ? 'ع' : 'ت'}
       </span>
+      <div>
+        <p className="text-sm font-bold text-text-primary">{label}</p>
+        <p className="text-xs text-text-secondary">{caption}</p>
+      </div>
     </div>
   );
 }
 
 function BotBubble({ children }: { children: React.ReactNode }) {
   return (
-    <div className="max-w-[94%] self-start rounded-card border border-border-subtle bg-page px-3.5 py-3 text-sm text-text-primary">
+    <div className="max-w-[94%] self-start rounded-card border border-border-subtle bg-page px-3 py-2.5 text-sm text-text-primary">
       {children}
     </div>
   );
 }
 
-function UserBubble({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="max-w-[80%] self-end rounded-card bg-action-primary-bg px-3.5 py-2.5 text-sm text-action-primary-fg">
-      {children}
-    </div>
-  );
-}
-
-function FakeButton({
-  children,
-  active = false,
+function ActionButton({
+  label,
+  ariaLabel,
+  testId,
+  onClick,
 }: {
-  children: React.ReactNode;
-  active?: boolean;
+  label: React.ReactNode;
+  ariaLabel: string;
+  testId: string;
+  onClick: () => void;
 }) {
   return (
-    <span
-      className={`flex min-h-9 items-center justify-center rounded-control border px-3 py-1.5 text-xs font-semibold ${
-        active
-          ? 'border-action-secondary bg-action-secondary text-action-primary-fg'
-          : 'border-border-input bg-surface text-text-primary'
-      }`}
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      data-testid={testId}
+      className="flex min-h-control w-full items-center justify-center rounded-control bg-action-primary-bg px-3 py-2 text-center text-xs font-semibold leading-5 text-action-primary-fg hover:bg-action-primary-bg-hover"
     >
-      {children}
-    </span>
+      {label}
+    </button>
   );
 }
 
-function OrderSummary({ compact = false }: { compact?: boolean }) {
+function PriceLine({
+  label,
+  value,
+  testId,
+}: {
+  label: string;
+  value: string;
+  testId?: string;
+}) {
   return (
-    <dl className={`grid gap-1.5 text-xs ${compact ? '' : 'mt-2'}`}>
-      <div className="flex items-center justify-between gap-3">
-        <dt className="text-text-secondary">المجموع الفرعي</dt>
-        <dd className="font-semibold" dir="ltr">
-          50.00 ر.س
-        </dd>
-      </div>
-      <div className="flex items-center justify-between gap-3">
-        <dt className="text-text-secondary">رسوم التوصيل</dt>
-        <dd className="font-semibold" dir="ltr">
-          10.00 ر.س
-        </dd>
-      </div>
+    <div className="flex items-center justify-between gap-3">
+      <dt className="text-text-secondary">{label}</dt>
+      <dd className="font-semibold" dir="ltr" data-testid={testId}>
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+function DetailLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between gap-3">
+      <dt className="text-text-secondary">{label}</dt>
+      <dd>{value}</dd>
+    </div>
+  );
+}
+
+function OrderSummary() {
+  const prices = PRODUCT_SHOWCASE_PRICES;
+  return (
+    <dl className="mt-2 grid gap-1.5 text-xs">
+      <PriceLine
+        label="المجموع الفرعي"
+        value={formatShowcaseMoney(prices.subtotalMinor)}
+        testId="showcase-subtotal"
+      />
+      <PriceLine
+        label="رسوم التوصيل"
+        value={formatShowcaseMoney(prices.deliveryMinor)}
+        testId="showcase-delivery-fee"
+      />
       <div className="flex items-center justify-between gap-3 border-t border-border-subtle pt-1.5">
         <dt className="font-semibold text-text-primary">الإجمالي</dt>
-        <dd className="font-bold text-text-primary" dir="ltr">
-          60.00 ر.س
+        <dd className="font-bold text-text-primary" dir="ltr" data-testid="showcase-total">
+          {formatShowcaseMoney(prices.totalMinor)}
         </dd>
       </div>
     </dl>
   );
 }
 
-function CustomerConversation({ state }: { state: ShowcaseScene['customer'] }) {
+function CustomerConversation({
+  state,
+  onAdvance,
+  canAdvance,
+}: {
+  state: ShowcaseScene['customer'];
+  onAdvance: () => void;
+  canAdvance: boolean;
+}) {
+  const prices = PRODUCT_SHOWCASE_PRICES;
+  const unit = formatShowcaseMoney(prices.unitMinor);
+  const subtotal = formatShowcaseMoney(prices.subtotalMinor);
+
   if (state === 'browse') {
     return (
-      <>
-        <BotBubble>
-          <p>أهلاً بك في متجر تجريبي 👋</p>
-          <p className="mt-1 text-xs text-text-secondary">اختر منتجاً للبدء:</p>
-          <div className="mt-2 grid gap-1.5">
-            <FakeButton>عبوة تغليف كرتونية · 25.00 ر.س</FakeButton>
-            <FakeButton>ملصقات متجر مخصصة · 40.00 ر.س</FakeButton>
-            <FakeButton>دفتر طلبات صغير · 15.00 ر.س</FakeButton>
-          </div>
-        </BotBubble>
-      </>
+      <BotBubble>
+        <p>أهلاً بك في متجر تجريبي 👋</p>
+        <p className="mt-1 text-xs text-text-secondary">اختر المنتج التجريبي للبدء:</p>
+        <div className="mt-2">
+          <ActionButton
+            label={`عبوة تغليف كرتونية · ${unit}`}
+            ariaLabel="اختيار المنتج التجريبي: عبوة تغليف كرتونية"
+            testId="showcase-action-product"
+            onClick={onAdvance}
+          />
+        </div>
+      </BotBubble>
     );
   }
 
   if (state === 'product') {
     return (
-      <>
-        <BotBubble>
-          <p className="font-bold">عبوة تغليف كرتونية</p>
-          <p className="mt-1 text-xs text-text-secondary">
-            25.00 ر.س · متوفر للطلب
-          </p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            <FakeButton active>إضافة 1</FakeButton>
-            <FakeButton>إضافة 2</FakeButton>
-            <FakeButton>إضافة 3</FakeButton>
-          </div>
-          <div className="mt-2">
-            <FakeButton>السلة</FakeButton>
-          </div>
-        </BotBubble>
-        <UserBubble>أضف قطعتين</UserBubble>
-      </>
+      <BotBubble>
+        <p className="font-bold">عبوة تغليف كرتونية</p>
+        <p className="mt-1 text-xs text-text-secondary">{unit} · متوفر للطلب</p>
+        <p className="mt-2 text-xs font-semibold text-text-primary">
+          الكمية المحددة: قطعتان
+        </p>
+        <div className="mt-2">
+          <ActionButton
+            label="إضافة قطعتين إلى السلة"
+            ariaLabel="إضافة قطعتين من عبوة تغليف كرتونية إلى السلة"
+            testId="showcase-action-quantity"
+            onClick={onAdvance}
+          />
+        </div>
+      </BotBubble>
     );
   }
 
@@ -240,13 +277,18 @@ function CustomerConversation({ state }: { state: ShowcaseScene['customer'] }) {
         <p className="font-bold">سلتك</p>
         <div className="mt-2 flex items-center justify-between gap-3 rounded-control border border-border-subtle bg-surface px-3 py-2">
           <span>عبوة تغليف كرتونية × 2</span>
-          <span className="text-xs font-semibold" dir="ltr">
-            50.00 ر.س
+          <span className="text-xs font-semibold" dir="ltr" data-testid="showcase-cart-line-total">
+            {subtotal}
           </span>
         </div>
         <OrderSummary />
-        <div className="mt-3">
-          <FakeButton active>إتمام الطلب</FakeButton>
+        <div className="mt-2.5">
+          <ActionButton
+            label="إتمام الطلب"
+            ariaLabel="بدء إتمام الطلب التجريبي"
+            testId="showcase-action-checkout"
+            onClick={onAdvance}
+          />
         </div>
       </BotBubble>
     );
@@ -257,60 +299,68 @@ function CustomerConversation({ state }: { state: ShowcaseScene['customer'] }) {
       <BotBubble>
         <p className="font-bold">راجع طلبك</p>
         <dl className="mt-2 grid gap-1 text-xs">
-          <div className="flex justify-between gap-3">
-            <dt className="text-text-secondary">الاسم</dt>
-            <dd>عميل تجريبي</dd>
-          </div>
-          <div className="flex justify-between gap-3">
-            <dt className="text-text-secondary">الهاتف</dt>
-            <dd dir="ltr">•••• 1234</dd>
-          </div>
-          <div className="flex justify-between gap-3">
-            <dt className="text-text-secondary">العنوان</dt>
-            <dd>عنوان تجريبي</dd>
-          </div>
-          <div className="flex justify-between gap-3">
-            <dt className="text-text-secondary">الدفع</dt>
-            <dd>عند الاستلام</dd>
-          </div>
+          <DetailLine label="الاسم" value="عميل تجريبي" />
+          <DetailLine label="الهاتف" value="•••• 1234" />
+          <DetailLine label="العنوان" value="عنوان تجريبي" />
+          <DetailLine label="الدفع" value="عند الاستلام" />
         </dl>
         <OrderSummary />
-        <div className="mt-3">
-          <FakeButton active>تأكيد الطلب — الدفع عند الاستلام</FakeButton>
+        <div className="mt-2.5">
+          <ActionButton
+            label="تأكيد الطلب — الدفع عند الاستلام"
+            ariaLabel="تأكيد الطلب التجريبي بالدفع عند الاستلام"
+            testId="showcase-action-confirm-cod"
+            onClick={onAdvance}
+          />
         </div>
       </BotBubble>
     );
   }
 
   return (
-    <>
-      <BotBubble>
-        <p className="font-bold text-status-success">تم تسجيل الطلب</p>
-        <p className="mt-1">
-          مرجع الطلب:{' '}
-          <span className="font-semibold" dir="ltr" data-testid="showcase-customer-order">
-            NW-1042
-          </span>
-        </p>
-        <OrderSummary />
-        <p className="mt-2 text-xs font-semibold text-text-primary">
-          الدفع عند الاستلام — بانتظار التحصيل
-        </p>
-        <p className="mt-1 text-xs text-text-secondary">
-          تم حجز المنتجات لهذا الطلب في المتجر.
-        </p>
-      </BotBubble>
-    </>
+    <BotBubble>
+      <p className="font-bold text-status-success">تم تسجيل الطلب</p>
+      <p className="mt-1">
+        مرجع الطلب:{' '}
+        <span className="font-semibold" dir="ltr" data-testid="showcase-customer-order">
+          {PRODUCT_SHOWCASE_ORDER_REFERENCE}
+        </span>
+      </p>
+      <OrderSummary />
+      <p className="mt-2 text-xs font-semibold text-text-primary">
+        الدفع عند الاستلام — بانتظار التحصيل
+      </p>
+      <div className="mt-2.5">
+        {canAdvance ? (
+          <ActionButton
+            label="فتح إدارة الطلبات"
+            ariaLabel={`فتح إدارة الطلبات لمتابعة الطلب التجريبي ${PRODUCT_SHOWCASE_ORDER_REFERENCE}`}
+            testId="showcase-action-open-merchant"
+            onClick={onAdvance}
+          />
+        ) : (
+          <p className="text-xs font-semibold text-text-secondary">
+            الطلب ظاهر الآن في إدارة المتجر.
+          </p>
+        )}
+      </div>
+    </BotBubble>
   );
 }
 
-function MerchantOrders({ state }: { state: ShowcaseScene['merchant'] }) {
+function MerchantOrders({
+  state,
+  onAdvance,
+}: {
+  state: ShowcaseScene['merchant'];
+  onAdvance: () => void;
+}) {
   if (state === 'waiting') {
     return (
-      <div className="flex min-h-[15rem] flex-col items-center justify-center gap-2 rounded-card border border-dashed border-border-subtle bg-page px-4 py-8 text-center">
+      <div className="flex min-h-[8rem] flex-col items-center justify-center gap-2 rounded-card border border-dashed border-border-subtle bg-page px-4 py-6 text-center">
         <span
           aria-hidden="true"
-          className="flex h-10 w-10 items-center justify-center rounded-control border border-border-subtle bg-surface text-lg font-bold text-text-secondary"
+          className="flex h-9 w-9 items-center justify-center rounded-control border border-border-subtle bg-surface text-base font-bold text-text-secondary"
         >
           ٠
         </span>
@@ -327,7 +377,7 @@ function MerchantOrders({ state }: { state: ShowcaseScene['merchant'] }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="font-bold text-text-primary">
           <span dir="ltr" data-testid="showcase-merchant-order">
-            NW-1042
+            {PRODUCT_SHOWCASE_ORDER_REFERENCE}
           </span>
         </p>
         <span
@@ -343,28 +393,44 @@ function MerchantOrders({ state }: { state: ShowcaseScene['merchant'] }) {
       </div>
       <div className="mt-2 flex items-center justify-between gap-3 rounded-control border border-border-subtle bg-surface px-3 py-2 text-sm">
         <span>عبوة تغليف كرتونية × 2</span>
-        <span className="text-xs font-semibold" dir="ltr">
-          60.00 ر.س
+        <span
+          className="text-xs font-semibold"
+          dir="ltr"
+          data-testid="showcase-merchant-total"
+        >
+          {formatShowcaseMoney(PRODUCT_SHOWCASE_PRICES.totalMinor)}
         </span>
       </div>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
         <span className="text-text-secondary">الدفع عند الاستلام</span>
         <span className="text-text-secondary">عميل تجريبي</span>
       </div>
-      <div className="mt-3 rounded-control border border-border-subtle bg-surface p-2.5">
-        <p className="text-[11px] font-semibold text-text-secondary">
-          الإجراء التالي
-        </p>
-        <div className="mt-1.5">
-          <FakeButton active>
-            {state === 'new' ? 'قبول الطلب' : 'بدء التجهيز'}
-          </FakeButton>
+      {state === 'new' ? (
+        <div className="mt-2.5">
+          <ActionButton
+            label="قبول الطلب"
+            ariaLabel={`قبول الطلب التجريبي ${PRODUCT_SHOWCASE_ORDER_REFERENCE}`}
+            testId="showcase-action-accept-order"
+            onClick={onAdvance}
+          />
         </div>
-      </div>
+      ) : (
+        <div className="mt-2.5 rounded-control border border-border-subtle bg-surface p-2.5">
+          <p className="text-[11px] font-semibold text-text-secondary">
+            الإجراء التالي المتاح
+          </p>
+          <p
+            className="mt-1 text-sm font-semibold text-text-primary"
+            data-testid="showcase-next-action-prepare"
+          >
+            بدء التجهيز
+          </p>
+        </div>
+      )}
       <p className="mt-2 text-xs leading-5 text-text-secondary">
         {state === 'new'
           ? 'نفس مرجع الطلب الظاهر في المحادثة.'
-          : 'تم قبول الطلب. الإجراء التالي المتاح هو بدء التجهيز.'}
+          : 'تم قبول الطلب التجريبي. لا توجد خطوة إضافية مطلوبة في هذا العرض.'}
       </p>
     </div>
   );
@@ -430,6 +496,10 @@ export function ProductShowcase({
     setIndex(Math.max(0, Math.min(next, lastIndex)));
   }
 
+  function advance() {
+    goTo(index + 1);
+  }
+
   function toggleAutoplay() {
     if (reducedMotion) return;
     if (playing) {
@@ -444,13 +514,14 @@ export function ProductShowcase({
     activeSide === 'customer' ? 'block' : 'hidden lg:block';
   const merchantPanelClass =
     activeSide === 'merchant' ? 'block' : 'hidden lg:block';
+  const activePhaseBody = steps[scene.phase]?.body;
 
   return (
     <Section id="product-showcase" tone="dark">
-      <Container className="flex flex-col gap-7">
-        <div className="flex max-w-3xl flex-col gap-3">
+      <Container className="flex flex-col gap-5 sm:gap-6">
+        <div className="flex max-w-3xl flex-col gap-2">
           <span className="w-fit rounded-control border border-brand-highlight px-3 py-1 text-xs font-semibold text-brand-highlight">
-            عرض تفاعلي ببيانات اصطناعية
+            عرض تفاعلي موجّه ببيانات اصطناعية
           </span>
           <h2 className="text-2xl font-bold leading-tight sm:text-3xl lg:text-4xl">
             {title}
@@ -462,39 +533,33 @@ export function ProductShowcase({
           data-testid="product-showcase"
           className="rounded-card border border-border-subtle bg-brand-primary p-2 sm:p-3"
         >
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
-            <div className="flex items-center gap-1.5 lg:hidden" role="group" aria-label="اختيار واجهة العرض">
-              <button
-                type="button"
-                onClick={() => setActiveSide('customer')}
-                aria-pressed={activeSide === 'customer'}
-                data-testid="showcase-mobile-customer"
-                className={`min-h-control rounded-control px-3 text-xs font-semibold ${
-                  activeSide === 'customer'
-                    ? 'bg-action-primary-bg text-action-primary-fg'
-                    : 'border border-border-interactive text-text-primary'
-                }`}
-              >
-                واجهة العميل
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveSide('merchant')}
-                aria-pressed={activeSide === 'merchant'}
-                data-testid="showcase-mobile-merchant"
-                className={`min-h-control rounded-control px-3 text-xs font-semibold ${
-                  activeSide === 'merchant'
-                    ? 'bg-action-primary-bg text-action-primary-fg'
-                    : 'border border-border-interactive text-text-primary'
-                }`}
-              >
-                إدارة الطلبات
-              </button>
-            </div>
-            <p className="ms-auto text-xs font-semibold text-text-secondary">
-              الخطوة <span dir="ltr">{index + 1}</span> من{' '}
-              <span dir="ltr">{PRODUCT_SHOWCASE_SCENES.length}</span>
-            </p>
+          <div className="mb-2 flex items-center gap-1.5 px-1 lg:hidden" role="group" aria-label="اختيار واجهة العرض">
+            <button
+              type="button"
+              onClick={() => setActiveSide('customer')}
+              aria-pressed={activeSide === 'customer'}
+              data-testid="showcase-mobile-customer"
+              className={`min-h-control rounded-control px-3 text-xs font-semibold ${
+                activeSide === 'customer'
+                  ? 'bg-action-primary-bg text-action-primary-fg'
+                  : 'border border-border-interactive text-text-primary'
+              }`}
+            >
+              واجهة العميل
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveSide('merchant')}
+              aria-pressed={activeSide === 'merchant'}
+              data-testid="showcase-mobile-merchant"
+              className={`min-h-control rounded-control px-3 text-xs font-semibold ${
+                activeSide === 'merchant'
+                  ? 'bg-action-primary-bg text-action-primary-fg'
+                  : 'border border-border-interactive text-text-primary'
+              }`}
+            >
+              إدارة الطلبات
+            </button>
           </div>
 
           <div className="grid items-stretch gap-3 lg:grid-cols-[1fr_auto_1fr]">
@@ -510,12 +575,13 @@ export function ProductShowcase({
                 caption="رحلة العميل داخل تيليجرام"
                 tone="customer"
               />
-              <div aria-hidden="true" className="flex min-h-[18rem] flex-col gap-2 px-3 py-3">
-                <CustomerConversation state={scene.customer} />
+              <div className="flex min-h-[13rem] flex-col gap-2 px-3 py-2.5">
+                <CustomerConversation
+                  state={scene.customer}
+                  onAdvance={advance}
+                  canAdvance={index < lastIndex}
+                />
               </div>
-              <p className="border-t border-border-subtle px-4 py-2.5 text-xs leading-5 text-text-secondary">
-                لا يتم إرسال أي طلب أو بيانات من هذا العرض.
-              </p>
             </div>
 
             <div className="hidden items-center justify-center lg:flex" aria-hidden="true">
@@ -541,12 +607,9 @@ export function ProductShowcase({
                 caption="لوحة التاجر"
                 tone="merchant"
               />
-              <div aria-hidden="true" className="min-h-[18rem] px-3 py-3">
-                <MerchantOrders state={scene.merchant} />
+              <div className="min-h-[13rem] px-3 py-2.5">
+                <MerchantOrders state={scene.merchant} onAdvance={advance} />
               </div>
-              <p className="border-t border-border-subtle px-4 py-2.5 text-xs leading-5 text-text-secondary">
-                الحالات والإجراءات المعروضة ضمن سلوك الطلبات المدعوم في تطبيق التاجر.
-              </p>
             </div>
           </div>
         </div>
@@ -556,16 +619,17 @@ export function ProductShowcase({
           {scene.detail}
         </p>
 
-        <div className="rounded-card border border-border-subtle bg-brand-primary p-4">
+        <div className="rounded-card border border-border-subtle bg-brand-primary p-3 sm:p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="max-w-xl">
+              <p className="text-xs font-semibold text-text-secondary">
+                الخطوة <span dir="ltr">{index + 1}</span> من{' '}
+                <span dir="ltr">{PRODUCT_SHOWCASE_SCENES.length}</span>
+              </p>
               <p className="font-bold text-text-primary" data-testid="showcase-step-title">
                 {scene.title}
               </p>
-              <p
-                className="mt-1 text-sm leading-6 text-text-secondary"
-                data-testid="showcase-step-detail"
-              >
+              <p className="sr-only" data-testid="showcase-step-detail">
                 {scene.detail}
               </p>
             </div>
@@ -607,6 +671,44 @@ export function ProductShowcase({
               </button>
             </div>
           </div>
+
+          <div className="mt-3 border-t border-border-subtle pt-3">
+            <ol className="flex flex-wrap items-center gap-x-4 gap-y-1.5" aria-label="مراحل العرض">
+              {steps.map((step, stepIndex) => {
+                const active = scene.phase === stepIndex;
+                return (
+                  <li
+                    key={step.title}
+                    aria-current={active ? 'step' : undefined}
+                    className={`flex items-center gap-1.5 text-xs ${
+                      active
+                        ? 'font-semibold text-text-primary'
+                        : 'text-text-secondary'
+                    }`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
+                        active
+                          ? 'bg-brand-highlight text-brand-primary'
+                          : 'border border-border-input'
+                      }`}
+                    >
+                      {stepIndex + 1}
+                    </span>
+                    {step.title}
+                  </li>
+                );
+              })}
+            </ol>
+            <p
+              className="mt-1.5 text-xs leading-5 text-text-secondary"
+              data-testid="showcase-phase-body"
+            >
+              {activePhaseBody}
+            </p>
+          </div>
+
           {reducedMotion ? (
             <p className="mt-2 text-xs leading-5 text-brand-highlight" data-testid="showcase-reduced-note">
               التشغيل التلقائي معطّل احتراماً لتفضيل تقليل الحركة في جهازك.
@@ -614,48 +716,12 @@ export function ProductShowcase({
           ) : null}
         </div>
 
-        <ol className="grid list-none gap-3 p-0 sm:grid-cols-3">
-          {steps.map((step, stepIndex) => {
-            const active = scene.phase === stepIndex;
-            return (
-              <li
-                key={step.title}
-                aria-current={active ? 'step' : undefined}
-                className={`flex gap-3 rounded-card border p-3 ${
-                  active
-                    ? 'border-brand-highlight bg-brand-primary'
-                    : 'border-border-subtle'
-                }`}
-              >
-                <span
-                  aria-hidden="true"
-                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-control text-xs font-bold ${
-                    active
-                      ? 'bg-brand-highlight text-brand-primary'
-                      : 'border border-border-input text-text-secondary'
-                  }`}
-                >
-                  {stepIndex + 1}
-                </span>
-                <div>
-                  <p className="text-sm font-semibold text-text-primary">{step.title}</p>
-                  <p className="mt-0.5 text-xs leading-5 text-text-secondary">
-                    {step.body}
-                  </p>
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-
-        <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex max-w-2xl flex-col gap-1">
-            <p className="text-xs font-semibold text-brand-highlight">{caption}</p>
-            <p className="text-xs leading-5 text-text-secondary">
-              عرض توضيحي ببيانات اصطناعية — لا يُنشئ طلباً حقيقياً ولا يُرسل بيانات،
-              ولا يمثل واجهة المتجر النهائية.
-            </p>
-          </div>
+        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="max-w-2xl text-xs leading-5 text-text-secondary" data-testid="showcase-disclosure">
+            <span className="font-semibold text-brand-highlight">{caption}.</span>{' '}
+            عرض توضيحي ببيانات اصطناعية؛ لا يُنشئ طلباً حقيقياً أو يرسل بيانات،
+            ولا يمثل واجهة الإنتاج النهائية.
+          </p>
           <Button href={cta.href} size="lg">
             {cta.label}
           </Button>

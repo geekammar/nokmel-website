@@ -274,7 +274,7 @@ test.describe('homepage structure', () => {
     await page.goto('/');
     const showcase = page.locator('#product-showcase');
     await expect(showcase).toBeVisible();
-    await expect(showcase.getByText('عرض تفاعلي ببيانات اصطناعية')).toBeVisible();
+    await expect(showcase.getByText('عرض تفاعلي موجّه ببيانات اصطناعية')).toBeVisible();
     await expect(showcase.locator('[data-testid="showcase-customer-panel"]')).toBeVisible();
     await expect(showcase.locator('[data-testid="showcase-merchant-panel"]')).toBeVisible();
     await expect(showcase.locator('ol > li')).toHaveCount(3);

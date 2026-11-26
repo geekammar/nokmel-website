@@ -84,9 +84,12 @@ W2-S status (2026-11-26): **implemented** on
 `feature/w2s-marketing-design-showcase` from merged W5 `main`
 (`4f32b94ac6943f61e96f58014672d25eaa37968e`). Premium marketing refinement of
 the existing seven public routes, a shorter focused homepage, an interactive
-customer/merchant showcase with clearly labelled synthetic data, an improved
-footer, a 1200 × 630 social-sharing candidate in the approved local-image
-registry, and the NKW-W5-001/NKW-W5-002 corrections. Merchant-app evidence is
+customer/merchant showcase with direct accessible action buttons and clearly
+labelled synthetic data, an improved footer, a 1200 × 630 social-sharing
+candidate in the approved local-image registry, and the NKW-W5-001/NKW-W5-002
+corrections. The focused UX closure reduced the 390 px showcase by about
+22–27% with consistent two-unit totals and added direct-interaction,
+quantity, keyboard, reduced-motion and no-mutation coverage. Merchant-app evidence is
 pinned to `geekammar/nokmel` commit
 `74e864dacfa0e6598bb01e99402946e27a94216f` (read-only inspection). No
 migration, no new route, no showcase backend, no real commerce mutation and no
