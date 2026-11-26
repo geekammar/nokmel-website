@@ -3,13 +3,40 @@ import { Button } from '@/components/ui/Button';
 import { Container } from '@/components/ui/Container';
 import { Section } from '@/components/ui/Section';
 import { TextLink } from '@/components/ui/TextLink';
+import { publicPlansUi } from '@/content/ar/plans';
 import type { PricingContent } from '@/content/ar/pricing';
+import type { PublicPlan } from '@/lib/plans/model';
 import { site } from '@/lib/site';
+import { PlanCard } from '@/components/pricing/PlanCard';
 
-export function PricingView({ content }: { content: PricingContent }) {
+export function PricingView({
+  content,
+  plans = [],
+}: {
+  content: PricingContent;
+  plans?: PublicPlan[];
+}) {
   return (
     <>
       <PageHero title={content.hero.title} lead={content.hero.lead} />
+
+      {plans.length > 0 ? (
+        <Section spacing="compact" aria-labelledby="published-plans-title">
+          <Container>
+            <h2 id="published-plans-title" className="text-2xl font-bold sm:text-3xl">
+              {publicPlansUi.sectionTitle}
+            </h2>
+            <p className="mt-3 max-w-3xl leading-relaxed text-text-secondary">
+              {publicPlansUi.sectionLead}
+            </p>
+            <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3" data-testid="published-plans">
+              {plans.map((plan) => (
+                <PlanCard key={plan.slug} plan={plan} />
+              ))}
+            </div>
+          </Container>
+        </Section>
+      ) : null}
 
       <Section spacing="compact">
         <Container className="grid max-w-5xl gap-6 lg:grid-cols-2 lg:gap-8">
@@ -47,7 +74,9 @@ export function PricingView({ content }: { content: PricingContent }) {
               {content.transparency.body}
             </p>
             <p className="mt-6 rounded-card border-s-4 border-status-warning bg-surface p-4 text-sm leading-relaxed text-text-secondary">
-              {content.noPurchase.warning}
+              {plans.length > 0
+                ? publicPlansUi.noPurchaseWithPlans
+                : content.noPurchase.warning}
             </p>
           </div>
         </Container>

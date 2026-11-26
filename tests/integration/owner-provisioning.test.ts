@@ -60,7 +60,7 @@ async function ownerPasswordHash(): Promise<string | null> {
 }
 
 describe('migrations from empty schema', () => {
-  test('creates all authentication and CMS tables', async () => {
+  test('creates all authentication, CMS, plan and join-request tables', async () => {
     const { rows } = await pg.pool.query(
       "select table_name from information_schema.tables where table_schema = 'public'",
     );
@@ -69,6 +69,9 @@ describe('migrations from empty schema', () => {
       'account',
       'content_sections',
       'faq_items',
+      'join_intake_rate_limits',
+      'join_requests',
+      'plans',
       'rate_limit',
       'session',
       'user',

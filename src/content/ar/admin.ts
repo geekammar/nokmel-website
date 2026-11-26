@@ -31,14 +31,14 @@ export const adminUi = {
     welcome: 'مرحباً بك في لوحة إدارة نكّمل.',
     overviewEmptyTitle: 'لا توجد بيانات لعرضها بعد',
     overviewEmptyBody:
-      'ستظهر هنا ملخصات الموقع وطلبات الانضمام عند تفعيل الأقسام الإدارية القادمة. يمكنك التنقل من القائمة للاطلاع على الأقسام المتاحة.',
+      'ستظهر هنا ملخصات الموقع والتحليلات عند تفعيل قسم التحليلات والإعدادات في مرحلة لاحقة. يمكنك الآن إدارة الباقات والأسعار وطلبات الانضمام من القائمة.',
     unavailableNote: 'غير متاح — في مرحلة لاحقة',
   },
   nav: [
     { id: 'overview', label: 'نظرة عامة', available: true, href: '/admin' },
     { id: 'content-seo', label: 'المحتوى والـSEO', available: true, href: '/admin/content' },
-    { id: 'plans-pricing', label: 'الباقات والأسعار', available: false },
-    { id: 'join-requests', label: 'طلبات الانضمام', available: false },
+    { id: 'plans-pricing', label: 'الباقات والأسعار', available: true, href: '/admin/plans' },
+    { id: 'join-requests', label: 'طلبات الانضمام', available: true, href: '/admin/requests' },
     { id: 'settings', label: 'الإعدادات', available: false },
   ],
 } as const;

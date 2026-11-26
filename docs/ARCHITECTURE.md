@@ -289,9 +289,9 @@ Confirmation submits the exact reviewed revision to the existing publish action.
 
 Additive migration: `drizzle/0002_w32-content-cms.sql` (tables + indexes + checks). It applies from an empty database and upgrades a W3.1 database without touching auth tables/rows (verified against synthetic user/account/session/verification/rate-limit records). Runtime grants and the temporary migrator database-level CREATE requirement are documented in `docs/DATABASE_PERMISSIONS.md`; the runtime receives only SELECT/INSERT/UPDATE/DELETE on the two CMS tables. There are no application sequences. The external lead reports that hosted development migration 0002, CMS runtime grants and the new branch Preview configuration are complete; independent hosted acceptance remains external. The coding agent never connects to hosted Neon, never runs hosted migrations, rotates credentials, revokes QA sessions, or touches production.
 
-## W3.3 — Page-level SEO and social metadata management [IMPLEMENTED; pending independent acceptance]
+## W3.3 — Page-level SEO and social metadata management [MERGED; accepted for continued development]
 
-Status: implementation complete on `feature/w33-seo-management` (base `main` `5c976db56331ba2077b4a32c1e05a580e9c5689a`). No schema migration. Hosted activation and acceptance remain external gates.
+Status: merged via PR #6 (accepted HEAD `dcf1f8d9ede739a29bd48d036df1a1d5cd9f28bf`, merge commit `0020ddacdd54b3c23471b58b17b54fda1c1a0ae1`). No schema migration. W4 builds on this merged baseline.
 
 ### Storage and publication boundary
 
@@ -321,3 +321,76 @@ Publication review now includes one-based intended positions for added questions
 
 - W3.3 adds focused unit coverage for SEO validation/fallbacks/metadata and FAQ final-order review, disposable-PostgreSQL coverage for SEO drafts/publication/coexistence/concurrency/fallbacks/published-only projection, and Playwright coverage for the full owner SEO workflow, combined/stale review, all-route metadata, NKW-W32-005 and responsive layouts. Local counts are recorded in `CURRENT_STATE.md`; exact CI is checked on the final HEAD.
 - Hosted requirements: no migration and no new database grants (existing `content_sections` runtime DML suffices), but the new W3.3 Vercel Preview branch requires its own `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `TRUSTED_ORIGINS` and `OWNER_EMAIL` configuration. W4 pricing/join-request submission, W5 analytics/settings and all W6 launch gates remain out of scope.
+
+## W4 — Marketing plans, pricing and early-access join requests [IMPLEMENTED; hosted activation and independent acceptance pending]
+
+Status: implementation complete on `feature/w4-plans-join-requests` (base merged `main` `0020ddacdd54b3c23471b58b17b54fda1c1a0ae1`). Additive migration `0003_w4-plans-join-requests`. Hosted migration/grants/Preview intake enablement and independent live acceptance remain external gates; Production intake and launch remain W6.
+
+### Marketing versus authoritative commercial data
+
+Plans are marketing data only. They never control subscriptions, commerce entitlements, merchant permissions or payment state. Authoritative commercial pricing/entitlements remain with the Nokmel platform. Public copy states that purchase/subscription is unavailable and that displayed plan prices are introductory/marketing information, not a payment obligation. No payment, checkout, billing, merchant account or entitlement code exists in W4.
+
+### Plan schema and publication model (`plans`)
+
+One row per plan with a stable server-generated text ID and an immutable, unique, URL-safe slug. A plan has separate `draft_*` and `published_*` values for name, short description, ordered marketing features (JSON string array), optional monthly price, optional yearly price, currency, CTA label, featured flag and display order. `status` is `draft | published | hidden`; `draft_revision` is the optimistic concurrency counter; `published_revision`/`published_at` record the last explicit publication. Created/updated timestamps are stored.
+
+- Creating a plan always creates `status = 'draft'` with `draft_revision = 1`; nothing is public.
+- Owner edits write draft values only. A live plan's public offer therefore cannot change before explicit publication.
+- Publication/show copies the saved draft into published columns, sets `status = 'published'`, advances the revision and updates the publication timestamp.
+- Hide sets `status = 'hidden'` and advances the revision. Published values and historical join-request references remain intact; there is no destructive plan delete and the join-request FK uses `ON DELETE RESTRICT`.
+- Every write serializes on a plan-scoped advisory lock and checks the expected revision; stale writes return a controlled Arabic conflict.
+- Public reads select only published columns where `status = 'published'`, ordered by published display order. Draft/hidden plans never appear on `/pricing` or in new `/join` selection.
+
+Plan names/descriptions/features are stored as Arabic-first plain text for W4 (no translation-management UI); the stable ID/slug and typed fields keep a future additive locale evolution possible without CMS translation coupling.
+
+Prices use exact integer minor units with a supported-currency allowlist and per-currency minor-unit exponents. Empty input stores `NULL` (unannounced price, displayed as “يُعلن لاحقًا”); explicit `0` stores zero. Negative/invalid values, excessive decimals, unsupported currencies and a yearly price without a monthly price are rejected. No automatic discount is calculated. The owner must choose the currency at creation; no currency is assumed.
+
+### Public pricing and plan selection
+
+`/pricing` combines the existing published CMS content/SEO with current published visible plans. A reusable card renders name, description, honest price state, features, optional featured presentation and a CTA to `/join?plan=<slug>&source=pricing`. If no plans are published, the card section is absent and the existing early-access fallback remains. When plans exist, a code-controlled note replaces the stored “no plans” purchase warning so the page cannot claim plans do not exist; the stored warning remains used in the no-plans state. Invalid/unavailable plan storage yields an empty plan list, never invented offers.
+
+`/join` resolves `?plan=` server-side from current published visible plans. Unknown/malformed/repeated parameters are ignored safely; hidden plans are not preselected. Visitors may change or remove the selection. Removed/unpublished plans at submission time return a controlled `plan_unavailable` response; a changed published revision returns `plan_changed` with the current public offer so the visitor can confirm it or continue without a plan. The server never silently substitutes a different plan.
+
+### Join-request schema and intake (`join_requests`)
+
+Stable server-generated text ID; name; normalized E.164 phone; optional email; optional business activity; optional plan FK; server-generated offer snapshot (plan name, relevant displayed price, period, currency); bounded acquisition source (`direct | pricing | join`) and optional bounded UTM values; status (`new | contacted | closed`); optional internal notes; unique submission token; revision; created/updated timestamps. Database checks enforce status/source allowlists, non-negative prices/revision, phone length, notes length and snapshot consistency; indexes cover token uniqueness, chronological listing, status filtering and plan references.
+
+Public creation runs in one transaction: it re-resolves the selected plan from current published data, compares the submitted published revision, captures the snapshot and inserts the request with `status = 'new'`, `notes = NULL`, server timestamps/IDs and a server-generated snapshot. Client-supplied status/notes/IDs/prices are rejected by strict Zod validation. A later plan edit/hide never rewrites historical snapshots. A plan-less direct request is valid.
+
+Idempotency uses the client-generated bounded submission token with a database unique constraint and `ON CONFLICT DO NOTHING`; repeated/concurrent submissions with the same token produce at most one row, and a different payload never overwrites the original. Phone numbers are deliberately not unique. Success responses are generic and never include stored rows, internal status/notes/IDs or customer data.
+
+### Intake gate, validation and public endpoint
+
+`JOIN_INTAKE_ENABLED` is a fail-closed server gate: only explicit `1`/`true` (trimmed, case-insensitive) enables intake; missing/invalid/empty values keep it disabled. The server route checks the gate before any write; CMS content cannot enable it. W4 enables it only on the isolated development Preview for acceptance. Public `/join` renders code-controlled enabled/disabled/storage-unavailable notices so stored CMS operational copy cannot contradict the actual state; disabled intake sends nothing. Production intake requires explicit owner authorization plus approved privacy/retention (W6).
+
+`POST /api/join` is the only public intake interface; GET is 405 and there is no public read/list/search endpoint. It enforces gate, JSON content type, a 16 KiB body limit, trusted-origin policy, durable rate limit, strict field limits, Arabic-Indic digit normalization, explicit-country/international phone handling and controlled errors. Missing `Origin` is allowed only as documented non-browser access and remains rate limited; an untrusted `Origin` is rejected. Next.js server-action CSRF/origin protections for owner mutations remain intact. No CORS/wildcards were added.
+
+### Rate limiting and request identity
+
+`join_intake_rate_limits` is a dedicated table (never Better Auth's `rate_limit`). A single atomic upsert increments the bucket or resets an expired fixed window; limits survive serverless restarts. Default is 5 attempts per 10 minutes per derived request identity; a test-only override is honored only under `NOKMEL_DISPOSABLE_TEST_ENV=1` and never on hosted Vercel production/preview. Exceeded limits return HTTP 429 with `Retry-After` and a body retry countdown. Obsolete buckets older than one day are pruned opportunistically by at most 500 rows per new window.
+
+Request identity follows the reviewed Better Auth policy: only a single-value parseable `x-forwarded-for` entry is used; multi-value/malformed headers resolve to one shared bucket instead of trusting a chain. Only an HMAC-derived `join-intake:v1:*` bucket key is stored — no raw IP/header. Hosted Vercel forwarded-header verification remains a W6 gate. The limiter reduces abuse but is not claimed to stop all bots/distributed traffic.
+
+### Owner Join Requests administration
+
+`/admin/requests` and `/admin/requests/[id]` are owner-only, dynamic/no-store pages. The list shows name, phone/email, business activity, selected offer/no plan, source, submission time and status; supports all/new/contacted/closed filters with real counts, newest-first ordering, bounded pagination (20/page, max 50 query size), search by name/phone and clear empty/error states. Detail shows contact details, historical offer snapshot, acquisition context and independent status/notes forms. Status and notes are authorized separately on the server; both use expected-revision compare-and-set updates, allow reopening a closed request, and never auto-contact the merchant. There is no bulk delete/export/CRM.
+
+### Personal data and privacy boundary
+
+Public can create but never read requests. Only the configured owner can list/view/mutate them; every page and server action independently enforces owner identity. Admin responses are dynamic and marked `cache-control: no-store`; private data must never appear in public HTML/metadata/RSC caches or errors. Application logs contain fixed operation/reason classes only, not names/phones/emails/notes. Tests use synthetic fixtures only. W4 sends no data to external services and adds no analytics/notification pipeline (W5/W6). Purpose of collection: reviewing an early-access request and contacting that merchant about it. A final approved privacy notice, retention period and a controlled owner/operator deletion procedure are W6 launch prerequisites; no compliance certification is claimed.
+
+Controlled deletion (after retention approval) is an operator action, owner-authorized and targeted by request ID — never a broad bulk delete:
+```sql
+DELETE FROM join_requests WHERE id = '<request-id>';
+```
+It uses the operator's direct migration/operator role under the approved procedure; no application route exposes deletion.
+
+### Safe defaults, authorization and migrations
+
+Public pricing and join pages do not require database access at build. Missing `DATABASE_URL`, unmigrated W4 tables, unavailable storage or invalid stored plan rows produce safe empty-plan/disabled-storage states rather than invented offers; failures are not cached. Join submission returns 503 with “not received” messaging when storage is unavailable; no false success fallback exists. Admin screens distinguish unconfigured/not-migrated/unavailable/invalid storage from empty data.
+
+Owner-only authorization reuses `requireOwner()`/`getOwnerSession()`; layout/middleware are not the security boundary. Public loaders select only published plan columns and never access other administrative records. Additive migration `0003_w4-plans-join-requests` creates `plans`, `join_requests` and `join_intake_rate_limits` plus checks/indexes. It upgrades a W3.3 database without touching auth/CMS/SEO/FAQ rows (verified with synthetic preserved data) and applies from an empty database. No sequences are used. Runtime grants are DML-only on the three new tables; exact SQL and the temporary migrator database CREATE requirement are in `docs/DATABASE_PERMISSIONS.md`. No hosted migration or Production action was performed by the coding agent.
+
+### W4 verification and external gates
+
+Local verification on Node 22: unit 177/177, disposable PostgreSQL integration 130/130, Playwright 98/98 with synthetic data (including a dedicated intake-disabled 3200 server). Exact remote CI is checked on the final HEAD and recorded in the draft PR/handoff. Responsive coverage includes 320/360/390/430/768/1440 for plan/request/join workflows; screenshots are synthetic. Hosted requirements: apply migration 0003 with the temporary migrator CREATE grant/revoke, add runtime DML on the three tables, and configure this branch Preview's existing five variables plus `JOIN_INTAKE_ENABLED` (test env only). Hosted activation/acceptance, physical Android acceptance, live header/recovery/pooler checks, approved privacy/retention, indexing/canonical live checks and launch approval remain W6/ external gates. Production readiness is not claimed.

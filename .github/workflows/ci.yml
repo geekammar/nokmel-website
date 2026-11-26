@@ -106,7 +106,7 @@ jobs:
         run: pnpm test:db
 
   e2e-auth:
-    name: Admin auth e2e (disposable PostgreSQL 18)
+    name: Admin, plans & join e2e (disposable PostgreSQL 18)
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -131,6 +131,8 @@ jobs:
       E2E_OWNER_PASSWORD: ci-disposable-e2e-owner-password-123
       RATE_LIMIT_SIGNIN_MAX: '50'
       NOKMEL_DISPOSABLE_TEST_ENV: '1'
+      JOIN_INTAKE_ENABLED: '1'
+      JOIN_RATE_LIMIT_MAX: '100'
 
     steps:
       - name: Checkout
@@ -151,10 +153,13 @@ jobs:
       - name: Install Playwright browser
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Browser e2e tests (public + admin auth flows against disposable DB)
+      - name: Production build (packaged server for e2e)
+        run: pnpm build
+
+      - name: Browser e2e tests (public + admin flows against disposable DB)
         run: pnpm test:e2e
 
-      - name: Upload admin e2e screenshots
+      - name: Upload admin/plans/join e2e screenshots
         if: always()
         uses: actions/upload-artifact@v6
         with:

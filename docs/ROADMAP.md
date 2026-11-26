@@ -25,15 +25,20 @@ W3.2 status (2026-11-25): merged via PR #5 (accepted HEAD
 development. Additive migration `0002_w32-content-cms` is applied on hosted
 development by the external lead.
 
-W3.3 status (2026-11-25): implementation complete on
-`feature/w33-seo-management` (draft PR pending independent acceptance). Adds
-owner-only page-level SEO/social metadata editing for the seven existing routes
-on the reused `content_sections` draft/publication model, with published-only
-public metadata generation, approved social-image registry, combined publication
-review, and the NKW-W32-005 FAQ final-order correction. No schema migration;
-existing W3.2 records remain valid. Hosted Preview branch configuration and
-independent/live acceptance remain external; production and indexing stay at W6.
-Plans/join-request storage W4; analytics/settings W5; launch W6.
+W3.3 status (2026-11-25): merged via PR #6 and accepted for continued
+development (accepted HEAD `dcf1f8d9ede739a29bd48d036df1a1d5cd9f28bf`, merge
+commit `0020ddacdd54b3c23471b58b17b54fda1c1a0ae1`). No schema migration.
+
+W4 status (2026-11-26): implementation complete on
+`feature/w4-plans-join-requests` (draft PR; external acceptance pending). Adds
+owner-managed marketing plans with draft/publish/hide and exact minor-unit
+prices, public pricing integration and `/join?plan=` selection, a fail-closed
+durable early-access intake with rate limiting/idempotency/offer snapshots, and
+owner-only Join Requests status/notes. Additive migration
+`0003_w4-plans-join-requests`; hosted activation, Preview intake enablement,
+approved privacy/retention and all production/launch gates remain external.
+NKW-W33-001 labels corrected; NKW-W33-002 revision behavior preserved.
+Analytics/settings remain W5; launch W6.
 
 ## Standing rules
 
