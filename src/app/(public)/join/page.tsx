@@ -3,6 +3,10 @@ import { JoinView, type JoinIntakeViewState } from '@/components/pages/JoinView'
 import { getPublicPageBundle } from '@/lib/cms/public-page';
 import { isJoinIntakeEnabled } from '@/lib/join/intake-gate';
 import {
+  resolveJoinHmacSecret,
+  resolveJoinOriginPolicy,
+} from '@/lib/join/request-context';
+import {
   sanitizeJoinSource,
   sanitizePlanQuery,
   sanitizeUtmValue,
@@ -37,9 +41,11 @@ export default async function JoinPage({
     params.source === undefined && selectedPlan ? 'pricing' : explicitSource;
   const storageReady =
     plansResult.status === 'ok' || plansResult.status === 'invalid';
+  const intakeSecurityConfigured =
+    resolveJoinHmacSecret() !== null && resolveJoinOriginPolicy().configured;
 
   const intake: JoinIntakeViewState = {
-    enabled: isJoinIntakeEnabled(),
+    enabled: isJoinIntakeEnabled() && intakeSecurityConfigured,
     storageReady,
     plans: plansResult.plans,
     selectedPlan,

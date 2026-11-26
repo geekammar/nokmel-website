@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
 import { applyMigrations, emptyDatabase, getDisposablePostgres } from './helpers';
 import {
+  JoinPlanChangedError,
   JoinPlanUnavailableError,
   JoinRequestConflictError,
 } from '@/lib/join/errors';
@@ -193,6 +194,126 @@ describe('public join-request persistence', () => {
     expect(detail.request.planNameSnapshot).toBe(plan.published?.name);
     expect(detail.request.planPriceMinorSnapshot).toBe(14_900);
     expect(detail.request.notes).toBeNull();
+  });
+
+  test('idempotent replay survives plan republication and hide without rewriting the original', async () => {
+    const plan = await publishedTestPlan(`replay-${randomUUID().slice(0, 8)}`);
+    const token = `replay-token-${randomUUID()}`;
+    const firstSubmission = submission({
+      name: 'تاجر إعادة المحاولة',
+      planSlug: plan.slug,
+      planRevision: plan.publishedRevision,
+      submissionToken: token,
+    });
+    const first = await createJoinRequest(firstSubmission, { db: pg.db });
+    expect(first.created).toBe(true);
+    const original = await pg.pool.query(
+      'select name, plan_name_snapshot, plan_price_minor_snapshot, plan_currency_snapshot from join_requests where submission_token = $1',
+      [token],
+    );
+    const originalRow = original.rows[0];
+    expect(originalRow).toEqual({
+      name: 'تاجر إعادة المحاولة',
+      plan_name_snapshot: plan.published?.name,
+      plan_price_minor_snapshot: 14_900,
+      plan_currency_snapshot: 'EGP',
+    });
+
+    const edited = await savePlanDraft(
+      {
+        id: plan.id,
+        expectedRevision: plan.revision,
+        values: planValues({ name: 'عرض بعد إعادة النشر', monthlyPrice: '299.00' }),
+      },
+      { db: pg.db },
+    );
+    const republished = await publishPlan(
+      { id: edited.id, expectedRevision: edited.revision },
+      { db: pg.db },
+    );
+    expect(republished.publishedRevision).not.toBe(plan.publishedRevision);
+
+    const replayAfterRepublish = await createJoinRequest(firstSubmission, { db: pg.db });
+    expect(replayAfterRepublish.created).toBe(false);
+    expect(await countRequests()).toBe(1);
+
+    const modifiedReplay = await createJoinRequest(
+      {
+        ...firstSubmission,
+        name: 'اسم مختلف لنفس الرمز',
+        planSlug: null,
+        planRevision: null,
+      },
+      { db: pg.db },
+    );
+    expect(modifiedReplay.created).toBe(false);
+    expect(await countRequests()).toBe(1);
+
+    await expect(
+      createJoinRequest(
+        submission({
+          planSlug: plan.slug,
+          planRevision: plan.publishedRevision,
+          submissionToken: `replay-stale-${randomUUID()}`,
+        }),
+        { db: pg.db },
+      ),
+    ).rejects.toBeInstanceOf(JoinPlanChangedError);
+    expect(await countRequests()).toBe(1);
+
+    await hidePlan(
+      { id: republished.id, expectedRevision: republished.revision },
+      { db: pg.db },
+    );
+    const replayAfterHide = await createJoinRequest(firstSubmission, { db: pg.db });
+    expect(replayAfterHide.created).toBe(false);
+    expect(await countRequests()).toBe(1);
+
+    await expect(
+      createJoinRequest(
+        submission({
+          planSlug: plan.slug,
+          planRevision: republished.publishedRevision,
+          submissionToken: `replay-hidden-${randomUUID()}`,
+        }),
+        { db: pg.db },
+      ),
+    ).rejects.toBeInstanceOf(JoinPlanUnavailableError);
+    expect(await countRequests()).toBe(1);
+
+    const after = await pg.pool.query(
+      'select name, plan_name_snapshot, plan_price_minor_snapshot, plan_currency_snapshot from join_requests where submission_token = $1',
+      [token],
+    );
+    expect(after.rows[0]).toEqual(originalRow);
+  });
+
+  test('a genuine first token racing an offer publication is rejected as stale', async () => {
+    const plan = await publishedTestPlan(`race-${randomUUID().slice(0, 8)}`);
+    const token = `race-token-${randomUUID()}`;
+    const pendingSubmission = submission({
+      planSlug: plan.slug,
+      planRevision: plan.publishedRevision,
+      submissionToken: token,
+    });
+
+    const blocker = await pg.pool.connect();
+    try {
+      await blocker.query('begin');
+      await blocker.query('select pg_advisory_xact_lock(hashtext($1)::bigint)', [
+        `nokmel.join.token:${token}`,
+      ]);
+      const pending = createJoinRequest(pendingSubmission, { db: pg.db });
+      await blocker.query(
+        "update plans set published_name = 'عرض سباق', published_revision = published_revision + 1 where id = $1",
+        [plan.id],
+      );
+      await blocker.query('commit');
+      await expect(pending).rejects.toBeInstanceOf(JoinPlanChangedError);
+    } finally {
+      blocker.release();
+    }
+    expect(await countRequests()).toBe(0);
   });
 
   test('idempotency: repeated and concurrent duplicate tokens create one immutable record', async () => {

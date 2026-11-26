@@ -223,6 +223,23 @@ export async function createJoinRequest(
 
   try {
     return await db.transaction(async (tx) => {
+      /**
+       * Serialize same-token operations. A committed request is resolved
+       * before any current-offer validation, so a lost-response retry succeeds
+       * even if the plan was republished/hidden in the meantime. Concurrent
+       * same-token callers wait for the first transaction and then observe the
+       * committed row instead of racing plan validation/INSERT.
+       */
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${`nokmel.join.token:${submission.submissionToken}`})::bigint)`,
+      );
+      const existing = await tx
+        .select({ id: joinRequests.id })
+        .from(joinRequests)
+        .where(eq(joinRequests.submissionToken, submission.submissionToken))
+        .limit(1);
+      if (existing.length > 0) return { created: false, duplicate: true };
+
       let snapshot: JoinRequestPlanSnapshot | null = null;
 
       if (submission.planSlug) {

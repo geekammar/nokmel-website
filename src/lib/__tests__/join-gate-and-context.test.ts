@@ -5,6 +5,7 @@ import {
   checkJoinRequestOrigin,
   deriveJoinBucketKey,
   resolveForwardedIdentity,
+  resolveJoinHmacSecret,
   resolveJoinOriginPolicy,
 } from '@/lib/join/request-context';
 
@@ -68,11 +69,34 @@ describe('join origin and request identity policy', () => {
     ).toBe(false);
   });
 
-  it('fails closed for browser origins when origin configuration is missing', () => {
+  it('fails closed when origin configuration is missing, even without an Origin header', () => {
     const policy = resolveJoinOriginPolicy({} as unknown as NodeJS.ProcessEnv);
     expect(policy.configured).toBe(false);
     expect(checkJoinRequestOrigin(new Headers({ origin: 'https://nokmel.tech' }), policy).ok).toBe(false);
-    expect(checkJoinRequestOrigin(new Headers(), policy).ok).toBe(true);
+    expect(checkJoinRequestOrigin(new Headers(), policy).ok).toBe(false);
+  });
+
+  it('rejects an invalid origin configuration (wildcard)', () => {
+    const policy = resolveJoinOriginPolicy({
+      ...baseEnv,
+      TRUSTED_ORIGINS: 'https://*.vercel.app',
+    } as unknown as NodeJS.ProcessEnv);
+    expect(policy.configured).toBe(false);
+    expect(checkJoinRequestOrigin(new Headers(), policy).ok).toBe(false);
+  });
+
+  it('requires a valid HMAC secret and never falls back to a constant', () => {
+    expect(resolveJoinHmacSecret({} as unknown as NodeJS.ProcessEnv)).toBeNull();
+    expect(
+      resolveJoinHmacSecret({ BETTER_AUTH_SECRET: 'short' } as unknown as NodeJS.ProcessEnv),
+    ).toBeNull();
+    expect(
+      resolveJoinHmacSecret({
+        BETTER_AUTH_SECRET: '  synthetic-secret-0123456789abcdef0123456789  ',
+      } as unknown as NodeJS.ProcessEnv),
+    ).toBe('synthetic-secret-0123456789abcdef0123456789');
+    expect(() => deriveJoinBucketKey('203.0.113.7', '')).toThrow();
+    expect(() => deriveJoinBucketKey('203.0.113.7', 'short')).toThrow();
   });
 
   it('uses only single-value parseable forwarded identities and never stores raw values', () => {
@@ -82,12 +106,20 @@ describe('join origin and request identity policy', () => {
     expect(
       resolveForwardedIdentity(new Headers({ 'x-forwarded-for': '203.0.113.7, 10.0.0.1' })),
     ).toBe('unknown');
+    expect(resolveForwardedIdentity(new Headers({ 'x-forwarded-for': '203.0.113.7,' }))).toBe(
+      'unknown',
+    );
+    expect(resolveForwardedIdentity(new Headers({ 'x-forwarded-for': '203.0.113.7,, ' }))).toBe(
+      'unknown',
+    );
     expect(resolveForwardedIdentity(new Headers({ 'x-forwarded-for': 'spoofed' }))).toBe('unknown');
     expect(resolveForwardedIdentity(new Headers())).toBe('unknown');
-    const key = deriveJoinBucketKey('203.0.113.7', baseEnv);
+    const secret = resolveJoinHmacSecret(baseEnv);
+    if (!secret) throw new Error('synthetic secret missing');
+    const key = deriveJoinBucketKey('203.0.113.7', secret);
     expect(key.startsWith('join-intake:v1:')).toBe(true);
     expect(key).not.toContain('203.0.113.7');
-    expect(key).toBe(deriveJoinBucketKey('203.0.113.7', baseEnv));
-    expect(key).not.toBe(deriveJoinBucketKey('203.0.113.8', baseEnv));
+    expect(key).toBe(deriveJoinBucketKey('203.0.113.7', secret));
+    expect(key).not.toBe(deriveJoinBucketKey('203.0.113.8', secret));
   });
 });

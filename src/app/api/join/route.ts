@@ -7,6 +7,7 @@ import {
   checkJoinRequestOrigin,
   deriveJoinBucketKey,
   resolveForwardedIdentity,
+  resolveJoinHmacSecret,
   resolveJoinOriginPolicy,
 } from '@/lib/join/request-context';
 import { createJoinRequest } from '@/lib/join/service';
@@ -120,6 +121,17 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   const originPolicy = resolveJoinOriginPolicy();
+  const hmacSecret = resolveJoinHmacSecret();
+  if (!originPolicy.configured || !hmacSecret) {
+    console.error('[join-intake] security configuration invalid', {
+      reason: !hmacSecret ? 'secret' : 'origins',
+    });
+    return errorResponse(
+      503,
+      'intake_misconfigured',
+      'استلام الطلبات غير متاح الآن. لم يُستلم طلبك. حاول لاحقاً.',
+    );
+  }
   const originCheck = checkJoinRequestOrigin(request.headers, originPolicy);
   if (!originCheck.ok) {
     return errorResponse(403, 'forbidden_origin', originCheck.message);
@@ -150,7 +162,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     const decision = await consumeJoinRateLimit({
       db,
-      bucketKey: deriveJoinBucketKey(identity),
+      bucketKey: deriveJoinBucketKey(identity, hmacSecret),
     });
     if (!decision.allowed) {
       return errorResponse(
@@ -194,12 +206,8 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   try {
-    const result = await createJoinRequest(validation.submission, { db });
-    return jsonResponse(200, {
-      ok: true,
-      status: 'received',
-      duplicate: !result.created,
-    });
+    await createJoinRequest(validation.submission, { db });
+    return jsonResponse(200, { ok: true, status: 'received' });
   } catch (error) {
     if (error instanceof JoinPlanUnavailableError) {
       return errorResponse(409, 'plan_unavailable', error.message);

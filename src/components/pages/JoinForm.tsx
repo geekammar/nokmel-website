@@ -32,7 +32,7 @@ type Banner = {
 } | null;
 
 type JoinApiResponse =
-  | { ok: true; status: 'received'; duplicate?: boolean }
+  | { ok: true; status: 'received' }
   | {
       ok: false;
       code: string;

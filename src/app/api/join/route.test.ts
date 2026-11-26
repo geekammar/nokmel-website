@@ -85,7 +85,7 @@ describe('join intake route', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('no-store');
     const body = (await response.json()) as Record<string, unknown>;
-    expect(body).toEqual({ ok: true, status: 'received', duplicate: false });
+    expect(body).toEqual({ ok: true, status: 'received' });
     expect(JSON.stringify(body)).not.toContain('internal-secret-id');
     const call = mocks.createJoinRequest.mock.calls[0][0];
     expect(call.phone).toBe('+201012345678');
@@ -97,7 +97,7 @@ describe('join intake route', () => {
     mocks.createJoinRequest.mockResolvedValue({ created: false, duplicate: true });
     const response = await POST(request(validBody()));
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true, status: 'received', duplicate: true });
+    expect(await response.json()).toEqual({ ok: true, status: 'received' });
   });
 
   test('is disabled by default / when the gate is invalid', async () => {
@@ -120,9 +120,39 @@ describe('join intake route', () => {
     expect(mocks.consumeJoinRateLimit).not.toHaveBeenCalled();
   });
 
-  test('allows missing Origin only as documented non-browser access', async () => {
+  test('allows missing Origin only when the security configuration is valid', async () => {
     const response = await POST(request(validBody(), { origin: null }));
     expect(response.status).toBe(200);
+  });
+
+  test('enabled intake fails closed when the HMAC secret is missing or invalid', async () => {
+    delete process.env.BETTER_AUTH_SECRET;
+    const missing = await POST(request(validBody(), { origin: null }));
+    expect(missing.status).toBe(503);
+    expect((await missing.json()).code).toBe('intake_misconfigured');
+    expect(mocks.consumeJoinRateLimit).not.toHaveBeenCalled();
+    expect(mocks.createJoinRequest).not.toHaveBeenCalled();
+
+    process.env.BETTER_AUTH_SECRET = 'short-secret';
+    const invalid = await POST(request(validBody(), { origin: null }));
+    expect(invalid.status).toBe(503);
+    expect(mocks.createJoinRequest).not.toHaveBeenCalled();
+  });
+
+  test('enabled intake fails closed when trusted-origin configuration is missing or invalid', async () => {
+    delete process.env.BETTER_AUTH_URL;
+    delete process.env.TRUSTED_ORIGINS;
+    const missing = await POST(request(validBody(), { origin: null }));
+    expect(missing.status).toBe(503);
+    expect((await missing.json()).code).toBe('intake_misconfigured');
+    expect(mocks.consumeJoinRateLimit).not.toHaveBeenCalled();
+    expect(mocks.createJoinRequest).not.toHaveBeenCalled();
+
+    process.env.BETTER_AUTH_URL = ORIGIN;
+    process.env.TRUSTED_ORIGINS = 'https://*.vercel.app';
+    const invalid = await POST(request(validBody(), { origin: null }));
+    expect(invalid.status).toBe(503);
+    expect(mocks.createJoinRequest).not.toHaveBeenCalled();
   });
 
   test('rejects unsupported media types, oversized bodies and malformed JSON', async () => {

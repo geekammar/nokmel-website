@@ -52,12 +52,13 @@ pnpm db:check      # Drizzle Kit: validate migration metadata
 pnpm db:migrate    # validates DATABASE_URL_DIRECT, then applies migrations (never prod without approval)
 pnpm owner:provision       # operator-only owner provisioning (interactive or stdin; never a web route)
 pnpm owner:reset-password  # operator-only password recovery (rehash + session invalidation)
+pnpm qa:cleanup-w4         # operator-only exact-ID QA join-request cleanup (dry-run unless --confirm)
 pnpm dev:postgres  # start a disposable local PostgreSQL 18 for DB tests/e2e
 ```
 
 `DATABASE_URL_DIRECT` is operator-only (migrations, owner provisioning/recovery). It must never be configured in Vercel or exposed to the deployed runtime; the runtime uses the pooled `DATABASE_URL` role. Least-privilege role SQL: `docs/DATABASE_PERMISSIONS.md`.
 
-Early-access join intake is fail-closed behind `JOIN_INTAKE_ENABLED` (`1`/`true` only; missing/invalid keeps it disabled). W4 enables it only on the isolated development Preview for acceptance. `JOIN_RATE_LIMIT_MAX` and `NOKMEL_DISPOSABLE_TEST_ENV` are disposable-test-only and must never weaken a hosted environment.
+Early-access join intake is fail-closed behind `JOIN_INTAKE_ENABLED` (`1`/`true` only; missing/invalid keeps it disabled). Enabled intake also requires a valid `BETTER_AUTH_SECRET` (32+ chars) and valid exact `BETTER_AUTH_URL`/`TRUSTED_ORIGINS`; otherwise the API returns a controlled 503 and stores nothing, even for requests without `Origin`. W4 enables it only on the isolated development Preview for acceptance. `JOIN_RATE_LIMIT_MAX` and `NOKMEL_DISPOSABLE_TEST_ENV` are disposable-test-only and must never weaken a hosted environment. QA cleanup is operator-only by exact request IDs/marker per `docs/DATABASE_PERMISSIONS.md` §3c.
 
 Integration/e2e databases are refused unless they are loopback, use an approved disposable database name, and explicitly set `sslmode=disable`. Without `TEST_DATABASE_URL` the integration harness starts its own temporary embedded PostgreSQL 18. Never point tests at a hosted Neon database.
 

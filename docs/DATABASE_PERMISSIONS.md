@@ -251,6 +251,46 @@ intended plan/join/limiter DML with a restricted synthetic role and confirms
 DDL/TRUNCATE refusal. The coding agent never connects to hosted Neon; hosted
 migration, grants and validation are performed by the external lead.
 
+## 3c. W4 QA join-request cleanup (operator-only, no hosted execution here)
+
+W4 does not add an admin deletion feature or any new grant for cleanup. After
+independent hosted acceptance, synthetic QA requests must be removed by an
+explicit owner-authorized operator action using the direct operator connection
+(`DATABASE_URL_DIRECT`, never the pooled runtime URL and never from this coding
+agent).
+
+The reviewed helper is `scripts/cleanup-w4-qa-requests.ts`
+(`pnpm qa:cleanup-w4`). It:
+
+- requires one or more exact, independently recorded `--request-id` values;
+- requires the synthetic name prefix via `--marker` (recommended `QA-W4-`);
+- defaults to a transactional dry-run that locks/validates rows and prints only
+  the matched count/IDs, then rolls back;
+- requires `--confirm` for deletion;
+- aborts if any ID is missing, duplicated, unexpected, or its name/marker does
+  not match;
+- deletes only `WHERE id = ANY($exact_ids)` in one transaction and verifies the
+  deleted count; it never deletes all requests and never uses `TRUNCATE`;
+- does not touch plans, auth/accounts/sessions, CMS, SEO, or unrelated requests.
+
+```bash
+# 1) dry-run; review the printed count and exact IDs
+DATABASE_URL_DIRECT=<direct development URL> pnpm qa:cleanup-w4 \
+  --marker "QA-W4-" --request-id <recorded-id> [--request-id <recorded-id>...]
+
+# 2) only after owner authorization, repeat the exact command with --confirm
+DATABASE_URL_DIRECT=<direct development URL> pnpm qa:cleanup-w4 \
+  --marker "QA-W4-" --request-id <recorded-id> [--request-id <recorded-id>...] --confirm
+```
+
+Test plans are normally hidden through the owner UI after acceptance; no
+test-plan deletion procedure is included, and the `join_requests.plan_id`
+foreign-key restriction is not weakened. If a plan must ever be removed through
+a separate owner-approved operator procedure, it must first have zero remaining
+references, including historical snapshots, and must never use `TRUNCATE` or an
+unscoped delete. The final production retention and personal-data deletion
+policy still requires owner approval before launch.
+
 ## 4. Default privileges for future objects
 
 Migration-created objects must not inherit PUBLIC access, and the runtime must
