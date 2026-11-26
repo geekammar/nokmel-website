@@ -206,7 +206,24 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   try {
-    await createJoinRequest(validation.submission, { db });
+    const created = await createJoinRequest(validation.submission, { db });
+    if (created.created) {
+      /**
+       * Best-effort owner notification after the accepted request committed.
+       * It cannot roll back or invalidate the request and its failure is never
+       * exposed to the public response (which stays minimal and generic).
+       */
+      try {
+        const { deliverNewJoinRequestNotification } = await import(
+          '@/lib/notifications/service'
+        );
+        await deliverNewJoinRequestNotification(created.id, { db });
+      } catch (notificationError) {
+        console.error('[join-intake] notification failed', {
+          reason: notificationError instanceof Error ? notificationError.name : 'unknown',
+        });
+      }
+    }
     return jsonResponse(200, { ok: true, status: 'received' });
   } catch (error) {
     if (error instanceof JoinPlanUnavailableError) {

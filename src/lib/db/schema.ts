@@ -25,7 +25,10 @@ import {
  * W3.2 adds the two predefined-CMS tables (`content_sections`, `faq_items`).
  * W4 adds `plans`, `join_requests` and `join_intake_rate_limits`; W4.1 adds
  * nullable draft/published promotion JSONB and an immutable offer snapshot.
- * Analytics/settings tables remain out of scope (W5).
+ * W5 adds one typed owner settings row (`site_settings`, public and private
+ * columns in the same typed model) and a small durable per-request Telegram
+ * notification state. There is still no first-party analytics events table:
+ * website traffic metrics come from the external GA4 provider.
  */
 
 export const user = pgTable('user', {
@@ -289,6 +292,15 @@ export const joinRequests = pgTable(
     notes: text('notes'),
     submissionToken: text('submission_token').notNull(),
     revision: integer('revision').notNull().default(0),
+    /**
+     * W5 owner-notification state for this accepted request. `null` is a
+     * legacy/never-attempted row. Delivery is best-effort and never affects the
+     * accepted request; `uncertain` records a timeout/ambiguous provider result.
+     */
+    notificationState: text('notification_state'),
+    notificationAttemptedAt: timestamp('notification_attempted_at', { withTimezone: true }),
+    notificationDeliveredAt: timestamp('notification_delivered_at', { withTimezone: true }),
+    notificationErrorCode: text('notification_error_code'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -324,6 +336,14 @@ export const joinRequests = pgTable(
       'join_requests_notes_length',
       sql`${table.notes} is null or char_length(${table.notes}) <= 4000`,
     ),
+    check(
+      'join_requests_notification_state_valid',
+      sql`${table.notificationState} is null or ${table.notificationState} in ('skipped', 'pending', 'sending', 'sent', 'failed', 'uncertain')`,
+    ),
+    check(
+      'join_requests_notification_error_length',
+      sql`${table.notificationErrorCode} is null or char_length(${table.notificationErrorCode}) <= 40`,
+    ),
   ],
 );
 
@@ -345,6 +365,77 @@ export const joinIntakeRateLimits = pgTable(
   (table) => [
     index('join_intake_rate_limits_window_idx').on(table.windowStart),
     check('join_intake_rate_limits_count_nonnegative', sql`${table.count} >= 0`),
+  ],
+);
+
+/**
+ * Owner-managed website settings (W5).
+ *
+ * One typed single row (`id = 'default'`). There is deliberately no generic
+ * arbitrary key/value configuration editor. Public columns are explicitly
+ * projected by the public loader; private integration preferences (notification
+ * destination, enablement flags, bot identity cache) are only read inside
+ * owner-authorized/server-only paths. Secrets (bot token, GA credentials) are
+ * never stored here — they remain server environment variables.
+ *
+ * Each settings group keeps its own optimistic revision so saving one group
+ * cannot overwrite an unrelated concurrent edit. CMS content, plans and auth
+ * remain separate domain models.
+ */
+export const siteSettings = pgTable(
+  'site_settings',
+  {
+    id: text('id').primaryKey().default('default'),
+    contactEmail: text('contact_email'),
+    contactPhone: text('contact_phone'),
+    contactTelegramUrl: text('contact_telegram_url'),
+    contactWhatsappUrl: text('contact_whatsapp_url'),
+    socialInstagramUrl: text('social_instagram_url'),
+    socialFacebookUrl: text('social_facebook_url'),
+    socialXUrl: text('social_x_url'),
+    notificationsEnabled: boolean('notifications_enabled').notNull().default(false),
+    telegramChatId: text('telegram_chat_id'),
+    telegramBotUsername: text('telegram_bot_username'),
+    telegramBotName: text('telegram_bot_name'),
+    analyticsEnabled: boolean('analytics_enabled').notNull().default(false),
+    publicRevision: integer('public_revision').notNull().default(0),
+    notificationRevision: integer('notification_revision').notNull().default(0),
+    analyticsRevision: integer('analytics_revision').notNull().default(0),
+    lastNotificationTestAt: timestamp('last_notification_test_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check('site_settings_single_row', sql`${table.id} = 'default'`),
+    check(
+      'site_settings_contact_email_length',
+      sql`${table.contactEmail} is null or char_length(${table.contactEmail}) between 3 and 254`,
+    ),
+    check(
+      'site_settings_contact_phone_length',
+      sql`${table.contactPhone} is null or char_length(${table.contactPhone}) between 8 and 20`,
+    ),
+    check('site_settings_public_revision_nonnegative', sql`${table.publicRevision} >= 0`),
+    check(
+      'site_settings_notification_revision_nonnegative',
+      sql`${table.notificationRevision} >= 0`,
+    ),
+    check(
+      'site_settings_analytics_revision_nonnegative',
+      sql`${table.analyticsRevision} >= 0`,
+    ),
+    check(
+      'site_settings_telegram_chat_id_format',
+      sql`${table.telegramChatId} is null or ${table.telegramChatId} ~ '^[0-9]{1,20}$'`,
+    ),
+    check(
+      'site_settings_telegram_bot_identity_length',
+      sql`(${table.telegramBotUsername} is null or char_length(${table.telegramBotUsername}) <= 64) and (${table.telegramBotName} is null or char_length(${table.telegramBotName}) <= 128)`,
+    ),
+    check(
+      'site_settings_public_url_length',
+      sql`(${table.contactTelegramUrl} is null or char_length(${table.contactTelegramUrl}) <= 500) and (${table.contactWhatsappUrl} is null or char_length(${table.contactWhatsappUrl}) <= 500) and (${table.socialInstagramUrl} is null or char_length(${table.socialInstagramUrl}) <= 500) and (${table.socialFacebookUrl} is null or char_length(${table.socialFacebookUrl}) <= 500) and (${table.socialXUrl} is null or char_length(${table.socialXUrl}) <= 500)`,
+    ),
   ],
 );
 

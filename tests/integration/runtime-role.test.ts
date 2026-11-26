@@ -57,7 +57,7 @@ beforeAll(async () => {
   );
   await pg.pool.query('revoke all on all tables in schema public from public');
   await pg.pool.query(
-    `grant select, insert, update, delete on table "user", "session", "account", "verification", "rate_limit", "content_sections", "faq_items", "plans", "join_requests", "join_intake_rate_limits" to ${quoteIdentifier(roleName)}`,
+    `grant select, insert, update, delete on table "user", "session", "account", "verification", "rate_limit", "content_sections", "faq_items", "plans", "join_requests", "join_intake_rate_limits", "site_settings" to ${quoteIdentifier(roleName)}`,
   );
 });
 
@@ -200,6 +200,32 @@ describe('restricted runtime database role', () => {
       await runtimePool.query(
         "delete from join_intake_rate_limits where key = 'join-intake:v1:runtime-probe'",
       );
+      await runtimePool.query(
+        "update join_requests set notification_state = 'sent', notification_delivered_at = now() where id = 'request-runtime-probe'",
+      );
+      const notificationRead = await runtimePool.query(
+        "select notification_state from join_requests where id = 'request-runtime-probe'",
+      );
+      expect(notificationRead.rows[0].notification_state).toBe('sent');
+
+      // W5 typed owner settings DML is allowed with an explicit grant.
+      await runtimePool.query(
+        `insert into site_settings (id, contact_email, public_revision)
+         values ('default', 'hello@runtime-probe.test', 1)
+         on conflict (id) do update set public_revision = site_settings.public_revision + 1`,
+      );
+      await runtimePool.query(
+        "update site_settings set notifications_enabled = true, telegram_chat_id = '123456789' where id = 'default'",
+      );
+      const settingsRead = await runtimePool.query(
+        "select public_revision, notifications_enabled, telegram_chat_id from site_settings where id = 'default'",
+      );
+      expect(settingsRead.rows[0]).toEqual({
+        public_revision: 1,
+        notifications_enabled: true,
+        telegram_chat_id: '123456789',
+      });
+      await runtimePool.query("delete from site_settings where id = 'default'");
       await runtimePool.query("delete from join_requests where id = 'request-runtime-probe'");
       await runtimePool.query("delete from plans where id = 'plan-runtime-probe'");
 
@@ -214,6 +240,9 @@ describe('restricted runtime database role', () => {
       ).rejects.toThrow(/permission denied/i);
       await expect(
         runtimePool.query('truncate table join_requests'),
+      ).rejects.toThrow(/permission denied/i);
+      await expect(
+        runtimePool.query('truncate table site_settings'),
       ).rejects.toThrow(/permission denied/i);
       await expect(
         runtimePool.query('alter table "user" add column "runtime_probe" integer'),

@@ -30,6 +30,7 @@ import {
   type PromotionFormValues,
   type PromotionState,
 } from '@/lib/plans/promotion';
+import { buildPromotionEditorPreview } from '@/lib/plans/editor-preview';
 import {
   createPlanAction,
   hidePlanAction,
@@ -173,31 +174,27 @@ export function PlanEditor({
   const promotionMathPreview = useMemo((): {
     offer: OfferResolution;
     currency: PlanFormValues['currency'];
+    kind: ReturnType<typeof buildPromotionEditorPreview>['kind'];
+    hypothetical: boolean;
   } | null => {
     const parsed = validatePlanForm(values);
     if (!parsed.ok || !parsed.values.currency || !parsed.values.promotion) {
       return null;
     }
-    const promotion = parsed.values.promotion;
-    const start = Date.parse(promotion.startsAt);
-    const end = Date.parse(promotion.endsAt);
-    const inside =
-      Number.isFinite(start) && Number.isFinite(end) && start < end
-        ? Math.min(Math.max(previewAsOf.getTime(), start), end - 1)
-        : previewAsOf.getTime();
-    return {
-      offer: resolveOffer(
-        {
-          slug: slug || 'preview-plan',
-          publishedRevision: plan?.revision ?? 1,
-          currency: parsed.values.currency,
-          monthlyPriceMinor: parsed.values.monthlyPriceMinor,
-          yearlyPriceMinor: parsed.values.yearlyPriceMinor,
-          promotion: { ...promotion, enabled: true },
-        },
-        new Date(inside),
-      ),
+    const preview = buildPromotionEditorPreview({
+      promotion: parsed.values.promotion,
+      slug: slug || 'preview-plan',
+      publishedRevision: plan?.revision ?? 1,
       currency: parsed.values.currency,
+      monthlyPriceMinor: parsed.values.monthlyPriceMinor,
+      yearlyPriceMinor: parsed.values.yearlyPriceMinor,
+      asOf: previewAsOf,
+    });
+    return {
+      offer: preview.offer,
+      currency: parsed.values.currency,
+      kind: preview.kind,
+      hypothetical: preview.hypothetical,
     };
   }, [values, slug, plan?.revision, previewAsOf]);
 
@@ -1001,10 +998,13 @@ export function PlanEditor({
               {promotionMathPreview ? (
                 <div
                   data-testid="plan-promotion-preview"
+                  data-preview-kind={promotionMathPreview.kind}
                   className="rounded-card border border-border-subtle p-3"
                 >
                   <h3 className="text-sm font-bold text-text-primary">
-                    {adminPlansUi.promotion.previewTitle}
+                    {promotionMathPreview.hypothetical
+                      ? adminPlansUi.promotion.previewHypotheticalTitle
+                      : adminPlansUi.promotion.previewTitle}
                   </h3>
                   <dl className="mt-2 flex flex-col gap-2 text-sm">
                     {promotionMathPreview.offer.monthly.baseMinor !== null ? (
@@ -1022,8 +1022,17 @@ export function PlanEditor({
                       />
                     ) : null}
                   </dl>
-                  <p className="mt-2 text-xs leading-5 text-text-secondary">
-                    {adminPlansUi.promotion.previewValuesNote}
+                  <p
+                    className="mt-2 text-xs leading-5 text-text-secondary"
+                    data-testid="plan-promotion-preview-note"
+                  >
+                    {promotionMathPreview.hypothetical
+                      ? adminPlansUi.promotion.previewHypotheticalNote
+                      : promotionMathPreview.kind === 'current_disabled'
+                        ? adminPlansUi.promotion.previewDisabledNote
+                        : promotionMathPreview.kind === 'current_expired'
+                          ? adminPlansUi.promotion.previewExpiredNote
+                          : adminPlansUi.promotion.previewValuesNote}
                   </p>
                 </div>
               ) : (

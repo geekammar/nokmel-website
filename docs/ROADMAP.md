@@ -13,7 +13,7 @@ Workstreams W0–W6. Each workstream ends with an external review gate before th
 | W3 | Admin & Content | Split into W3.1 (admin foundation & authentication — see above), W3.2 (CMS/content management) and W3.3 (SEO management). Join-request storage/submission is NOT in W3 — it belongs to W4 | Auth enforced on all admin routes; content editable |
 | W4 | Pricing & Join Requests | Plans & Pricing admin (marketing data only), public join form **submission + join-request storage/management** (moved here from earlier W3 wording) | No billing integration; requests captured with plan/status |
 | W4.1 | Scheduled Promotional Pricing | One optional scheduled marketing discount per plan (percentage/fixed, monthly/yearly/both), draft/published lifecycle, owner preview, shared effective-offer resolver/version, stale-offer recovery, expanded historical offer snapshot | No billing effect; real PostgreSQL + browser coverage; hosted activation/acceptance external |
-| W5 | Analytics & Settings | Overview metrics (visitors, sources, pricing interest, join requests, conversion), Settings section | Metrics match event data; settings persist |
+| W5 | Analytics & Settings | Business Overview from authoritative join requests plus optional Google Analytics 4 aggregates; owner Telegram notifications; typed website settings; NKW-W41-001 correction | Database metrics match accepted requests; unavailable analytics is honest; settings persist with owner-only privacy boundaries |
 | W6 | Launch Acceptance | End-to-end acceptance, accessibility pass, performance pass, launch checklist | Owner approval; deployment only with explicit approval |
 
 W3.1 status (2026-11-25): merged via PR #4; accepted for continued
@@ -44,14 +44,36 @@ privacy/retention approval and explicit launch approval remain external.
 NKW-W33-001 labels corrected; NKW-W33-002 revision behavior preserved.
 Analytics/settings remain W5; launch W6.
 
-W4.1 status (2026-11-26): implemented on
-`feature/w41-scheduled-promotional-pricing` from merged W4 `main`
-(`ce82fda57565b4bbea3d31fea21e7c2eac54159b`). Additive migration
-`0004_w41-scheduled-promotional-pricing` adds draft/published promotion JSONB
-and an immutable historical offer snapshot. Local unit 210/210, PostgreSQL
-160/160 and Playwright 101/101 pass; exact CI is checked on the final HEAD.
-Hosted migration/Preview configuration, NKW-W4-006 owner CMS correction and
-independent acceptance remain external. W5 has not started.
+W4.1 status (2026-11-26): **merged and accepted for continued development**
+via PR #8 (accepted HEAD
+`7d33ab734cc84cb51f17d67aa972390559c71e86`, merge commit
+`d50f7d555859b5f0ee4dc5b7075127f9e02eafde`). Additive migration
+`0004_w41-scheduled-promotional-pricing` added draft/published promotion JSONB
+and an immutable historical offer snapshot. Final local verification was unit
+210/210, PostgreSQL 160/160 and Playwright 101/101; all three remote CI jobs
+passed. Independent live acceptance: 18 PASS, 0 FAIL, 0 PARTIAL, 0 BLOCKED.
+The authorized QA cleanup removed exactly three synthetic requests and
+table-content hashes confirmed plans/CMS/FAQ/auth/sessions unchanged.
+NKW-W4-006 is closed and FAQ Q6 preserved. Hosted Production activation and W6
+launch gates remain external.
+
+W5 status (2026-11-26): implemented on
+`feature/w5-analytics-notifications-settings` from merged W4.1 `main`
+(`d50f7d555859b5f0ee4dc5b7075127f9e02eafde`). Additive migration
+`0005_w5-settings-notifications` adds typed `site_settings` and durable
+per-request notification state, with no analytics-events table. The database
+Overview, GA4 adapter/reversible consent gate, optional owner Telegram
+notifications, owner-only settings and the NKW-W41-001 correction are
+implemented. The focused W5-R01–R06 closure adds test-before-enable
+notifications, attempt-fenced completion with persistence uncertainty,
+reversible visitor consent, tag-level sanitized defaults/no-admin boundary,
+event-specific key-event conversion (or truthful unavailable state) and masked
+private-settings readback without a schema change. Local unit 274/274,
+PostgreSQL 187/187 and Playwright 117/117 pass; exact CI is checked on the
+final HEAD. Hosted migration 0005, runtime grant, Preview configuration,
+GA4/Telegram external activation and independent acceptance remain external.
+NKW-W41-002 stays deferred to physical Android evaluation in W6. Production
+readiness is not claimed.
 
 ## Standing rules
 

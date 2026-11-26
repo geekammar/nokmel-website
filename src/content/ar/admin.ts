@@ -1,9 +1,9 @@
 /**
- * Admin shell + login strings (W3.1).
+ * Admin shell + login strings (W3.1; W5 activates all five sections).
  *
- * W3.1 implements only the admin foundation: the login page, the protected
- * shell, the Overview section, and the future information architecture shown
- * honestly as unavailable. No fake dashboards, metrics, or application data.
+ * The admin shell contains exactly the five approved primary sections. W5
+ * replaces the Overview placeholder with database-backed business metrics and
+ * activates Settings; no sixth section is added.
  */
 
 export const adminUi = {
@@ -28,17 +28,12 @@ export const adminUi = {
     logout: 'تسجيل الخروج',
     navLabel: 'التنقل في لوحة الإدارة',
     overviewTitle: 'نظرة عامة',
-    welcome: 'مرحباً بك في لوحة إدارة نكّمل.',
-    overviewEmptyTitle: 'لا توجد بيانات لعرضها بعد',
-    overviewEmptyBody:
-      'ستظهر هنا ملخصات الموقع والتحليلات عند تفعيل قسم التحليلات والإعدادات في مرحلة لاحقة. يمكنك الآن إدارة الباقات والأسعار وطلبات الانضمام من القائمة.',
-    unavailableNote: 'غير متاح — في مرحلة لاحقة',
   },
   nav: [
     { id: 'overview', label: 'نظرة عامة', available: true, href: '/admin' },
     { id: 'content-seo', label: 'المحتوى والـSEO', available: true, href: '/admin/content' },
     { id: 'plans-pricing', label: 'الباقات والأسعار', available: true, href: '/admin/plans' },
     { id: 'join-requests', label: 'طلبات الانضمام', available: true, href: '/admin/requests' },
-    { id: 'settings', label: 'الإعدادات', available: false },
+    { id: 'settings', label: 'الإعدادات', available: true, href: '/admin/settings' },
   ],
 } as const;
