@@ -12,6 +12,7 @@ Workstreams W0–W6. Each workstream ends with an external review gate before th
 | W3.3 | SEO Management | SEO metadata editing in the admin | SEO managed in admin; public metadata stays pre-launch noindex until launch approval |
 | W3 | Admin & Content | Split into W3.1 (admin foundation & authentication — see above), W3.2 (CMS/content management) and W3.3 (SEO management). Join-request storage/submission is NOT in W3 — it belongs to W4 | Auth enforced on all admin routes; content editable |
 | W4 | Pricing & Join Requests | Plans & Pricing admin (marketing data only), public join form **submission + join-request storage/management** (moved here from earlier W3 wording) | No billing integration; requests captured with plan/status |
+| W4.1 | Scheduled Promotional Pricing | One optional scheduled marketing discount per plan (percentage/fixed, monthly/yearly/both), draft/published lifecycle, owner preview, shared effective-offer resolver/version, stale-offer recovery, expanded historical offer snapshot | No billing effect; real PostgreSQL + browser coverage; hosted activation/acceptance external |
 | W5 | Analytics & Settings | Overview metrics (visitors, sources, pricing interest, join requests, conversion), Settings section | Metrics match event data; settings persist |
 | W6 | Launch Acceptance | End-to-end acceptance, accessibility pass, performance pass, launch checklist | Owner approval; deployment only with explicit approval |
 
@@ -42,6 +43,15 @@ forwarded-header/security evidence, physical Android acceptance, final
 privacy/retention approval and explicit launch approval remain external.
 NKW-W33-001 labels corrected; NKW-W33-002 revision behavior preserved.
 Analytics/settings remain W5; launch W6.
+
+W4.1 status (2026-11-26): implemented on
+`feature/w41-scheduled-promotional-pricing` from merged W4 `main`
+(`ce82fda57565b4bbea3d31fea21e7c2eac54159b`). Additive migration
+`0004_w41-scheduled-promotional-pricing` adds draft/published promotion JSONB
+and an immutable historical offer snapshot. Local unit 210/210, PostgreSQL
+160/160 and Playwright 101/101 pass; exact CI is checked on the final HEAD.
+Hosted migration/Preview configuration, NKW-W4-006 owner CMS correction and
+independent acceptance remain external. W5 has not started.
 
 ## Standing rules
 

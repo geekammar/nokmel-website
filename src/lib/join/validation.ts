@@ -16,6 +16,7 @@ export const JOIN_LIMITS = {
   utm: 100,
   submissionToken: 100,
   planSlug: 60,
+  offerVersion: 80,
 } as const;
 
 export const JOIN_SOURCES = ['direct', 'pricing', 'join'] as const;
@@ -195,11 +196,12 @@ export const joinSubmissionInputSchema = z
       },
       planSlugSchema.optional(),
     ),
-    planRevision: z
-      .number()
-      .int('إصدار الخطة غير صالح.')
-      .min(0, 'إصدار الخطة غير صالح.')
-      .max(1_000_000, 'إصدار الخطة غير صالح.')
+    offerVersion: z
+      .string()
+      .trim()
+      .min(8, 'إصدار العرض غير صالح.')
+      .max(JOIN_LIMITS.offerVersion, 'إصدار العرض غير صالح.')
+      .regex(/^[A-Za-z0-9._:-]+$/, 'إصدار العرض غير صالح.')
       .optional(),
     source: optionalSource(),
     utmSource: optionalUtm(),
@@ -214,14 +216,14 @@ export const joinSubmissionInputSchema = z
   })
   .strict()
   .superRefine((value, ctx) => {
-    if (value.planSlug && value.planRevision === undefined) {
+    if (value.planSlug && value.offerVersion === undefined) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['planRevision'],
-        message: 'إصدار الخطة مطلوب عند اختيار خطة.',
+        path: ['offerVersion'],
+        message: 'إصدار العرض مطلوب عند اختيار خطة.',
       });
     }
-    if (!value.planSlug && value.planRevision !== undefined) {
+    if (!value.planSlug && value.offerVersion !== undefined) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['planSlug'],
@@ -236,7 +238,7 @@ export type JoinSubmission = {
   email: string | null;
   businessActivity: string | null;
   planSlug: string | null;
-  planRevision: number | null;
+  offerVersion: string | null;
   source: JoinSource;
   utmSource: string | null;
   utmMedium: string | null;
@@ -270,7 +272,7 @@ export function parseJoinSubmission(raw: unknown): JoinValidationResult {
       email: parsed.data.email ?? null,
       businessActivity: parsed.data.businessActivity ?? null,
       planSlug: parsed.data.planSlug ?? null,
-      planRevision: parsed.data.planRevision ?? null,
+      offerVersion: parsed.data.offerVersion ?? null,
       source: parsed.data.source ?? 'direct',
       utmSource: parsed.data.utmSource ?? null,
       utmMedium: parsed.data.utmMedium ?? null,

@@ -6,6 +6,11 @@ import { joinRequests, plans } from '@/lib/db/schema';
 import type { Db } from '@/lib/db/types';
 import { toPublicPlan, type PublicPlan, type SupportedCurrencyCode } from '@/lib/plans/model';
 import {
+  buildOfferSnapshot,
+  parseOfferSnapshot,
+  type OfferSnapshot,
+} from './snapshot';
+import {
   JoinPlanChangedError,
   JoinPlanUnavailableError,
   JoinRequestConflictError,
@@ -52,6 +57,8 @@ export type JoinRequestSummary = {
 
 export type JoinRequestDetail = JoinRequestSummary & {
   planId: string | null;
+  offerSnapshot: OfferSnapshot | null;
+  offerSnapshotInvalid: boolean;
   utmSource: string | null;
   utmMedium: string | null;
   utmCampaign: string | null;
@@ -86,7 +93,7 @@ export type CreateJoinRequestResult =
   | { created: true; id: string }
   | { created: false; duplicate: true };
 
-type JoinServiceOptions = { db?: Db };
+type JoinServiceOptions = { db?: Db; asOf?: Date };
 type JoinRequestRow = typeof joinRequests.$inferSelect;
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
@@ -179,9 +186,13 @@ function summaryFromRow(row: JoinRequestRow): JoinRequestSummary {
 }
 
 function detailFromRow(row: JoinRequestRow): JoinRequestDetail {
+  const parsedSnapshot = parseOfferSnapshot(row.offerSnapshot);
   return {
     ...summaryFromRow(row),
     planId: row.planId,
+    offerSnapshot:
+      parsedSnapshot.status === 'valid' ? parsedSnapshot.snapshot : null,
+    offerSnapshotInvalid: parsedSnapshot.status === 'invalid',
     utmSource: row.utmSource,
     utmMedium: row.utmMedium,
     utmCampaign: row.utmCampaign,
@@ -195,11 +206,11 @@ function publishedPlanSelection(plan: PublicPlan): {
   priceMinor: number | null;
   pricePeriod: 'monthly' | 'yearly' | null;
 } {
-  if (plan.monthlyPriceMinor !== null) {
-    return { priceMinor: plan.monthlyPriceMinor, pricePeriod: 'monthly' };
+  if (plan.offer.monthly.effectiveMinor !== null) {
+    return { priceMinor: plan.offer.monthly.effectiveMinor, pricePeriod: 'monthly' };
   }
-  if (plan.yearlyPriceMinor !== null) {
-    return { priceMinor: plan.yearlyPriceMinor, pricePeriod: 'yearly' };
+  if (plan.offer.yearly.effectiveMinor !== null) {
+    return { priceMinor: plan.offer.yearly.effectiveMinor, pricePeriod: 'yearly' };
   }
   return { priceMinor: null, pricePeriod: null };
 }
@@ -207,12 +218,14 @@ function publishedPlanSelection(plan: PublicPlan): {
 /**
  * Public write transaction. The selected plan is re-resolved from the current
  * published data; the client cannot provide trusted names or prices. A stale
- * plan revision rejects the request without silently changing the selection.
+ * effective-offer version rejects the request without silently changing the
+ * selection.
  */
 export async function createJoinRequest(
   submission: JoinSubmission,
   options: JoinServiceOptions = {},
 ): Promise<CreateJoinRequestResult> {
+  const asOf = options.asOf ?? new Date();
   let db: Db;
   try {
     db = resolveDb(options);
@@ -241,8 +254,15 @@ export async function createJoinRequest(
       if (existing.length > 0) return { created: false, duplicate: true };
 
       let snapshot: JoinRequestPlanSnapshot | null = null;
+      let offerSnapshot: OfferSnapshot | null = null;
 
       if (submission.planSlug) {
+        /**
+         * One row read provides the complete offer context. FOR SHARE makes a
+         * concurrent plan publication/update wait until this transaction
+         * commits, so the accepted snapshot and the validated current offer
+         * cannot be mixed.
+         */
         const rows = await tx
           .select({
             id: plans.id,
@@ -257,10 +277,12 @@ export async function createJoinRequest(
             featured: plans.publishedFeatured,
             displayOrder: plans.publishedDisplayOrder,
             publishedRevision: plans.publishedRevision,
+            publishedPromotion: plans.publishedPromotion,
           })
           .from(plans)
           .where(and(eq(plans.slug, submission.planSlug), eq(plans.status, 'published')))
-          .limit(1);
+          .limit(1)
+          .for('share');
         const row = rows[0];
         if (
           !row ||
@@ -274,23 +296,32 @@ export async function createJoinRequest(
         ) {
           throw new JoinPlanUnavailableError();
         }
-        const currentPlan = toPublicPlan({
-          slug: row.slug,
-          name: row.name,
-          description: row.description,
-          features: row.features,
-          monthlyPriceMinor: row.monthlyPriceMinor,
-          yearlyPriceMinor: row.yearlyPriceMinor,
-          currency: row.currency,
-          ctaLabel: row.ctaLabel,
-          featured: row.featured,
-          displayOrder: row.displayOrder,
-          publishedRevision: row.publishedRevision,
-        });
-        if (submission.planRevision === null) {
+        let currentPlan: PublicPlan;
+        try {
+          currentPlan = toPublicPlan(
+            {
+              slug: row.slug,
+              name: row.name,
+              description: row.description,
+              features: row.features,
+              monthlyPriceMinor: row.monthlyPriceMinor,
+              yearlyPriceMinor: row.yearlyPriceMinor,
+              currency: row.currency,
+              ctaLabel: row.ctaLabel,
+              featured: row.featured,
+              displayOrder: row.displayOrder,
+              publishedRevision: row.publishedRevision,
+              publishedPromotion: row.publishedPromotion,
+            },
+            asOf,
+          );
+        } catch {
           throw new JoinPlanUnavailableError();
         }
-        if (submission.planRevision !== currentPlan.publishedRevision) {
+        if (submission.offerVersion === null) {
+          throw new JoinPlanUnavailableError();
+        }
+        if (submission.offerVersion !== currentPlan.offer.version) {
           throw new JoinPlanChangedError(currentPlan);
         }
         const price = publishedPlanSelection(currentPlan);
@@ -301,6 +332,12 @@ export async function createJoinRequest(
           pricePeriod: price.pricePeriod,
           currency: currentPlan.currency,
         };
+        offerSnapshot = buildOfferSnapshot({
+          plan: currentPlan,
+          planId: row.id,
+          offer: currentPlan.offer,
+          capturedAt: asOf,
+        });
       }
 
       const now = new Date();
@@ -317,6 +354,7 @@ export async function createJoinRequest(
           planPriceMinorSnapshot: snapshot?.priceMinor ?? null,
           planPricePeriodSnapshot: snapshot?.pricePeriod ?? null,
           planCurrencySnapshot: snapshot?.currency ?? null,
+          offerSnapshot,
           source: submission.source,
           utmSource: submission.utmSource,
           utmMedium: submission.utmMedium,

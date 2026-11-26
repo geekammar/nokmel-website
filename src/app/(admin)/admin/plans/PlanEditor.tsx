@@ -10,12 +10,26 @@ import { adminPlansUi } from '@/content/ar/admin-plans';
 import {
   PLAN_LIMITS,
   SUPPORTED_CURRENCIES,
+  emptyPlanFormValues,
+  formatPriceMinor,
   planFormValuesFromOwnerPlan,
   planSlugSchema,
   validatePlanForm,
   type OwnerPlan,
   type PlanFormValues,
 } from '@/lib/plans/model';
+import {
+  PROMOTION_TIMEZONE_LABEL,
+  cairoDateTimeInputs,
+  emptyPromotionFormValues,
+  formatCairoDateTime,
+  formatSavedPercent,
+  resolveOffer,
+  type OfferResolution,
+  type PromotionConfig,
+  type PromotionFormValues,
+  type PromotionState,
+} from '@/lib/plans/promotion';
 import {
   createPlanAction,
   hidePlanAction,
@@ -26,17 +40,7 @@ import {
 type Banner = { kind: 'success' | 'error' | 'info' | 'conflict'; text: string } | null;
 
 function emptyValues(): PlanFormValues {
-  return {
-    name: '',
-    description: '',
-    features: [],
-    monthlyPrice: '',
-    yearlyPrice: '',
-    currency: '',
-    ctaLabel: 'اطلب الانضمام',
-    featured: false,
-    displayOrder: 0,
-  };
+  return emptyPlanFormValues();
 }
 
 function serialize(values: PlanFormValues): string {
@@ -59,9 +63,11 @@ const secondaryButton =
 export function PlanEditor({
   plan: initialPlan,
   justCreated = false,
+  nowIso,
 }: {
   plan?: OwnerPlan;
   justCreated?: boolean;
+  nowIso: string;
 }) {
   const router = useRouter();
   const [plan, setPlan] = useState<OwnerPlan | null>(initialPlan ?? null);
@@ -82,6 +88,7 @@ export function PlanEditor({
   const [confirmPublish, setConfirmPublish] = useState(false);
   const [confirmHide, setConfirmHide] = useState(false);
   const saveButtonRef = useRef<HTMLButtonElement>(null);
+  const previewAsOf = useMemo(() => new Date(nowIso), [nowIso]);
 
   const busy = saving || publishing || hiding;
   const dirty = serialize(values) !== baseline;
@@ -128,6 +135,138 @@ export function PlanEditor({
       delete next[key as string];
       return next;
     });
+  }
+
+  const promotionErrors = useMemo(() => {
+    const next: Record<string, string> = {};
+    for (const [key, message] of Object.entries(errors)) {
+      if (key.startsWith('promotion.')) next[key.slice('promotion.'.length)] = message;
+    }
+    return next;
+  }, [errors]);
+
+  const draftPreview = useMemo((): {
+    offer: OfferResolution;
+    promotion: PromotionConfig | null;
+    currency: PlanFormValues['currency'] | null;
+  } | null => {
+    const parsed = validatePlanForm(values);
+    if (!parsed.ok || !parsed.values.currency) return null;
+    const offer = resolveOffer(
+      {
+        slug: slug || 'preview-plan',
+        publishedRevision: plan?.revision ?? 1,
+        currency: parsed.values.currency,
+        monthlyPriceMinor: parsed.values.monthlyPriceMinor,
+        yearlyPriceMinor: parsed.values.yearlyPriceMinor,
+        promotion: parsed.values.promotion,
+      },
+      previewAsOf,
+    );
+    return {
+      offer,
+      promotion: parsed.values.promotion,
+      currency: parsed.values.currency,
+    };
+  }, [values, slug, plan?.revision, previewAsOf]);
+
+  const promotionMathPreview = useMemo((): {
+    offer: OfferResolution;
+    currency: PlanFormValues['currency'];
+  } | null => {
+    const parsed = validatePlanForm(values);
+    if (!parsed.ok || !parsed.values.currency || !parsed.values.promotion) {
+      return null;
+    }
+    const promotion = parsed.values.promotion;
+    const start = Date.parse(promotion.startsAt);
+    const end = Date.parse(promotion.endsAt);
+    const inside =
+      Number.isFinite(start) && Number.isFinite(end) && start < end
+        ? Math.min(Math.max(previewAsOf.getTime(), start), end - 1)
+        : previewAsOf.getTime();
+    return {
+      offer: resolveOffer(
+        {
+          slug: slug || 'preview-plan',
+          publishedRevision: plan?.revision ?? 1,
+          currency: parsed.values.currency,
+          monthlyPriceMinor: parsed.values.monthlyPriceMinor,
+          yearlyPriceMinor: parsed.values.yearlyPriceMinor,
+          promotion: { ...promotion, enabled: true },
+        },
+        new Date(inside),
+      ),
+      currency: parsed.values.currency,
+    };
+  }, [values, slug, plan?.revision, previewAsOf]);
+
+  const publishedOffer = useMemo((): OfferResolution | null => {
+    if (!plan?.published) return null;
+    return resolveOffer(
+      {
+        slug: plan.slug,
+        publishedRevision: plan.publishedRevision ?? plan.revision,
+        currency: plan.published.currency,
+        monthlyPriceMinor: plan.published.monthlyPriceMinor,
+        yearlyPriceMinor: plan.published.yearlyPriceMinor,
+        promotion: plan.published.promotion,
+      },
+      previewAsOf,
+    );
+  }, [plan, previewAsOf]);
+
+  function updatePromotion(patch: Partial<PromotionFormValues>) {
+    setValues((current) =>
+      current.promotion
+        ? { ...current, promotion: { ...current.promotion, ...patch } }
+        : current,
+    );
+    setErrors((current) => {
+      const next: Record<string, string> = {};
+      for (const [key, message] of Object.entries(current)) {
+        if (!key.startsWith('promotion.')) next[key] = message;
+      }
+      return next;
+    });
+  }
+
+  function addPromotion() {
+    const start = cairoDateTimeInputs(previewAsOf.toISOString());
+    const end = cairoDateTimeInputs(
+      new Date(previewAsOf.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    );
+    updateValue('promotion', {
+      ...emptyPromotionFormValues(),
+      startsDate: start.date,
+      startsTime: start.time,
+      endsDate: end.date,
+      endsTime: end.time,
+    });
+  }
+
+  function removePromotion() {
+    updateValue('promotion', null);
+  }
+
+  function setPromotionDiscountType(discountType: PromotionFormValues['discountType']) {
+    updatePromotion(
+      discountType === 'percentage'
+        ? { discountType, fixedMonthly: '', fixedYearly: '' }
+        : { discountType, percentage: '' },
+    );
+  }
+
+  function setPromotionTarget(target: PromotionFormValues['target']) {
+    updatePromotion({
+      target,
+      ...(target === 'monthly' ? { fixedYearly: '' } : {}),
+      ...(target === 'yearly' ? { fixedMonthly: '' } : {}),
+    });
+  }
+
+  function promotionStateLabel(state: PromotionState): string {
+    return adminPlansUi.promotion.stateLabels[state];
   }
 
   function updateFeature(index: number, value: string) {
@@ -601,6 +740,315 @@ export function PlanEditor({
           </div>
         </fieldset>
 
+        <section
+          data-testid="plan-promotion-section"
+          aria-labelledby="plan-promotion-title"
+          className="flex flex-col gap-4 rounded-card border border-border-subtle p-4"
+        >
+          <div>
+            <h2 id="plan-promotion-title" className="text-base font-bold text-text-primary">
+              {adminPlansUi.promotion.sectionTitle}
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-text-secondary">
+              {adminPlansUi.promotion.sectionDescription}
+            </p>
+          </div>
+
+          {!values.promotion ? (
+            <div>
+              <button
+                type="button"
+                onClick={addPromotion}
+                className={secondaryButton}
+                data-testid="plan-promotion-add"
+              >
+                {adminPlansUi.promotion.add}
+              </button>
+            </div>
+          ) : (
+            <>
+              <label className="flex min-h-control cursor-pointer items-center gap-3 text-sm font-semibold text-text-primary">
+                <input
+                  type="checkbox"
+                  checked={values.promotion.enabled}
+                  onChange={(event) =>
+                    updatePromotion({ enabled: event.target.checked })
+                  }
+                  className="h-5 w-5 rounded border-border-interactive"
+                  data-testid="plan-promotion-enabled"
+                />
+                {adminPlansUi.promotion.enabled}
+              </label>
+              {!values.promotion.enabled ? (
+                <p className="text-sm leading-6 text-status-warning">
+                  {adminPlansUi.promotion.disabledHint}
+                </p>
+              ) : null}
+
+              <Input
+                id="plan-field-promotion-label"
+                label={adminPlansUi.promotion.label}
+                value={values.promotion.label}
+                onChange={(event) => updatePromotion({ label: event.target.value })}
+                placeholder={adminPlansUi.promotion.labelPlaceholder}
+                maxLength={80}
+                autoComplete="off"
+                error={promotionErrors.label}
+              />
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <label
+                    htmlFor="plan-field-promotion-discountType"
+                    className="text-sm font-semibold text-text-primary"
+                  >
+                    {adminPlansUi.promotion.discountType}
+                  </label>
+                  <select
+                    id="plan-field-promotion-discountType"
+                    value={values.promotion.discountType}
+                    onChange={(event) =>
+                      setPromotionDiscountType(
+                        event.target.value as PromotionFormValues['discountType'],
+                      )
+                    }
+                    className="min-h-control w-full rounded-control border border-border-interactive bg-surface px-3 text-base text-text-primary"
+                  >
+                    <option value="percentage">
+                      {adminPlansUi.promotion.discountTypePercentage}
+                    </option>
+                    <option value="fixed">
+                      {adminPlansUi.promotion.discountTypeFixed}
+                    </option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label
+                    htmlFor="plan-field-promotion-target"
+                    className="text-sm font-semibold text-text-primary"
+                  >
+                    {adminPlansUi.promotion.target}
+                  </label>
+                  <select
+                    id="plan-field-promotion-target"
+                    value={values.promotion.target}
+                    onChange={(event) =>
+                      setPromotionTarget(
+                        event.target.value as PromotionFormValues['target'],
+                      )
+                    }
+                    className="min-h-control w-full rounded-control border border-border-interactive bg-surface px-3 text-base text-text-primary"
+                    aria-invalid={promotionErrors.target ? true : undefined}
+                  >
+                    <option value="monthly">
+                      {adminPlansUi.promotion.targetMonthly}
+                    </option>
+                    <option value="yearly">
+                      {adminPlansUi.promotion.targetYearly}
+                    </option>
+                    <option value="both">{adminPlansUi.promotion.targetBoth}</option>
+                  </select>
+                  {promotionErrors.target ? (
+                    <p role="alert" className="text-sm text-status-error">
+                      {promotionErrors.target}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+
+              {values.promotion.discountType === 'percentage' ? (
+                <Input
+                  id="plan-field-promotion-percentage"
+                  label={adminPlansUi.promotion.percentage}
+                  value={values.promotion.percentage}
+                  onChange={(event) =>
+                    updatePromotion({ percentage: event.target.value })
+                  }
+                  inputMode="decimal"
+                  dir="ltr"
+                  autoComplete="off"
+                  error={promotionErrors.percentage}
+                />
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {values.promotion.target === 'monthly' ||
+                  values.promotion.target === 'both' ? (
+                    <Input
+                      id="plan-field-promotion-fixedMonthly"
+                      label={adminPlansUi.promotion.fixedMonthly}
+                      value={values.promotion.fixedMonthly}
+                      onChange={(event) =>
+                        updatePromotion({ fixedMonthly: event.target.value })
+                      }
+                      inputMode="decimal"
+                      dir="ltr"
+                      autoComplete="off"
+                      error={promotionErrors.fixedMonthly}
+                    />
+                  ) : null}
+                  {values.promotion.target === 'yearly' ||
+                  values.promotion.target === 'both' ? (
+                    <Input
+                      id="plan-field-promotion-fixedYearly"
+                      label={adminPlansUi.promotion.fixedYearly}
+                      value={values.promotion.fixedYearly}
+                      onChange={(event) =>
+                        updatePromotion({ fixedYearly: event.target.value })
+                      }
+                      inputMode="decimal"
+                      dir="ltr"
+                      autoComplete="off"
+                      error={promotionErrors.fixedYearly}
+                    />
+                  ) : null}
+                </div>
+              )}
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Input
+                  id="plan-field-promotion-startsDate"
+                  label={adminPlansUi.promotion.startsDate}
+                  type="date"
+                  value={values.promotion.startsDate}
+                  onChange={(event) =>
+                    updatePromotion({ startsDate: event.target.value })
+                  }
+                  dir="ltr"
+                  error={promotionErrors.startsDate}
+                />
+                <Input
+                  id="plan-field-promotion-startsTime"
+                  label={adminPlansUi.promotion.startsTime}
+                  type="time"
+                  value={values.promotion.startsTime}
+                  onChange={(event) =>
+                    updatePromotion({ startsTime: event.target.value })
+                  }
+                  dir="ltr"
+                  aria-describedby={
+                    promotionErrors.startsDate
+                      ? 'plan-field-promotion-startsDate-error'
+                      : undefined
+                  }
+                />
+                <Input
+                  id="plan-field-promotion-endsDate"
+                  label={adminPlansUi.promotion.endsDate}
+                  type="date"
+                  value={values.promotion.endsDate}
+                  onChange={(event) =>
+                    updatePromotion({ endsDate: event.target.value })
+                  }
+                  dir="ltr"
+                  error={promotionErrors.endsDate}
+                />
+                <Input
+                  id="plan-field-promotion-endsTime"
+                  label={adminPlansUi.promotion.endsTime}
+                  type="time"
+                  value={values.promotion.endsTime}
+                  onChange={(event) =>
+                    updatePromotion({ endsTime: event.target.value })
+                  }
+                  dir="ltr"
+                  aria-describedby={
+                    promotionErrors.endsDate
+                      ? 'plan-field-promotion-endsDate-error'
+                      : undefined
+                  }
+                />
+              </div>
+              <p className="-mt-2 text-xs leading-5 text-text-secondary">
+                {adminPlansUi.promotion.timezoneNote}
+              </p>
+
+              <div
+                data-testid="plan-promotion-status"
+                className="rounded-card bg-background p-3 text-sm"
+              >
+                <p className="font-semibold text-text-primary">
+                  {adminPlansUi.promotion.draftStatus}:{' '}
+                  {draftPreview
+                    ? promotionStateLabel(draftPreview.offer.state)
+                    : '—'}
+                </p>
+                <p className="mt-1 text-text-secondary">
+                  {adminPlansUi.promotion.publishedStatus}:{' '}
+                  {plan?.published?.promotion
+                    ? publishedOffer
+                      ? promotionStateLabel(publishedOffer.state)
+                      : '—'
+                    : adminPlansUi.promotion.publishedNone}
+                </p>
+                {draftPreview?.offer.startsAt && draftPreview.offer.endsAt ? (
+                  <p className="mt-1 text-xs leading-5 text-text-secondary">
+                    {adminPlansUi.promotion.startsAt}:{' '}
+                    <span dir="ltr">
+                      {formatCairoDateTime(draftPreview.offer.startsAt)}
+                    </span>{' '}
+                    · {adminPlansUi.promotion.endsAt}:{' '}
+                    <span dir="ltr">
+                      {formatCairoDateTime(draftPreview.offer.endsAt)}
+                    </span>{' '}
+                    {PROMOTION_TIMEZONE_LABEL}
+                  </p>
+                ) : null}
+                <p className="mt-1 text-xs leading-5 text-text-secondary">
+                  {adminPlansUi.promotion.currentTimeNote}
+                </p>
+              </div>
+
+              {promotionMathPreview ? (
+                <div
+                  data-testid="plan-promotion-preview"
+                  className="rounded-card border border-border-subtle p-3"
+                >
+                  <h3 className="text-sm font-bold text-text-primary">
+                    {adminPlansUi.promotion.previewTitle}
+                  </h3>
+                  <dl className="mt-2 flex flex-col gap-2 text-sm">
+                    {promotionMathPreview.offer.monthly.baseMinor !== null ? (
+                      <PromotionPreviewRow
+                        label={adminPlansUi.promotion.priceMonthly}
+                        offer={promotionMathPreview.offer.monthly}
+                        currency={promotionMathPreview.currency}
+                      />
+                    ) : null}
+                    {promotionMathPreview.offer.yearly.baseMinor !== null ? (
+                      <PromotionPreviewRow
+                        label={adminPlansUi.promotion.priceYearly}
+                        offer={promotionMathPreview.offer.yearly}
+                        currency={promotionMathPreview.currency}
+                      />
+                    ) : null}
+                  </dl>
+                  <p className="mt-2 text-xs leading-5 text-text-secondary">
+                    {adminPlansUi.promotion.previewValuesNote}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-sm text-text-secondary">
+                  {adminPlansUi.promotion.previewNeedsValid}
+                </p>
+              )}
+
+              <div>
+                <button
+                  type="button"
+                  onClick={removePromotion}
+                  className={secondaryButton}
+                  data-testid="plan-promotion-remove"
+                >
+                  {adminPlansUi.promotion.remove}
+                </button>
+                <p className="mt-2 text-xs leading-5 text-text-secondary">
+                  {adminPlansUi.promotion.removeHint}
+                </p>
+              </div>
+            </>
+          )}
+        </section>
+
         {banner ? (
           <p
             role={banner.kind === 'success' ? 'status' : 'alert'}
@@ -725,6 +1173,48 @@ export function PlanEditor({
           </p>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+function PromotionPreviewRow({
+  label,
+  offer,
+  currency,
+}: {
+  label: string;
+  offer: OfferResolution['monthly'];
+  currency: PlanFormValues['currency'] | null;
+}) {
+  if (!currency) return null;
+  const base = formatPriceMinor(offer.baseMinor, currency);
+  const effective = formatPriceMinor(offer.effectiveMinor, currency);
+  const saved = formatPriceMinor(offer.savedMinor, currency);
+  const savedPercent = formatSavedPercent(offer.savedPercentBps);
+  return (
+    <div className="flex flex-wrap items-baseline justify-between gap-2">
+      <dt className="font-semibold text-text-secondary">{label}</dt>
+      <dd className="text-text-primary">
+        {offer.discounted ? (
+          <>
+            <s className="text-text-secondary line-through" dir="ltr">
+              {base}
+            </s>{' '}
+            <span className="font-bold" dir="ltr">
+              {effective}
+            </span>
+            {saved ? (
+              <span className="text-xs text-text-secondary" dir="ltr">
+                {' '}
+                ({adminPlansUi.promotion.savings}: {saved}
+                {savedPercent ? ` · ${savedPercent}` : ''})
+              </span>
+            ) : null}
+          </>
+        ) : (
+          <span dir="ltr">{effective ?? base}</span>
+        )}
+      </dd>
     </div>
   );
 }

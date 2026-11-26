@@ -325,10 +325,10 @@ test('owner request list, filters, detail, status and notes workflow persist', a
   await page.waitForURL(/\/admin\/requests\/.+/);
   const detailUrl = page.url();
   await expect(page.getByText(PLAN_NAME).first()).toBeVisible();
-  await expect(page.getByText('149.00 EGP')).toBeVisible();
+  await expect(page.getByText('149.00 EGP').first()).toBeVisible();
+  await expect(page.getByText('بيانات العرض التاريخية')).toBeVisible();
   await expect(page.getByText('السعر الشهري وقت الإرسال')).toBeVisible();
-  await expect(page.getByText('لا يُحفظ السعر السنوي')).toBeVisible();
-  await expect(page.getByText('لقطة مختصرة للعرض')).toBeVisible();
+  await expect(page.getByText('هذه القيم محفوظة وقت الإرسال')).toBeVisible();
 
   await page.selectOption('#request-status', 'contacted');
   await page.getByTestId('request-save-status').click();

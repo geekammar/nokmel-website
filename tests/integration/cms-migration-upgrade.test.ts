@@ -157,6 +157,6 @@ describe('W3.1 to W3.2 migration upgrade', () => {
     const migrationRows = await pg.pool.query(
       'select count(*)::int as count from drizzle.__drizzle_migrations',
     );
-    expect(migrationRows.rows[0].count).toBe(4);
+    expect(migrationRows.rows[0].count).toBe(5);
   });
 });

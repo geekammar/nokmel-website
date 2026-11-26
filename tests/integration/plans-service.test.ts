@@ -30,6 +30,7 @@ function planValues(overrides: Partial<PlanFormValues> = {}): PlanFormValues {
     ctaLabel: 'اطلب الانضمام',
     featured: false,
     displayOrder: 10,
+    promotion: null,
     ...overrides,
   };
 }

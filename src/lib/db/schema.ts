@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm';
+import type { PromotionConfig } from '../plans/promotion';
 import {
   bigint,
   boolean,
@@ -22,7 +23,9 @@ import {
  * `rate_limit` for Better Auth's database-backed rate limiting.
  *
  * W3.2 adds the two predefined-CMS tables (`content_sections`, `faq_items`).
- * Pricing/join-request/analytics/settings tables remain out of scope.
+ * W4 adds `plans`, `join_requests` and `join_intake_rate_limits`; W4.1 adds
+ * nullable draft/published promotion JSONB and an immutable offer snapshot.
+ * Analytics/settings tables remain out of scope (W5).
  */
 
 export const user = pgTable('user', {
@@ -183,6 +186,7 @@ export const plans = pgTable(
     draftCtaLabel: text('draft_cta_label').notNull(),
     draftFeatured: boolean('draft_featured').notNull().default(false),
     draftDisplayOrder: integer('draft_display_order').notNull().default(0),
+    draftPromotion: jsonb('draft_promotion').$type<PromotionConfig>(),
     publishedName: text('published_name'),
     publishedDescription: text('published_description'),
     publishedFeatures: jsonb('published_features').$type<string[]>(),
@@ -192,6 +196,7 @@ export const plans = pgTable(
     publishedCtaLabel: text('published_cta_label'),
     publishedFeatured: boolean('published_featured'),
     publishedDisplayOrder: integer('published_display_order'),
+    publishedPromotion: jsonb('published_promotion').$type<PromotionConfig>(),
     status: text('status').notNull().default('draft'),
     draftRevision: integer('draft_revision').notNull().default(0),
     publishedRevision: integer('published_revision'),
@@ -228,6 +233,14 @@ export const plans = pgTable(
     check(
       'plans_published_currency_format',
       sql`${table.publishedCurrency} is null or ${table.publishedCurrency} ~ '^[A-Z]{3}$'`,
+    ),
+    check(
+      'plans_draft_promotion_object',
+      sql`${table.draftPromotion} is null or jsonb_typeof(${table.draftPromotion}) = 'object'`,
+    ),
+    check(
+      'plans_published_promotion_object',
+      sql`${table.publishedPromotion} is null or jsonb_typeof(${table.publishedPromotion}) = 'object'`,
     ),
     check(
       'plans_published_complete',
@@ -267,6 +280,7 @@ export const joinRequests = pgTable(
     planPriceMinorSnapshot: integer('plan_price_minor_snapshot'),
     planPricePeriodSnapshot: text('plan_price_period_snapshot'),
     planCurrencySnapshot: text('plan_currency_snapshot'),
+    offerSnapshot: jsonb('offer_snapshot').$type<Record<string, unknown>>(),
     source: text('source').notNull().default('direct'),
     utmSource: text('utm_source'),
     utmMedium: text('utm_medium'),
@@ -301,6 +315,10 @@ export const joinRequests = pgTable(
     check(
       'join_requests_price_snapshot_nonnegative',
       sql`${table.planPriceMinorSnapshot} is null or ${table.planPriceMinorSnapshot} >= 0`,
+    ),
+    check(
+      'join_requests_offer_snapshot_object',
+      sql`${table.offerSnapshot} is null or jsonb_typeof(${table.offerSnapshot}) = 'object'`,
     ),
     check(
       'join_requests_notes_length',

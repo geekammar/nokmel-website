@@ -170,20 +170,25 @@ describe('restricted runtime database role', () => {
          values ('plan-runtime-probe', 'runtime-probe', 'باقة', 'وصف', 'EGP', 'اطلب الانضمام', 1)`,
       );
       await runtimePool.query(
-        "update plans set draft_revision = 2 where id = 'plan-runtime-probe'",
+        "update plans set draft_revision = 2, draft_promotion = '{\"enabled\":false}'::jsonb where id = 'plan-runtime-probe'",
       );
       const planRead = await runtimePool.query(
         "select draft_revision from plans where id = 'plan-runtime-probe'",
       );
       expect(planRead.rows[0].draft_revision).toBe(2);
       await runtimePool.query(
-        `insert into join_requests (id, name, phone, plan_id, plan_name_snapshot, plan_currency_snapshot, submission_token)
-         values ('request-runtime-probe', 'Synthetic Trader', '+201000000000', 'plan-runtime-probe', 'باقة', 'EGP', 'runtime-probe-token')`,
+        `insert into join_requests (id, name, phone, plan_id, plan_name_snapshot, plan_currency_snapshot, offer_snapshot, submission_token)
+         values ('request-runtime-probe', 'Synthetic Trader', '+201000000000', 'plan-runtime-probe', 'باقة', 'EGP', '{"version":1}'::jsonb, 'runtime-probe-token')`,
       );
       const requestRead = await runtimePool.query(
-        "select status, notes, revision from join_requests where id = 'request-runtime-probe'",
+        "select status, notes, revision, offer_snapshot from join_requests where id = 'request-runtime-probe'",
       );
-      expect(requestRead.rows[0]).toEqual({ status: 'new', notes: null, revision: 0 });
+      expect(requestRead.rows[0]).toEqual({
+        status: 'new',
+        notes: null,
+        revision: 0,
+        offer_snapshot: { version: 1 },
+      });
       await runtimePool.query(
         "update join_requests set notes = 'probe', revision = 1 where id = 'request-runtime-probe'",
       );

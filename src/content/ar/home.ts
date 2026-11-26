@@ -216,7 +216,7 @@ export const home: HomeContent = homeContentSchema.parse({
   },
   finalCta: {
     title: 'جاهز تخلّي بزنسك يكمل؟',
-    body: 'سجّل اهتمامك بالانضمام المبكر، وسنراجع طلبك للتواصل معك بشأن الخطوة التالية عند الحاجة.',
+    body: 'سجّل اهتمامك بالانضمام المبكر، وسنراجع طلبك للتواصل معك بشأن الخطوة التالية.',
     primaryCta: { label: 'اطلب الانضمام', href: '/join' },
     secondaryCta: { label: 'استعرض الميزات', href: '/features' },
   },
