@@ -21,6 +21,7 @@ const baseValues: PlanFormValues = {
   ctaLabel: 'اطلب الانضمام',
   featured: false,
   displayOrder: 1,
+  promotion: null,
 };
 
 describe('plan slug validation', () => {
@@ -46,7 +47,8 @@ describe('exact price parsing and formatting', () => {
     expect(parsePriceInput('199.9', 'EGP')).toEqual({ ok: true, minor: 19_990 });
     expect(parsePriceInput('199.99', 'EGP')).toEqual({ ok: true, minor: 19_999 });
     expect(parsePriceInput('1.234', 'KWD')).toEqual({ ok: true, minor: 1_234 });
-    expect(parsePriceInput('99999999.99', 'EGP')).toEqual({ ok: true, minor: 9_999_999_999 });
+    expect(parsePriceInput('21474836.47', 'EGP')).toEqual({ ok: true, minor: 2_147_483_647 });
+    expect(parsePriceInput('21474836.48', 'EGP').ok).toBe(false);
   });
 
   it('accepts Arabic-Indic and extended Arabic-Indic digits', () => {
@@ -141,5 +143,144 @@ describe('plan form validation', () => {
     expect(validatePlanForm({ ...baseValues, displayOrder: PLAN_LIMITS.displayOrder + 1 }).ok).toBe(
       false,
     );
+  });
+});
+
+describe('plan promotion form validation', () => {
+  const promotion = {
+    enabled: true,
+    label: 'عرض الصيف',
+    discountType: 'percentage' as const,
+    target: 'monthly' as const,
+    percentage: '20',
+    fixedMonthly: '',
+    fixedYearly: '',
+    startsDate: '2026-06-01',
+    startsTime: '00:00',
+    endsDate: '2026-07-01',
+    endsTime: '00:00',
+  };
+
+  it('normalizes a valid percentage promotion against exact base prices', () => {
+    const result = validatePlanForm({ ...baseValues, promotion });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.values.promotion).toMatchObject({
+      enabled: true,
+      label: 'عرض الصيف',
+      discountType: 'percentage',
+      target: 'monthly',
+      percentageBps: 2000,
+      fixedMonthlyMinor: null,
+      fixedYearlyMinor: null,
+      startsAt: '2026-05-31T21:00:00.000Z',
+      endsAt: '2026-06-30T21:00:00.000Z',
+    });
+  });
+
+  it('supports separate fixed monthly/yearly amounts and clears incompatible fields', () => {
+    const result = validatePlanForm({
+      ...baseValues,
+      yearlyPrice: '1990.00',
+      promotion: {
+        ...promotion,
+        discountType: 'fixed',
+        target: 'both',
+        percentage: '20',
+        fixedMonthly: '50',
+        fixedYearly: '200',
+      },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.values.promotion).toMatchObject({
+      discountType: 'fixed',
+      target: 'both',
+      percentageBps: null,
+      fixedMonthlyMinor: 5_000,
+      fixedYearlyMinor: 20_000,
+    });
+  });
+
+  it('rejects stale incompatible fixed fields and missing amounts', () => {
+    const stale = validatePlanForm({
+      ...baseValues,
+      promotion: {
+        ...promotion,
+        discountType: 'percentage',
+        fixedMonthly: '50',
+      },
+    });
+    // Stale fixed strings are ignored because the normalized output keeps only
+    // percentage basis points for a percentage promotion.
+    expect(stale.ok).toBe(true);
+    if (stale.ok) {
+      expect(stale.values.promotion?.fixedMonthlyMinor).toBeNull();
+    }
+
+    const missing = validatePlanForm({
+      ...baseValues,
+      promotion: {
+        ...promotion,
+        discountType: 'fixed',
+        target: 'both',
+        percentage: '',
+        fixedMonthly: '50',
+        fixedYearly: '',
+      },
+    });
+    expect(missing.ok).toBe(false);
+    if (!missing.ok) {
+      expect(missing.errors['promotion.fixedYearly']).toBeTruthy();
+    }
+  });
+
+  it('rejects discounts on unannounced or zero prices and invalid schedules', () => {
+    const unannounced = validatePlanForm({
+      ...baseValues,
+      monthlyPrice: '',
+      yearlyPrice: '',
+      promotion,
+    });
+    expect(unannounced.ok).toBe(false);
+    if (!unannounced.ok) {
+      expect(unannounced.errors['promotion.target']).toBeTruthy();
+    }
+
+    const zero = validatePlanForm({
+      ...baseValues,
+      monthlyPrice: '0',
+      promotion,
+    });
+    expect(zero.ok).toBe(false);
+
+    const badSchedule = validatePlanForm({
+      ...baseValues,
+      promotion: {
+        ...promotion,
+        startsDate: '2026-07-01',
+        endsDate: '2026-06-01',
+      },
+    });
+    expect(badSchedule.ok).toBe(false);
+    if (!badSchedule.ok) {
+      expect(badSchedule.errors['promotion.endsDate']).toBeTruthy();
+    }
+  });
+
+  it('rejects fixed discounts above the base price', () => {
+    const result = validatePlanForm({
+      ...baseValues,
+      promotion: {
+        ...promotion,
+        discountType: 'fixed',
+        target: 'monthly',
+        percentage: '',
+        fixedMonthly: '199.01',
+      },
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors['promotion.fixedMonthly']).toBeTruthy();
   });
 });

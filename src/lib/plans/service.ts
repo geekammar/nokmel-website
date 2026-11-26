@@ -24,6 +24,12 @@ import {
   type PlanStatus,
   type PublicPlan,
 } from './model';
+import {
+  MAX_PRICE_MINOR,
+  parsePromotionConfig,
+  validatePromotionAgainstPrices,
+  type PromotionConfig,
+} from './promotion';
 
 /**
  * Server-side marketing-plan service (W4).
@@ -34,7 +40,7 @@ import {
  * an empty plan list rather than invented offers.
  */
 
-type PlanServiceOptions = { db?: Db };
+type PlanServiceOptions = { db?: Db; asOf?: Date };
 
 export type PlanStorageStatus =
   | 'ok'
@@ -124,8 +130,32 @@ function asCurrency(value: string | null): PlanDraftValues['currency'] {
 
 function assertMinor(value: number | null): number | null {
   if (value === null) return null;
-  if (!Number.isSafeInteger(value) || value < 0) throw new PlanStorageError();
+  if (
+    !Number.isSafeInteger(value) ||
+    value < 0 ||
+    value > MAX_PRICE_MINOR
+  ) {
+    throw new PlanStorageError();
+  }
   return value;
+}
+
+function parseStoredPromotion(
+  value: unknown,
+  base: { monthlyPriceMinor: number | null; yearlyPriceMinor: number | null },
+): PromotionConfig | null {
+  try {
+    const promotion = parsePromotionConfig(value);
+    if (
+      promotion &&
+      Object.keys(validatePromotionAgainstPrices(promotion, base)).length > 0
+    ) {
+      throw new PlanStorageError();
+    }
+    return promotion;
+  } catch {
+    throw new PlanStorageError();
+  }
 }
 
 function draftFromRow(row: PlanRow): PlanDraftValues {
@@ -136,16 +166,22 @@ function draftFromRow(row: PlanRow): PlanDraftValues {
   ) {
     throw new PlanStorageError();
   }
+  const monthlyPriceMinor = assertMinor(row.draftMonthlyPriceMinor);
+  const yearlyPriceMinor = assertMinor(row.draftYearlyPriceMinor);
   return {
     name: row.draftName,
     description: row.draftDescription,
     features: asFeatures(row.draftFeatures),
-    monthlyPriceMinor: assertMinor(row.draftMonthlyPriceMinor),
-    yearlyPriceMinor: assertMinor(row.draftYearlyPriceMinor),
+    monthlyPriceMinor,
+    yearlyPriceMinor,
     currency: asCurrency(row.draftCurrency),
     ctaLabel: row.draftCtaLabel,
     featured: Boolean(row.draftFeatured),
     displayOrder: row.draftDisplayOrder,
+    promotion: parseStoredPromotion(row.draftPromotion, {
+      monthlyPriceMinor,
+      yearlyPriceMinor,
+    }),
   };
 }
 
@@ -160,16 +196,22 @@ function publishedFromRow(row: PlanRow): PlanPublishedValues | null {
   ) {
     return null;
   }
+  const monthlyPriceMinor = assertMinor(row.publishedMonthlyPriceMinor);
+  const yearlyPriceMinor = assertMinor(row.publishedYearlyPriceMinor);
   return {
     name: row.publishedName,
     description: row.publishedDescription,
     features: asFeatures(row.publishedFeatures),
-    monthlyPriceMinor: assertMinor(row.publishedMonthlyPriceMinor),
-    yearlyPriceMinor: assertMinor(row.publishedYearlyPriceMinor),
+    monthlyPriceMinor,
+    yearlyPriceMinor,
     currency: asCurrency(row.publishedCurrency),
     ctaLabel: row.publishedCtaLabel,
     featured: Boolean(row.publishedFeatured),
     displayOrder: row.publishedDisplayOrder,
+    promotion: parseStoredPromotion(row.publishedPromotion, {
+      monthlyPriceMinor,
+      yearlyPriceMinor,
+    }),
   };
 }
 
@@ -284,6 +326,7 @@ export async function getPublicPlans(
   if (!options.db && !process.env.DATABASE_URL?.trim()) {
     return { status: 'unconfigured', plans: [] };
   }
+  const asOf = options.asOf ?? new Date();
   let db: Db;
   try {
     db = resolveDb(options);
@@ -305,6 +348,7 @@ export async function getPublicPlans(
         featured: plans.publishedFeatured,
         displayOrder: plans.publishedDisplayOrder,
         publishedRevision: plans.publishedRevision,
+        publishedPromotion: plans.publishedPromotion,
       })
       .from(plans)
       .where(eq(plans.status, 'published'))
@@ -325,19 +369,23 @@ export async function getPublicPlans(
           throw new Error('Incomplete published plan');
         }
         publicPlans.push(
-          toPublicPlan({
-            slug: row.slug,
-            name: row.name,
-            description: row.description,
-            features: row.features,
-            monthlyPriceMinor: row.monthlyPriceMinor,
-            yearlyPriceMinor: row.yearlyPriceMinor,
-            currency: row.currency,
-            ctaLabel: row.ctaLabel,
-            featured: row.featured,
-            displayOrder: row.displayOrder,
-            publishedRevision: row.publishedRevision,
-          }),
+          toPublicPlan(
+            {
+              slug: row.slug,
+              name: row.name,
+              description: row.description,
+              features: row.features,
+              monthlyPriceMinor: row.monthlyPriceMinor,
+              yearlyPriceMinor: row.yearlyPriceMinor,
+              currency: row.currency,
+              ctaLabel: row.ctaLabel,
+              featured: row.featured,
+              displayOrder: row.displayOrder,
+              publishedRevision: row.publishedRevision,
+              publishedPromotion: row.publishedPromotion,
+            },
+            asOf,
+          ),
         );
       } catch {
         console.error('[plans] public-plan invalid', { reason: 'invalid_row' });
@@ -404,6 +452,7 @@ export async function createPlan(
           draftCtaLabel: values.ctaLabel,
           draftFeatured: values.featured,
           draftDisplayOrder: values.displayOrder,
+          draftPromotion: values.promotion,
           status: 'draft',
           draftRevision: 1,
           updatedAt: now,
@@ -450,6 +499,7 @@ export async function savePlanDraft(
           draftCtaLabel: values.ctaLabel,
           draftFeatured: values.featured,
           draftDisplayOrder: values.displayOrder,
+          draftPromotion: values.promotion,
           draftRevision: nextRevision,
           updatedAt: now,
         })
@@ -489,6 +539,22 @@ export async function publishPlan(
       const current = await readPlan(tx, args.id as string);
       if (current.draftRevision !== expectedRevision) throw new PlanConflictError();
       const draft = draftFromRow(current);
+      if (draft.promotion) {
+        const promotionErrors = validatePromotionAgainstPrices(draft.promotion, {
+          monthlyPriceMinor: draft.monthlyPriceMinor,
+          yearlyPriceMinor: draft.yearlyPriceMinor,
+        });
+        if (Object.keys(promotionErrors).length > 0) {
+          throw new PlanValidationError(
+            Object.fromEntries(
+              Object.entries(promotionErrors).map(([key, message]) => [
+                `promotion.${key}`,
+                message,
+              ]),
+            ),
+          );
+        }
+      }
       const nextRevision = expectedRevision + 1;
       const now = new Date();
       const rows = await tx
@@ -503,6 +569,7 @@ export async function publishPlan(
           publishedCtaLabel: draft.ctaLabel,
           publishedFeatured: draft.featured,
           publishedDisplayOrder: draft.displayOrder,
+          publishedPromotion: draft.promotion,
           status: 'published',
           draftRevision: nextRevision,
           publishedRevision: nextRevision,

@@ -13,7 +13,9 @@ reports W3.2 `0002_w32-content-cms` applied on hosted development, CMS runtime
 grants configured, and database-level CREATE revoked. W4 migration
 `0003_w4-plans-join-requests`, runtime grants and branch Preview intake
 configuration were activated externally; the coding agent did not connect to
-hosted Neon. No credentials are recorded here.
+hosted Neon. W4.1 migration `0004_w41-scheduled-promotional-pricing` is
+**pending** hosted application; it adds nullable columns to existing tables, so
+no new runtime grant is expected. No credentials are recorded here.
 
 ## Roles
 
@@ -253,7 +255,60 @@ intended plan/join/limiter DML with a restricted synthetic role and confirms
 DDL/TRUNCATE refusal. The coding agent never connects to hosted Neon; hosted
 migration, grants and validation are performed by the external lead.
 
-## 3c. W4 QA join-request cleanup (operator-only, no hosted execution here)
+## 3c. W4.1 promotion columns (no new runtime grant expected)
+
+Migration `0004_w41-scheduled-promotional-pricing` only adds nullable columns
+and JSON-object checks to the existing W4 tables:
+
+- `plans.draft_promotion` (JSONB, nullable)
+- `plans.published_promotion` (JSONB, nullable)
+- `join_requests.offer_snapshot` (JSONB, nullable)
+
+Because the runtime already has table-level `SELECT, INSERT, UPDATE, DELETE` on
+`public.plans` and `public.join_requests`, these new columns are covered by the
+existing grants. No new table, sequence, column grant, `TRUNCATE`, `REFERENCES`,
+`TRIGGER`, ownership or DDL grant is introduced. `nokmel_runtime` must still not
+receive database/schema CREATE, migration-history access or TRUNCATE.
+
+Apply the additive migration with the same temporary database-level CREATE
+procedure as prior migrations:
+
+```sql
+-- as the project owner, before migration 0004:
+GRANT CREATE ON DATABASE nokmel_website TO nokmel_migrator;
+-- run the reviewed migration as nokmel_migrator (direct connection only):
+--   pnpm db:check
+--   DATABASE_URL_DIRECT=<direct development URL> pnpm db:migrate
+-- immediately afterward:
+REVOKE CREATE ON DATABASE nokmel_website FROM nokmel_migrator;
+```
+
+Verification (no secrets printed):
+
+```sql
+SELECT column_name, is_nullable, data_type
+  FROM information_schema.columns
+ WHERE table_schema = 'public'
+   AND (
+     (table_name = 'plans' AND column_name IN ('draft_promotion', 'published_promotion')) OR
+     (table_name = 'join_requests' AND column_name = 'offer_snapshot')
+   )
+ ORDER BY table_name, column_name;
+
+SELECT has_table_privilege('nokmel_runtime', 'public.plans', 'UPDATE') AS plans_update, -- true
+       has_table_privilege('nokmel_runtime', 'public.join_requests', 'UPDATE') AS requests_update, -- true
+       has_table_privilege('nokmel_runtime', 'public.plans', 'TRUNCATE') AS plans_truncate, -- false
+       has_table_privilege('nokmel_runtime', 'public.join_requests', 'TRUNCATE') AS requests_truncate; -- false
+```
+
+The disposable-PostgreSQL runtime probe now also writes/reads `draft_promotion`
+and `offer_snapshot` with the restricted synthetic role, proving the existing
+table-level DML is sufficient and DDL/TRUNCATE remain refused. Existing W4 rows
+must remain unchanged and readable; `draft_promotion`/`published_promotion`/
+`offer_snapshot` stay `NULL` for them. Hosted execution is external; the coding
+agent never connects to hosted Neon.
+
+## 3d. W4 QA join-request cleanup (operator-only, no hosted execution here)
 
 W4 does not add an admin deletion feature or any new grant for cleanup. After
 independent hosted acceptance, synthetic QA requests must be removed by an

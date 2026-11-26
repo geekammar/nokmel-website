@@ -32,7 +32,7 @@ Pages:
 Exactly five primary sections:
 1. **Overview** — essential visitor analytics, traffic sources, pricing-page interest, join requests, conversion metrics.
 2. **Content & SEO** — editable page content, images, predefined sections, FAQ, and page-level editable SEO metadata (titles, descriptions, social sharing metadata per page).
-3. **Plans & Pricing** — owner-managed marketing plans: immutable URL-safe slug, name, short description, ordered features, optional monthly and yearly prices in an explicit supported currency (or an honest unannounced-price state), display order, draft/publish/hide visibility, optional featured flag and editable early-access CTA. New plans are unpublished by default; editing a live plan never changes the public offer before explicit publication.
+3. **Plans & Pricing** — owner-managed marketing plans: immutable URL-safe slug, name, short description, ordered features, optional monthly and yearly prices in an explicit supported currency (or an honest unannounced-price state), display order, draft/publish/hide visibility, optional featured flag and editable early-access CTA. New plans are unpublished by default; editing a live plan never changes the public offer before explicit publication. One optional scheduled promotional discount per plan (W4.1): percentage or fixed, monthly/yearly/both, custom label, Africa/Cairo scheduled start/end, manual enable/disable, draft/published separation, protected preview, automatic time-based activation/expiration and a historical offer snapshot on new planned join requests.
 4. **Requests** — owner-only join-request list/detail: name, normalized phone, optional email/business activity, optional selected plan, server-generated historical offer snapshot, acquisition source, status (`new` / `contacted` / `closed`), optional internal notes, filters, bounded pagination, search. Public submissions are write-only and always start as `new`.
 5. **Settings** — website, contact, social, CTA, notification, and owner account settings. Owner authentication data is stored separately from general website settings.
 
@@ -41,7 +41,7 @@ Lightweight CMS with predefined components only. No generic website builder.
 ## 5. Pricing boundary [APPROVED]
 
 - Website-managed plan offers are marketing data only during early access. Published marketing plans may be displayed on `/pricing` and selected from `/join?plan=<slug>`; this is lead intake, not merchant registration, checkout or a commercial subscription.
-- A plan price may be absent (`NULL`, displayed as announced later) or explicitly zero; prices are exact integer minor units and are never used for billing or entitlement calculations.
+- A plan price may be absent (`NULL`, displayed as announced later) or explicitly zero; prices are exact integer minor units and are never used for billing or entitlement calculations. Promotional prices are derived at request time from published plan data and the authoritative server clock; no promotion stack, coupon, customer-specific discount or billing effect exists.
 - Early-access join intake is controlled by a fail-closed server environment gate (`JOIN_INTAKE_ENABLED`). W4 enables it only for the authorized isolated development Preview; Production intake and the approved privacy/retention policy remain W6 launch prerequisites.
 - They must not control actual subscriptions, commerce entitlements, or merchant permissions.
 - Before commercial subscription activation, authoritative pricing and entitlement ownership belong to the Nokmel platform.
@@ -70,6 +70,7 @@ Live demo, demo management, media library dashboard, security & activity dashboa
 - W2: all approved public pages render RTL-first, mobile-first, with visible CTA.
 - W3: owner-only admin auth works; content/SEO editable via predefined components.
 - W4: plans editable as marketing data only; join requests captured and listed. Implemented on `feature/w4-plans-join-requests` with additive migration `0003_w4-plans-join-requests`; hosted activation and independent acceptance remain external. No billing/payment/entitlement code.
+- W4.1: one optional scheduled promotional discount per plan, shared effective-offer resolver/version, stale-offer recovery at activation/expiration, and expanded historical offer snapshots. Implemented on `feature/w41-scheduled-promotional-pricing` with additive migration `0004_w41-scheduled-promotional-pricing`; hosted activation and independent acceptance remain external.
 - W5: overview analytics and settings functional.
 - W6: launch acceptance by owner; no deployment without explicit approval.
 

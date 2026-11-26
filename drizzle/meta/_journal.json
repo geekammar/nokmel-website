@@ -29,6 +29,13 @@
       "when": 1795654458974,
       "tag": "0003_w4-plans-join-requests",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795692677307,
+      "tag": "0004_w41-scheduled-promotional-pricing",
+      "breakpoints": true
     }
   ]
 }

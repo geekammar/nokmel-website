@@ -3,7 +3,12 @@ import Link from 'next/link';
 import { adminRequestsUi } from '@/content/ar/admin-requests';
 import { getJoinRequest } from '@/lib/join/service';
 import { requireOwner } from '@/lib/owner';
-import { formatPriceMinor } from '@/lib/plans/model';
+import { formatPriceMinor, type SupportedCurrencyCode } from '@/lib/plans/model';
+import {
+  PROMOTION_TIMEZONE_LABEL,
+  formatCairoDateTime,
+  formatSavedPercent,
+} from '@/lib/plans/promotion';
 import { pageMetadata } from '@/lib/seo';
 import { RequestActions } from './RequestActions';
 
@@ -55,9 +60,12 @@ export default async function AdminRequestDetailPage({
   }
 
   const request = result.request;
-  const hasPlanSnapshot = request.planNameSnapshot !== null;
+  const snapshot = request.offerSnapshot;
+  const hasFullSnapshot = snapshot !== null;
+  const planName = snapshot?.planName ?? request.planNameSnapshot;
+  const hasPlanSnapshot = planName !== null;
   const price =
-    hasPlanSnapshot && request.planCurrencySnapshot
+    !hasFullSnapshot && hasPlanSnapshot && request.planCurrencySnapshot
       ? formatPriceMinor(request.planPriceMinorSnapshot, request.planCurrencySnapshot)
       : null;
   const pricePeriod =
@@ -124,39 +132,182 @@ export default async function AdminRequestDetailPage({
           </dl>
         </section>
 
-        <section aria-labelledby="request-offer-title" className="rounded-card border border-border-subtle bg-surface p-4">
+        <section aria-labelledby="request-offer-title" className="rounded-card border border-border-subtle bg-surface p-4 sm:col-span-2">
           <h2 id="request-offer-title" className="text-base font-bold text-text-primary">
             {adminRequestsUi.offerSnapshot}
           </h2>
           <dl className="mt-3 flex flex-col gap-2 text-sm">
             <div>
               <dt className="font-semibold text-text-secondary">{adminRequestsUi.plan}</dt>
-              <dd className="text-text-primary">
-                {request.planNameSnapshot ?? adminRequestsUi.noPlan}
-              </dd>
+              <dd className="text-text-primary">{planName ?? adminRequestsUi.noPlan}</dd>
             </div>
-            <div>
-              <dt className="font-semibold text-text-secondary">
-                {hasPlanSnapshot ? priceLabel : adminRequestsUi.priceSnapshot}
-              </dt>
-              <dd className="text-text-primary" dir={price ? 'ltr' : undefined}>
-                {!hasPlanSnapshot
-                  ? adminRequestsUi.priceNotApplicable
-                  : price
-                    ? `${price}${pricePeriod ? ` · ${pricePeriod}` : ''}`
-                    : adminRequestsUi.priceNotAnnounced}
-              </dd>
-            </div>
+
+            {hasFullSnapshot && snapshot ? (
+              <>
+                <p className="mt-1 font-semibold text-text-primary">
+                  {adminRequestsUi.historicalOfferTitle}
+                </p>
+                {(snapshot.promotion?.monthlySavedMinor ?? 0) > 0 ? (
+                  <>
+                    <HistoricalPriceRow
+                      label={adminRequestsUi.historicalOriginalMonthly}
+                      minor={snapshot.baseMonthlyPriceMinor}
+                      currency={snapshot.currency}
+                    />
+                    <HistoricalPriceRow
+                      label={adminRequestsUi.historicalEffectiveMonthly}
+                      minor={snapshot.effectiveMonthlyPriceMinor}
+                      currency={snapshot.currency}
+                    />
+                  </>
+                ) : (
+                  <HistoricalPriceRow
+                    label={adminRequestsUi.priceMonthlySnapshot}
+                    minor={snapshot.effectiveMonthlyPriceMinor}
+                    currency={snapshot.currency}
+                  />
+                )}
+                {(snapshot.promotion?.yearlySavedMinor ?? 0) > 0 ? (
+                  <>
+                    <HistoricalPriceRow
+                      label={adminRequestsUi.historicalOriginalYearly}
+                      minor={snapshot.baseYearlyPriceMinor}
+                      currency={snapshot.currency}
+                    />
+                    <HistoricalPriceRow
+                      label={adminRequestsUi.historicalEffectiveYearly}
+                      minor={snapshot.effectiveYearlyPriceMinor}
+                      currency={snapshot.currency}
+                    />
+                  </>
+                ) : (
+                  <HistoricalPriceRow
+                    label={adminRequestsUi.priceYearlySnapshot}
+                    minor={snapshot.effectiveYearlyPriceMinor}
+                    currency={snapshot.currency}
+                  />
+                )}
+                {snapshot.promotion ? (
+                  <div className="mt-2 rounded-card bg-background p-3 text-sm">
+                    <p className="font-semibold text-text-primary">
+                      {adminRequestsUi.historicalPromotion}
+                    </p>
+                    <p className="mt-1 text-text-primary">
+                      {adminRequestsUi.historicalPromotionLabel}:{' '}
+                      {snapshot.promotion.label}
+                    </p>
+                    <p className="mt-1 text-text-secondary">
+                      {adminRequestsUi.historicalPromotionType}:{' '}
+                      {
+                        adminRequestsUi.historicalPromotionTypes[
+                          snapshot.promotion.discountType
+                        ]
+                      }{' '}
+                      · {adminRequestsUi.historicalPromotionTarget}:{' '}
+                      {
+                        adminRequestsUi.historicalPromotionTargets[
+                          snapshot.promotion.target
+                        ]
+                      }
+                    </p>
+                    <p className="mt-1 text-text-secondary">
+                      {adminRequestsUi.historicalPromotionPeriod}:{' '}
+                      <span dir="ltr">
+                        {formatCairoDateTime(snapshot.promotion.startsAt)}
+                      </span>{' '}
+                      —{' '}
+                      <span dir="ltr">
+                        {formatCairoDateTime(snapshot.promotion.endsAt)}
+                      </span>{' '}
+                      {PROMOTION_TIMEZONE_LABEL}
+                    </p>
+                    {snapshot.promotion.monthlySavedMinor !== null ? (
+                      <p className="mt-1 text-text-secondary">
+                        {adminRequestsUi.historicalSavings} (
+                        {adminRequestsUi.historicalEffectiveMonthly}):{' '}
+                        <span dir="ltr">
+                          {formatPriceMinor(
+                            snapshot.promotion.monthlySavedMinor,
+                            snapshot.currency,
+                          )}
+                          {snapshot.promotion.monthlySavedPercentBps !== null
+                            ? ` (${formatSavedPercent(
+                                snapshot.promotion.monthlySavedPercentBps,
+                              )})`
+                            : ''}
+                        </span>
+                      </p>
+                    ) : null}
+                    {snapshot.promotion.yearlySavedMinor !== null ? (
+                      <p className="mt-1 text-text-secondary">
+                        {adminRequestsUi.historicalSavings} (
+                        {adminRequestsUi.historicalEffectiveYearly}):{' '}
+                        <span dir="ltr">
+                          {formatPriceMinor(
+                            snapshot.promotion.yearlySavedMinor,
+                            snapshot.currency,
+                          )}
+                          {snapshot.promotion.yearlySavedPercentBps !== null
+                            ? ` (${formatSavedPercent(
+                                snapshot.promotion.yearlySavedPercentBps,
+                              )})`
+                            : ''}
+                        </span>
+                      </p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="text-xs leading-5 text-text-secondary">
+                    {adminRequestsUi.historicalNoPromotion}
+                  </p>
+                )}
+                <p className="text-xs leading-5 text-text-secondary">
+                  {adminRequestsUi.historicalCapturedAt}:{' '}
+                  <span dir="ltr">{formatCairoDateTime(snapshot.capturedAt)}</span>{' '}
+                  {PROMOTION_TIMEZONE_LABEL}
+                </p>
+                <p className="break-all text-xs leading-5 text-text-secondary" dir="ltr">
+                  {adminRequestsUi.historicalVersion}: {snapshot.effectiveOfferVersion}
+                </p>
+              </>
+            ) : (
+              <div>
+                <dt className="font-semibold text-text-secondary">
+                  {hasPlanSnapshot ? priceLabel : adminRequestsUi.priceSnapshot}
+                </dt>
+                <dd className="text-text-primary" dir={price ? 'ltr' : undefined}>
+                  {!hasPlanSnapshot
+                    ? adminRequestsUi.priceNotApplicable
+                    : price
+                      ? `${price}${pricePeriod ? ` · ${pricePeriod}` : ''}`
+                      : adminRequestsUi.priceNotAnnounced}
+                </dd>
+              </div>
+            )}
+
             <div>
               <dt className="font-semibold text-text-secondary">{adminRequestsUi.source}</dt>
               <dd className="text-text-primary">{sourceLabel(request.source)}</dd>
             </div>
           </dl>
-          <p className="mt-3 text-xs leading-5 text-text-secondary">
-            {hasPlanSnapshot
-              ? adminRequestsUi.offerSnapshotNote
-              : adminRequestsUi.noPlanSnapshotNote}
-          </p>
+          {request.offerSnapshotInvalid ? (
+            <p className="mt-3 rounded-card border-s-4 border-status-warning bg-background p-3 text-xs leading-5 text-text-primary">
+              {adminRequestsUi.historicalSnapshotInvalid}
+            </p>
+          ) : null}
+          {hasFullSnapshot ? (
+            <p className="mt-3 text-xs leading-5 text-text-secondary">
+              {adminRequestsUi.historicalOfferNote}
+            </p>
+          ) : hasPlanSnapshot ? (
+            <p className="mt-3 text-xs leading-5 text-text-secondary">
+              {adminRequestsUi.legacyOfferSnapshotNote}
+            </p>
+          ) : (
+            <p className="mt-3 text-xs leading-5 text-text-secondary">
+              {adminRequestsUi.noPlanSnapshotNote}
+            </p>
+          )}
         </section>
       </div>
 
@@ -192,6 +343,27 @@ export default async function AdminRequestDetailPage({
       </div>
 
       <p className="mt-4 text-xs leading-5 text-text-secondary">{adminRequestsUi.privacyNote}</p>
+    </div>
+  );
+}
+
+function HistoricalPriceRow({
+  label,
+  minor,
+  currency,
+}: {
+  label: string;
+  minor: number | null;
+  currency: SupportedCurrencyCode;
+}) {
+  if (minor === null) return null;
+  const formatted = formatPriceMinor(minor, currency);
+  return (
+    <div>
+      <dt className="font-semibold text-text-secondary">{label}</dt>
+      <dd className="text-text-primary" dir="ltr">
+        {formatted}
+      </dd>
     </div>
   );
 }

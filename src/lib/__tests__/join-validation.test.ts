@@ -77,27 +77,27 @@ describe('join submission validation', () => {
     expect(result.submission.source).toBe('pricing');
   });
 
-  it('accepts an optional plan only with its published revision', () => {
+  it('accepts an optional plan only with its effective-offer version', () => {
     const withPlan = parseJoinSubmission({
       ...baseSubmission,
       planSlug: 'starter-plan',
-      planRevision: 3,
+      offerVersion: 'w41-0123456789abcdef',
     });
     expect(withPlan.ok).toBe(true);
     if (withPlan.ok) {
       expect(withPlan.submission.planSlug).toBe('starter-plan');
-      expect(withPlan.submission.planRevision).toBe(3);
+      expect(withPlan.submission.offerVersion).toBe('w41-0123456789abcdef');
     }
-    const missingRevision = parseJoinSubmission({
+    const missingVersion = parseJoinSubmission({
       ...baseSubmission,
       planSlug: 'starter-plan',
     });
-    expect(missingRevision.ok).toBe(false);
-    const revisionWithoutPlan = parseJoinSubmission({
+    expect(missingVersion.ok).toBe(false);
+    const versionWithoutPlan = parseJoinSubmission({
       ...baseSubmission,
-      planRevision: 3,
+      offerVersion: 'w41-0123456789abcdef',
     });
-    expect(revisionWithoutPlan.ok).toBe(false);
+    expect(versionWithoutPlan.ok).toBe(false);
   });
 
   it('rejects administrative/client-controlled fields and oversized values', () => {

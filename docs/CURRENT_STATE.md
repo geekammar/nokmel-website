@@ -1,8 +1,50 @@
 # CURRENT_STATE.md — Nokmel Website
 
-Last updated: W4 final product-consistency closure, 2026-11-26. Keep concise.
+Last updated: W4.1 implementation, 2026-11-26. Keep concise.
 
-## Status: W4 — CONDITIONAL ACCEPT for Preview; final product-consistency closure on `feature/w4-plans-join-requests` (draft PR; no production claim)
+## Status: W4.1 — IMPLEMENTED on `feature/w41-scheduled-promotional-pricing` (draft PR; local verification; hosted activation/acceptance external; no production claim)
+
+- Baseline: merged `main` `ce82fda57565b4bbea3d31fea21e7c2eac54159b` (W4 PR #7, accepted HEAD `f24b86ee9602f113c1fdacf5ae82683f5cece50d`). W4 remains accepted for continued development; W3/CMS/FAQ/SEO behavior is preserved.
+- W4.1 adds one optional scheduled promotional discount per marketing plan. It is marketing data only and creates no purchase, payment, subscription, entitlement, merchant permission, coupon, promotion stack or campaign.
+- Storage: additive `drizzle/0004_w41-scheduled-promotional-pricing.sql` adds nullable `plans.draft_promotion`, `plans.published_promotion` and `join_requests.offer_snapshot` JSONB plus object checks. Existing plans migrate to no promotion with unchanged prices/revisions/visibility; existing W4 requests keep their legacy single-price meaning.
+- Promotion configuration: enabled, label, percentage (integer basis points) or fixed amount, monthly/yearly/both target, Cairo start/end instants, manual enable/disable/removal. Percentage and fixed arithmetic use exact minor units and BigInt intermediates with deterministic half-up rounding. `PLAN_LIMITS.priceMinor` now matches the PostgreSQL signed integer maximum `2,147,483,647`; no value is accepted that the database cannot represent.
+- Scheduling: owner input is Africa/Cairo (explicit label); nonexistent/ambiguous DST wall times are rejected; stored instants are UTC. Active only when enabled and `startsAt <= now < endsAt`. No cron/background worker; plan rows are never rewritten by time passing. Publishing after the scheduled end remains expired; republishing a hidden plan does not extend it.
+- Draft/public separation: owner edits/disable/removal never change the public offer before explicit publication. Changing prices/currency/periods revalidates the promotion and rejects invalid combinations.
+- Shared resolver/version: `src/lib/plans/promotion.ts` is authoritative for public pricing, `/join`, submission validation and snapshots. It exposes per-period original/effective/savings values, derived state and a bounded deterministic `effectiveOfferVersion` that is stable within an interval and changes at activation/expiration or relevant publication changes. Public loaders resolve with one captured server `asOf`; drafts are never exposed.
+- Public UI: discounted periods show semantic strikethrough original, effective price, truthful savings amount/percentage (floored), promotion label and simple Cairo expiry. Monthly-only/yearly-only offers never imply the other period; no countdown/fake urgency. `/pricing` remains dynamic; an open page may show the old offer until refresh, but submission uses server time and never accepts a stale version.
+- Join form: selected-plan summary, dropdown and recovery consistently use the effective offer and send `offerVersion`; contact fields, optional plan selection, direct join, source/UTM handling and requested-plan notice are preserved. `plan_changed` updates the option/summary/label/savings/expiry/version together.
+- Server validation: planned submission resolves the committed token first (idempotent replay), then reads the published plan row `FOR SHARE`, resolves the current offer once and compares `offerVersion`. Stale activation/expiration or publication returns the existing controlled `plan_changed` flow; hidden/unavailable plans remain rejected. A concurrent publication waits for the join transaction, so snapshots cannot mix offer states.
+- Historical snapshot: new planned requests store a versioned object with plan ID/slug/name, currency, published revision, original/effective monthly/yearly prices, promotion state/version, capture instant and active promotion label/type/target/values/schedule/per-period savings. Legacy columns remain populated for compatibility (effective displayed monthly, else yearly). No-plan requests have no snapshot. Legacy rows are not backfilled or reconstructed.
+- Owner UX: compact **العروض والخصومات** inside the existing plan editor; no new primary admin section/route. Owner preview shows current state and an explicitly labelled simulation for a future scheduled promotion; expired/disabled offers are not simulated as active; preview CTA stays disabled. Request detail distinguishes full W4.1 snapshots, legacy single-price rows and no-plan rows.
+- Local verification (Node 22, disposable loopback PostgreSQL 18): unit **210/210**, PostgreSQL integration **160/160**, Playwright **101/101**; lint 0 errors (3 pre-existing warnings), typecheck, `db:check`, build pass. Exact remote CI is checked on the final HEAD and recorded in the PR/handoff.
+- W4.1 requires no new runtime table/column grant beyond the existing `plans`/`join_requests` table DML. Hosted migration 0004 still requires the documented temporary migrator database-level CREATE grant, revoked immediately after. The new branch Preview needs scoped `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `TRUSTED_ORIGINS`, `OWNER_EMAIL` and intake acceptance configuration from the external lead. The coding agent performed no hosted Neon access, hosted data mutation, Vercel setting change or Production action.
+
+### NKW-W4-006 owner CMS correction handoff (external)
+
+The published homepage final CTA description still contains:
+`سجّل اهتمامك بالانضمام المبكر، وسنتواصل معك عند تفعيل استلام الطلبات لترتيب خطوتك التالية.`
+Approved replacement:
+`سجّل اهتمامك بالانضمام المبكر، وسنراجع طلبك للتواصل معك بشأن الخطوة التالية.`
+Owner workflow for the external lead/Muse during hosted W4.1 acceptance:
+1. Open `المحتوى والـSEO` → homepage editor.
+2. Ensure no unrelated draft changes exist.
+3. Modify only the final CTA description field.
+4. Save the draft.
+5. Inspect the publication review; confirm only the authorized correction is listed.
+6. Publish only that correction.
+7. Verify the public homepage text.
+8. Preserve the corrected Q6 FAQ answer unchanged.
+No hosted CMS row was mutated by the coding agent and no content-rewrite migration was added.
+
+### W4.1 remaining independent acceptance
+
+- Hosted migration 0004 + grant/revoke and scoped Preview configuration (external lead).
+- Independent owner/visitor acceptance of the promotion workflow, preview, activation/expiration recovery and historical snapshot presentation.
+- NKW-W4-006 owner CMS correction above.
+- Raw hosted HTTP metadata/canonical/noindex, forwarded-header evidence, exact-token replay/429 raw headers, recovery-lock/pooler verification, Production isolation, final privacy/retention approval, physical Android acceptance and explicit commercial launch approval remain W6 gates.
+- W5 has not started.
+
+## Historical W4 status: CONDITIONAL ACCEPT for Preview; final product-consistency closure on `feature/w4-plans-join-requests` (merged)
 
 - Baseline: merged `main` `0020ddacdd54b3c23471b58b17b54fda1c1a0ae1` (W3.3 PR #6, accepted HEAD `dcf1f8d9ede739a29bd48d036df1a1d5cd9f28bf`). W3.1/W3.2/W3.3 behavior is preserved.
 - W4 activates the existing **الباقات والأسعار** and **طلبات الانضمام** admin sections. Settings remains unavailable until W5; no CRM, billing, checkout, subscriptions, merchant accounts, notifications, analytics provider or public request tracking portal was added.
@@ -40,7 +82,7 @@ Last updated: W4 final product-consistency closure, 2026-11-26. Keep concise.
 
 - **NKW-W4-001 source attribution:** plan preselection no longer implies `pricing`. No explicit source → `direct`; explicit valid `source=pricing` stays pricing; unknown/malformed/repeated source → direct. Plan changes/removal/recovery do not modify the original source. Source remains a bounded acquisition hint, not proof of navigation history.
 - **NKW-W4-002 operational copy:** default FAQ answer now uses neutral wording valid in enabled/disabled states. The stale hosted FAQ answer remains an owner-published CMS value and must be corrected through the CMS workflow; no automatic CMS rewrite/delete/ID change or migration was added. A focused integration test proves rendering does not mutate a stale published answer. Exact owner procedure: open Content & SEO → homepage, locate `هل نموذج طلب الانضمام يعمل الآن؟`, replace only the answer with `يمكنك معرفة حالة استقبال طلبات الانضمام من صفحة «اطلب الانضمام». عندما يكون النموذج متاحًا، يمكنك إرسال طلبك دون دفع أو التزام بشراء اشتراك.`, save draft, verify publication review lists only the intended answer correction, confirm publication, verify public answer/current join state.
-- **NKW-W4-003 snapshot limitation:** schema unchanged. Owner detail now labels the captured historical period (monthly/yearly) and states the snapshot contains one displayed price only; yearly is not captured when monthly is stored and must not be derived from current plans. No-plan requests show not-applicable/no-plan note instead of an unannounced price implication.
+- **NKW-W4-003 snapshot limitation:** schema unchanged in W4. Owner detail labels the captured historical period (monthly/yearly) and states the legacy snapshot contains one displayed price only; yearly is not captured when monthly is stored and must not be derived from current plans. No-plan requests show not-applicable/no-plan note instead of an unannounced price implication. W4.1 stores a full versioned snapshot for newly accepted requests while preserving this legacy interpretation.
 - **NKW-W4-004 recovery UI:** form now maintains one effective plan-option collection. `plan_changed` replaces the option/summary/prices/revision and preserves pending confirmation; switching away/back cannot resurrect stale values. `plan_unavailable` removes that option, clears selection, preserves other options/fields/token and allows continue-without-plan. Browser regressions cover both.
 - **NKW-W4-005 notice:** requested-but-unresolved plan shows a concise neutral notice, no raw query reflection, no unrelated selection, and intake-disabled behavior remains unchanged.
 - Remaining focused live retest: source attribution, owner FAQ correction, snapshot labels, recovery UI and requested-plan notice. Raw HTTP metadata, exact-token replay/429 raw headers, hosted forwarded-header evidence, physical Android acceptance and final privacy/retention approval remain separate/W6 gates.

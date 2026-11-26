@@ -14,14 +14,20 @@ import {
   type JoinSource,
 } from '@/lib/join/validation';
 import { formatPriceMinor, type PublicPlan } from '@/lib/plans/model';
+import {
+  PROMOTION_TIMEZONE_LABEL,
+  formatCairoDateTime,
+  formatSavedPercent,
+  type OfferResolution,
+  type PeriodOffer,
+} from '@/lib/plans/promotion';
 
 type PlanSource = {
   slug: string;
   name: string;
-  monthlyPriceMinor: number | null;
-  yearlyPriceMinor: number | null;
   currency: PublicPlan['currency'];
   publishedRevision: number;
+  offer: OfferResolution;
 };
 
 type PlanChangedResponse = PlanSource;
@@ -48,27 +54,54 @@ const FIELD_IDS: Record<string, string> = {
   email: 'join-email',
   businessActivity: 'join-activity',
   planSlug: 'join-plan',
-  planRevision: 'join-plan',
+  offerVersion: 'join-plan',
 };
 
 function toPlanSource(plan: PublicPlan): PlanSource {
   return {
     slug: plan.slug,
     name: plan.name,
-    monthlyPriceMinor: plan.monthlyPriceMinor,
-    yearlyPriceMinor: plan.yearlyPriceMinor,
     currency: plan.currency,
     publishedRevision: plan.publishedRevision,
+    offer: plan.offer,
   };
 }
 
 function priceSummary(plan: PlanSource): string {
-  const monthly = formatPriceMinor(plan.monthlyPriceMinor, plan.currency);
-  const yearly = formatPriceMinor(plan.yearlyPriceMinor, plan.currency);
+  const monthly = formatPriceMinor(plan.offer.monthly.effectiveMinor, plan.currency);
+  const yearly = formatPriceMinor(plan.offer.yearly.effectiveMinor, plan.currency);
   if (monthly && yearly) {
     return `${monthly} / ${yearly}`;
   }
   return monthly ?? yearly ?? publicPlansUi.priceLater;
+}
+
+function hasActivePromotion(plan: PlanSource): boolean {
+  return plan.offer.monthly.discounted || plan.offer.yearly.discounted;
+}
+
+function planOptionText(plan: PlanSource): string {
+  if (!hasActivePromotion(plan)) return priceSummary(plan);
+  const parts: string[] = [];
+  const monthly = formatPriceMinor(plan.offer.monthly.effectiveMinor, plan.currency);
+  const yearly = formatPriceMinor(plan.offer.yearly.effectiveMinor, plan.currency);
+  if (plan.offer.monthly.discounted && monthly) {
+    const original = formatPriceMinor(plan.offer.monthly.baseMinor, plan.currency);
+    parts.push(
+      original
+        ? `${publicPlansUi.monthly}: ${monthly} بدلاً من ${original}`
+        : `${publicPlansUi.monthly}: ${monthly}`,
+    );
+  }
+  if (plan.offer.yearly.discounted && yearly) {
+    const original = formatPriceMinor(plan.offer.yearly.baseMinor, plan.currency);
+    parts.push(
+      original
+        ? `${publicPlansUi.yearly}: ${yearly} بدلاً من ${original}`
+        : `${publicPlansUi.yearly}: ${yearly}`,
+    );
+  }
+  return parts.join(' · ') || priceSummary(plan);
 }
 
 export function JoinForm({
@@ -152,7 +185,7 @@ export function JoinForm({
     setErrors((current) => {
       const next = { ...current };
       delete next.planSlug;
-      delete next.planRevision;
+      delete next.offerVersion;
       return next;
     });
   }
@@ -176,7 +209,7 @@ export function JoinForm({
     };
     if (selection.slug) {
       payload.planSlug = selection.slug;
-      payload.planRevision = selection.plan?.publishedRevision;
+      payload.offerVersion = selection.plan?.offer.version;
     }
 
     const validation = parseJoinSubmission(payload);
@@ -353,12 +386,44 @@ export function JoinForm({
           data-testid="selected-plan-context"
         >
           <p className="font-semibold text-text-primary">{publicJoinUi.selectedPlanTitle}</p>
-          <p className="mt-1 text-text-primary">
-            {selectedPlan.name}{' '}
-            <span className="text-text-secondary" dir="ltr">
-              ({priceSummary(selectedPlan)})
-            </span>
-          </p>
+          <p className="mt-1 text-text-primary">{selectedPlan.name}</p>
+          {hasActivePromotion(selectedPlan) ? (
+            <div className="mt-2 flex flex-col gap-1" data-testid="selected-plan-offer">
+              {selectedPlan.offer.label ? (
+                <p className="text-text-primary">
+                  {publicPlansUi.promotionLabel} «{selectedPlan.offer.label}»
+                  {selectedPlan.offer.endsAt ? (
+                    <span className="text-text-secondary">
+                      {' '}
+                      · {publicPlansUi.promotionEnds}:{' '}
+                      <time dateTime={selectedPlan.offer.endsAt} dir="ltr">
+                        {formatCairoDateTime(selectedPlan.offer.endsAt)}
+                      </time>{' '}
+                      {PROMOTION_TIMEZONE_LABEL}
+                    </span>
+                  ) : null}
+                </p>
+              ) : null}
+              {selectedPlan.offer.monthly.baseMinor !== null ? (
+                <PeriodPriceLine
+                  label={publicPlansUi.monthly}
+                  period={selectedPlan.offer.monthly}
+                  currency={selectedPlan.currency}
+                />
+              ) : null}
+              {selectedPlan.offer.yearly.baseMinor !== null ? (
+                <PeriodPriceLine
+                  label={publicPlansUi.yearly}
+                  period={selectedPlan.offer.yearly}
+                  currency={selectedPlan.currency}
+                />
+              ) : null}
+            </div>
+          ) : (
+            <p className="mt-1 text-text-secondary" dir="ltr">
+              {priceSummary(selectedPlan)}
+            </p>
+          )}
           <p className="mt-1 text-xs text-text-secondary">{publicJoinUi.selectedPlanChange}</p>
         </div>
       ) : null}
@@ -461,18 +526,18 @@ export function JoinForm({
               value={selectedSlug}
               onChange={(event) => handlePlanChange(event.target.value)}
               className="min-h-control w-full rounded-control border border-border-interactive bg-surface px-3 text-base text-text-primary"
-              aria-invalid={errors.planSlug || errors.planRevision ? true : undefined}
+              aria-invalid={errors.planSlug || errors.offerVersion ? true : undefined}
             >
               <option value="">{publicJoinUi.noPlan}</option>
               {planOptions.map((plan) => (
                 <option key={plan.slug} value={plan.slug}>
-                  {plan.name} — {priceSummary(plan)}
+                  {plan.name} — {planOptionText(plan)}
                 </option>
               ))}
             </select>
-            {errors.planSlug || errors.planRevision ? (
+            {errors.planSlug || errors.offerVersion ? (
               <p role="alert" className="text-sm text-status-error">
-                {errors.planSlug ?? errors.planRevision}
+                {errors.planSlug ?? errors.offerVersion}
               </p>
             ) : null}
           </div>
@@ -534,5 +599,45 @@ export function JoinForm({
         </div>
       </form>
     </Card>
+  );
+}
+
+function PeriodPriceLine({
+  label,
+  period,
+  currency,
+}: {
+  label: string;
+  period: PeriodOffer;
+  currency: PublicPlan['currency'];
+}) {
+  const base = formatPriceMinor(period.baseMinor, currency);
+  const effective = formatPriceMinor(period.effectiveMinor, currency);
+  const saved = formatPriceMinor(period.savedMinor, currency);
+  const savedPercent = formatSavedPercent(period.savedPercentBps);
+  if (!period.discounted || !base || !effective) {
+    return (
+      <p className="text-text-secondary">
+        {label}: <span dir="ltr">{effective ?? base}</span>
+      </p>
+    );
+  }
+  return (
+    <p className="text-text-secondary">
+      {label}:{' '}
+      <s className="line-through" dir="ltr">
+        {base}
+      </s>{' '}
+      <span className="font-semibold text-text-primary" dir="ltr">
+        {effective}
+      </span>
+      {saved ? (
+        <span dir="ltr">
+          {' '}
+          · {publicPlansUi.savingsLabel} {saved}
+          {savedPercent ? ` (${savedPercent})` : ''}
+        </span>
+      ) : null}
+    </p>
   );
 }

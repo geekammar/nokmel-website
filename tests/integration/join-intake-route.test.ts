@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest'
 import { applyMigrations, emptyDatabase, getDisposablePostgres } from './helpers';
 import { POST } from '@/app/api/join/route';
 import { getDb } from '@/lib/db';
+import { getPublicPlanBySlug } from '@/lib/plans/service';
 
 const pg = await getDisposablePostgres();
 const ORIGIN = 'http://127.0.0.1:3100';
@@ -173,10 +174,13 @@ describe('public join-intake route against PostgreSQL', () => {
          'published', 2, 2, now()
        )`,
     );
+    const publicPlan = await getPublicPlanBySlug('route-replay-plan');
+    if (!publicPlan) throw new Error('seeded plan missing');
+    const originalOfferVersion = publicPlan.offer.version;
     const token = `route-replay-${randomUUID()}`;
     const body = validBody({
       planSlug: 'route-replay-plan',
-      planRevision: 2,
+      offerVersion: originalOfferVersion,
       submissionToken: token,
     });
     const first = await POST(request(body, { ip: '203.0.113.90' }));
@@ -220,7 +224,7 @@ describe('public join-intake route against PostgreSQL', () => {
       request(
         validBody({
           planSlug: 'route-replay-plan',
-          planRevision: 2,
+          offerVersion: originalOfferVersion,
           submissionToken: `route-stale-${randomUUID()}`,
         }),
         { ip: '203.0.113.91' },

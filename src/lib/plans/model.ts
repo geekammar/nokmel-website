@@ -1,7 +1,25 @@
 import { z } from 'zod';
+import {
+  MAX_PRICE_MINOR,
+  cairoDateTimeInputs,
+  cairoLocalDateTimeToInstant,
+  emptyPromotionFormValues,
+  formatPercentageInput,
+  normalizeDigits,
+  parseMajorAmountInput,
+  parsePercentageInput,
+  parsePromotionConfig,
+  promotionConfigSchema,
+  promotionFormSchema,
+  resolveOffer,
+  validatePromotionAgainstPrices,
+  type OfferResolution,
+  type PromotionConfig,
+  type PromotionFormValues,
+} from './promotion';
 
 /**
- * Marketing-plan domain model (W4).
+ * Marketing-plan domain model (W4, extended in W4.1).
  *
  * Plans are marketing data only. They never authorize purchases, subscriptions,
  * entitlements or merchant permissions. Prices are stored as exact integer
@@ -24,7 +42,7 @@ export const PLAN_LIMITS = {
   features: 10,
   ctaLabel: 40,
   displayOrder: 9999,
-  priceMinor: 9_999_999_999,
+  priceMinor: MAX_PRICE_MINOR,
 } as const;
 
 export type SupportedCurrencyCode =
@@ -119,18 +137,7 @@ export function formatPriceMinor(
   return fractionPart ? `${grouped}.${fractionPart} ${currency}` : `${grouped} ${currency}`;
 }
 
-const ARABIC_INDIC_DIGITS = /[\u0660-\u0669]/g;
-const EXTENDED_ARABIC_INDIC_DIGITS = /[\u06F0-\u06F9]/g;
-
-export function normalizeNumericInputDigits(value: string): string {
-  return value
-    .replace(ARABIC_INDIC_DIGITS, (digit) =>
-      String(digit.charCodeAt(0) - 0x0660),
-    )
-    .replace(EXTENDED_ARABIC_INDIC_DIGITS, (digit) =>
-      String(digit.charCodeAt(0) - 0x06f0),
-    );
-}
+export const normalizeNumericInputDigits = normalizeDigits;
 
 export type PriceParseResult =
   | { ok: true; minor: number | null }
@@ -144,34 +151,7 @@ export function parsePriceInput(
   raw: string,
   currency: SupportedCurrencyCode,
 ): PriceParseResult {
-  const normalized = normalizeNumericInputDigits(String(raw ?? ''))
-    .replace(/[\u066C\u060C\s]/g, '')
-    .replace(/\u066B/g, '.')
-    .trim();
-  if (normalized === '') return { ok: true, minor: null };
-  if (!/^\d+(?:\.\d+)?$/.test(normalized)) {
-    return { ok: false, message: 'أدخل مبلغاً رقمياً صالحاً بدون رموز أو فواصل آلاف.' };
-  }
-  const [integerDigits, fractionDigits = ''] = normalized.split('.');
-  const exponent = currencyDefinition(currency).exponent;
-  if (fractionDigits.length > exponent) {
-    return {
-      ok: false,
-      message:
-        exponent === 0
-          ? 'هذه العملة لا تقبل كسوراً عشرية.'
-          : `هذه العملة تقبل ${exponent} خانة عشرية كحد أقصى.`,
-    };
-  }
-  if (integerDigits.length > 10) {
-    return { ok: false, message: 'المبلغ أكبر من الحد المسموح.' };
-  }
-  const minorDigits = `${integerDigits}${fractionDigits.padEnd(exponent, '0')}`;
-  const minor = Number(minorDigits);
-  if (!Number.isSafeInteger(minor) || minor < 0 || minor > PLAN_LIMITS.priceMinor) {
-    return { ok: false, message: 'المبلغ أكبر من الحد المسموح.' };
-  }
-  return { ok: true, minor };
+  return parseMajorAmountInput(raw, currencyDefinition(currency).exponent);
 }
 
 export function priceInputFromMinor(
@@ -207,6 +187,7 @@ export type PlanDraftValues = {
   ctaLabel: string;
   featured: boolean;
   displayOrder: number;
+  promotion: PromotionConfig | null;
 };
 
 export type PlanFormValues = {
@@ -219,6 +200,7 @@ export type PlanFormValues = {
   ctaLabel: string;
   featured: boolean;
   displayOrder: number;
+  promotion: PromotionFormValues | null;
 };
 
 export type PlanFormValidation =
@@ -249,8 +231,93 @@ export const planFormInputSchema = z
       .int()
       .min(0, 'ترتيب العرض غير صالح.')
       .max(PLAN_LIMITS.displayOrder, 'ترتيب العرض أكبر من الحد المسموح.'),
+    promotion: promotionFormSchema.nullable(),
   })
   .strict();
+
+type PromotionBuildResult =
+  | { ok: true; promotion: PromotionConfig | null }
+  | { ok: false; errors: Record<string, string> };
+
+function buildPromotionFromForm(
+  form: PromotionFormValues | null,
+  currency: SupportedCurrencyCode,
+  base: { monthlyPriceMinor: number | null; yearlyPriceMinor: number | null },
+): PromotionBuildResult {
+  if (form === null) return { ok: true, promotion: null };
+
+  const errors: Record<string, string> = {};
+  const label = form.label.trim();
+  if (!label) errors.label = 'أدخل اسم العرض.';
+
+  const start = cairoLocalDateTimeToInstant(form.startsDate, form.startsTime);
+  if (!start.ok) {
+    errors.startsDate =
+      start.reason === 'nonexistent'
+        ? 'هذا الوقت غير موجود بسبب تغيير التوقيت الصيفي. اختر وقتاً آخر.'
+        : start.reason === 'ambiguous'
+          ? 'هذا الوقت متكرر بسبب تغيير التوقيت الصيفي. اختر وقتاً آخر.'
+          : 'أدخل تاريخ ووقت بداية صحيحين.';
+  }
+  const end = cairoLocalDateTimeToInstant(form.endsDate, form.endsTime);
+  if (!end.ok) {
+    errors.endsDate =
+      end.reason === 'nonexistent'
+        ? 'هذا الوقت غير موجود بسبب تغيير التوقيت الصيفي. اختر وقتاً آخر.'
+        : end.reason === 'ambiguous'
+          ? 'هذا الوقت متكرر بسبب تغيير التوقيت الصيفي. اختر وقتاً آخر.'
+          : 'أدخل تاريخ ووقت انتهاء صحيحين.';
+  }
+  if (start.ok && end.ok && Date.parse(start.iso) >= Date.parse(end.iso)) {
+    errors.endsDate = 'يجب أن يكون وقت الانتهاء بعد وقت البداية.';
+  }
+
+  let percentageBps: number | null = null;
+  let fixedMonthlyMinor: number | null = null;
+  let fixedYearlyMinor: number | null = null;
+
+  if (form.discountType === 'percentage') {
+    const percentage = parsePercentageInput(form.percentage);
+    if (!percentage.ok) errors.percentage = percentage.message;
+    else percentageBps = percentage.bps;
+  } else {
+    if (form.target === 'monthly' || form.target === 'both') {
+      const fixed = parsePriceInput(form.fixedMonthly, currency);
+      if (!fixed.ok) errors.fixedMonthly = fixed.message;
+      else if (fixed.minor === null) errors.fixedMonthly = 'أدخل مبلغ الخصم الشهري.';
+      else fixedMonthlyMinor = fixed.minor;
+    }
+    if (form.target === 'yearly' || form.target === 'both') {
+      const fixed = parsePriceInput(form.fixedYearly, currency);
+      if (!fixed.ok) errors.fixedYearly = fixed.message;
+      else if (fixed.minor === null) errors.fixedYearly = 'أدخل مبلغ الخصم السنوي.';
+      else fixedYearlyMinor = fixed.minor;
+    }
+  }
+
+  if (Object.keys(errors).length > 0 || !start.ok || !end.ok) {
+    return { ok: false, errors };
+  }
+
+  const promotion: PromotionConfig = {
+    enabled: form.enabled,
+    label,
+    discountType: form.discountType,
+    target: form.target,
+    percentageBps,
+    fixedMonthlyMinor,
+    fixedYearlyMinor,
+    startsAt: start.iso,
+    endsAt: end.iso,
+  };
+
+  const promotionErrors = validatePromotionAgainstPrices(promotion, base);
+  if (Object.keys(promotionErrors).length > 0) {
+    return { ok: false, errors: promotionErrors };
+  }
+
+  return { ok: true, promotion };
+}
 
 /**
  * Validates and normalizes owner plan input. Currency must be explicit; a
@@ -287,6 +354,18 @@ export function validatePlanForm(raw: unknown): PlanFormValidation {
     };
   }
 
+  const promotion = buildPromotionFromForm(parsed.data.promotion, currency, {
+    monthlyPriceMinor: monthly.minor,
+    yearlyPriceMinor: yearly.minor,
+  });
+  if (!promotion.ok) {
+    const errors: Record<string, string> = {};
+    for (const [key, message] of Object.entries(promotion.errors)) {
+      errors[`promotion.${key}`] = message;
+    }
+    return { ok: false, errors };
+  }
+
   return {
     ok: true,
     values: {
@@ -299,6 +378,7 @@ export function validatePlanForm(raw: unknown): PlanFormValidation {
       ctaLabel: parsed.data.ctaLabel,
       featured: parsed.data.featured,
       displayOrder: parsed.data.displayOrder,
+      promotion: promotion.promotion,
     },
   };
 }
@@ -315,6 +395,8 @@ export type PublicPlan = {
   featured: boolean;
   displayOrder: number;
   publishedRevision: number;
+  publishedPromotion: PromotionConfig | null;
+  offer: OfferResolution;
 };
 
 export type PlanPublishedValues = {
@@ -327,6 +409,7 @@ export type PlanPublishedValues = {
   ctaLabel: string;
   featured: boolean;
   displayOrder: number;
+  promotion: PromotionConfig | null;
 };
 
 export type OwnerPlan = {
@@ -356,19 +439,23 @@ export function planPriceLabel(plan: {
  * Converts a server-provided public plan into a validated shared view object.
  * Invalid stored data is rejected by callers and never rendered.
  */
-export function toPublicPlan(input: {
-  slug: string;
-  name: string;
-  description: string;
-  features: unknown;
-  monthlyPriceMinor: number | null;
-  yearlyPriceMinor: number | null;
-  currency: string;
-  ctaLabel: string;
-  featured: boolean;
-  displayOrder: number;
-  publishedRevision: number;
-}): PublicPlan {
+export function toPublicPlan(
+  input: {
+    slug: string;
+    name: string;
+    description: string;
+    features: unknown;
+    monthlyPriceMinor: number | null;
+    yearlyPriceMinor: number | null;
+    currency: string;
+    ctaLabel: string;
+    featured: boolean;
+    displayOrder: number;
+    publishedRevision: number;
+    publishedPromotion: unknown;
+  },
+  asOf: Date,
+): PublicPlan {
   const features = Array.isArray(input.features)
     ? input.features.filter((entry): entry is string => typeof entry === 'string')
     : [];
@@ -377,10 +464,33 @@ export function toPublicPlan(input: {
     typeof input.name !== 'string' ||
     typeof input.description !== 'string' ||
     typeof input.ctaLabel !== 'string' ||
-    typeof input.slug !== 'string'
+    typeof input.slug !== 'string' ||
+    !Number.isSafeInteger(input.monthlyPriceMinor ?? 0) ||
+    !Number.isSafeInteger(input.yearlyPriceMinor ?? 0)
   ) {
     throw new Error('Invalid plan');
   }
+  const publishedPromotion = parsePromotionConfig(input.publishedPromotion);
+  if (publishedPromotion) {
+    const promotionErrors = validatePromotionAgainstPrices(publishedPromotion, {
+      monthlyPriceMinor: input.monthlyPriceMinor,
+      yearlyPriceMinor: input.yearlyPriceMinor,
+    });
+    if (Object.keys(promotionErrors).length > 0) {
+      throw new Error('Invalid published promotion');
+    }
+  }
+  const offer = resolveOffer(
+    {
+      slug: input.slug,
+      publishedRevision: input.publishedRevision,
+      currency: input.currency,
+      monthlyPriceMinor: input.monthlyPriceMinor,
+      yearlyPriceMinor: input.yearlyPriceMinor,
+      promotion: publishedPromotion,
+    },
+    asOf,
+  );
   return {
     slug: input.slug,
     name: input.name,
@@ -393,6 +503,45 @@ export function toPublicPlan(input: {
     featured: input.featured,
     displayOrder: input.displayOrder,
     publishedRevision: input.publishedRevision,
+    publishedPromotion,
+    offer,
+  };
+}
+
+export function promotionFormValuesFromConfig(
+  config: PromotionConfig | null,
+  currency: SupportedCurrencyCode,
+): PromotionFormValues | null {
+  if (!config) return null;
+  const start = cairoDateTimeInputs(config.startsAt);
+  const end = cairoDateTimeInputs(config.endsAt);
+  return {
+    enabled: config.enabled,
+    label: config.label,
+    discountType: config.discountType,
+    target: config.target,
+    percentage: formatPercentageInput(config.percentageBps),
+    fixedMonthly: priceInputFromMinor(config.fixedMonthlyMinor, currency),
+    fixedYearly: priceInputFromMinor(config.fixedYearlyMinor, currency),
+    startsDate: start.date,
+    startsTime: start.time,
+    endsDate: end.date,
+    endsTime: end.time,
+  };
+}
+
+export function emptyPlanFormValues(): PlanFormValues {
+  return {
+    name: '',
+    description: '',
+    features: [],
+    monthlyPrice: '',
+    yearlyPrice: '',
+    currency: '',
+    ctaLabel: 'اطلب الانضمام',
+    featured: false,
+    displayOrder: 0,
+    promotion: null,
   };
 }
 
@@ -407,10 +556,22 @@ export function planFormValuesFromOwnerPlan(plan: OwnerPlan): PlanFormValues {
     ctaLabel: plan.draft.ctaLabel,
     featured: plan.draft.featured,
     displayOrder: plan.draft.displayOrder,
+    promotion: promotionFormValuesFromConfig(plan.draft.promotion, plan.draft.currency),
   };
 }
 
-export function planDraftToPublic(plan: OwnerPlan): PublicPlan {
+export function planDraftToPublic(plan: OwnerPlan, asOf: Date): PublicPlan {
+  const offer = resolveOffer(
+    {
+      slug: plan.slug,
+      publishedRevision: plan.revision,
+      currency: plan.draft.currency,
+      monthlyPriceMinor: plan.draft.monthlyPriceMinor,
+      yearlyPriceMinor: plan.draft.yearlyPriceMinor,
+      promotion: plan.draft.promotion,
+    },
+    asOf,
+  );
   return {
     slug: plan.slug,
     name: plan.draft.name,
@@ -423,5 +584,9 @@ export function planDraftToPublic(plan: OwnerPlan): PublicPlan {
     featured: plan.draft.featured,
     displayOrder: plan.draft.displayOrder,
     publishedRevision: plan.revision,
+    publishedPromotion: plan.draft.promotion,
+    offer,
   };
 }
+
+export { emptyPromotionFormValues, promotionConfigSchema, resolveOffer };

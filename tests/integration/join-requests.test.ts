@@ -18,7 +18,13 @@ import {
   parseJoinSubmission,
   type JoinSubmission,
 } from '@/lib/join/validation';
-import { createPlan, hidePlan, publishPlan, savePlanDraft } from '@/lib/plans/service';
+import {
+  createPlan,
+  getPublicPlanBySlug,
+  hidePlan,
+  publishPlan,
+  savePlanDraft,
+} from '@/lib/plans/service';
 import type { PlanFormValues } from '@/lib/plans/model';
 
 const pg = await getDisposablePostgres();
@@ -34,6 +40,7 @@ function planValues(overrides: Partial<PlanFormValues> = {}): PlanFormValues {
     ctaLabel: 'اطلب الانضمام',
     featured: false,
     displayOrder: 1,
+    promotion: null,
     ...overrides,
   };
 }
@@ -50,6 +57,23 @@ function submission(overrides: Record<string, unknown> = {}): JoinSubmission {
   });
   if (!result.ok) throw new Error(`invalid test submission: ${JSON.stringify(result.errors)}`);
   return result.submission;
+}
+
+async function publishedOfferVersion(slug: string): Promise<string> {
+  const plan = await getPublicPlanBySlug(slug, { db: pg.db });
+  if (!plan) throw new Error(`public plan ${slug} missing`);
+  return plan.offer.version;
+}
+
+async function planSubmission(
+  slug: string,
+  overrides: Record<string, unknown> = {},
+): Promise<JoinSubmission> {
+  return submission({
+    planSlug: slug,
+    offerVersion: await publishedOfferVersion(slug),
+    ...overrides,
+  });
 }
 
 async function publishedTestPlan(slug: string) {
@@ -100,10 +124,9 @@ describe('public join-request persistence', () => {
 
   test('join with a published plan stores a server-generated offer snapshot', async () => {
     const plan = await publishedTestPlan(`snapshot-${randomUUID().slice(0, 8)}`);
-    const result = await createJoinRequest(
-      submission({ planSlug: plan.slug, planRevision: plan.publishedRevision }),
-      { db: pg.db },
-    );
+    const result = await createJoinRequest(await planSubmission(plan.slug), {
+      db: pg.db,
+    });
     expect(result.created).toBe(true);
     if (!result.created) return;
     const detail = await getJoinRequest(result.id, { db: pg.db });
@@ -116,9 +139,12 @@ describe('public join-request persistence', () => {
 
   test('unknown and hidden plans are rejected safely without creating records', async () => {
     await expect(
-      createJoinRequest(submission({ planSlug: 'unknown-plan', planRevision: 1 }), {
-        db: pg.db,
-      }),
+      createJoinRequest(
+        submission({ planSlug: 'unknown-plan', offerVersion: 'w41-0000000000000000' }),
+        {
+          db: pg.db,
+        },
+      ),
     ).rejects.toBeInstanceOf(JoinPlanUnavailableError);
     expect(await countRequests()).toBe(0);
 
@@ -128,17 +154,22 @@ describe('public join-request persistence', () => {
       { db: pg.db },
     );
     await expect(
-      createJoinRequest(submission({ planSlug: hidden.slug, planRevision: plan.publishedRevision }), {
-        db: pg.db,
-      }),
+      createJoinRequest(
+        submission({
+          planSlug: hidden.slug,
+          offerVersion: 'w41-0000000000000000',
+        }),
+        {
+          db: pg.db,
+        },
+      ),
     ).rejects.toBeInstanceOf(JoinPlanUnavailableError);
     expect(await countRequests()).toBe(0);
   });
 
   test('a plan change between selection and submission is rejected without silent reassignment', async () => {
     const plan = await publishedTestPlan(`changed-${randomUUID().slice(0, 8)}`);
-    const selectedRevision = plan.publishedRevision;
-    if (selectedRevision === null) throw new Error('missing revision');
+    const selectedVersion = await publishedOfferVersion(plan.slug);
 
     const edited = await savePlanDraft(
       {
@@ -154,9 +185,12 @@ describe('public join-request persistence', () => {
     );
 
     await expect(
-      createJoinRequest(submission({ planSlug: plan.slug, planRevision: selectedRevision }), {
-        db: pg.db,
-      }),
+      createJoinRequest(
+        submission({ planSlug: plan.slug, offerVersion: selectedVersion }),
+        {
+          db: pg.db,
+        },
+      ),
     ).rejects.toMatchObject({
       name: 'JoinPlanChangedError',
       currentPlan: { publishedRevision: republished.publishedRevision },
@@ -166,10 +200,9 @@ describe('public join-request persistence', () => {
 
   test('historical offer snapshots survive later plan edits and hiding', async () => {
     const plan = await publishedTestPlan(`history-${randomUUID().slice(0, 8)}`);
-    const created = await createJoinRequest(
-      submission({ planSlug: plan.slug, planRevision: plan.publishedRevision }),
-      { db: pg.db },
-    );
+    const created = await createJoinRequest(await planSubmission(plan.slug), {
+      db: pg.db,
+    });
     if (!created.created) throw new Error('create failed');
 
     const edited = await savePlanDraft(
@@ -199,10 +232,8 @@ describe('public join-request persistence', () => {
   test('idempotent replay survives plan republication and hide without rewriting the original', async () => {
     const plan = await publishedTestPlan(`replay-${randomUUID().slice(0, 8)}`);
     const token = `replay-token-${randomUUID()}`;
-    const firstSubmission = submission({
+    const firstSubmission = await planSubmission(plan.slug, {
       name: 'تاجر إعادة المحاولة',
-      planSlug: plan.slug,
-      planRevision: plan.publishedRevision,
       submissionToken: token,
     });
     const first = await createJoinRequest(firstSubmission, { db: pg.db });
@@ -242,7 +273,7 @@ describe('public join-request persistence', () => {
         ...firstSubmission,
         name: 'اسم مختلف لنفس الرمز',
         planSlug: null,
-        planRevision: null,
+        offerVersion: null,
       },
       { db: pg.db },
     );
@@ -253,7 +284,7 @@ describe('public join-request persistence', () => {
       createJoinRequest(
         submission({
           planSlug: plan.slug,
-          planRevision: plan.publishedRevision,
+          offerVersion: firstSubmission.offerVersion,
           submissionToken: `replay-stale-${randomUUID()}`,
         }),
         { db: pg.db },
@@ -273,7 +304,7 @@ describe('public join-request persistence', () => {
       createJoinRequest(
         submission({
           planSlug: plan.slug,
-          planRevision: republished.publishedRevision,
+          offerVersion: 'w41-0000000000000000',
           submissionToken: `replay-hidden-${randomUUID()}`,
         }),
         { db: pg.db },
@@ -291,9 +322,7 @@ describe('public join-request persistence', () => {
   test('a genuine first token racing an offer publication is rejected as stale', async () => {
     const plan = await publishedTestPlan(`race-${randomUUID().slice(0, 8)}`);
     const token = `race-token-${randomUUID()}`;
-    const pendingSubmission = submission({
-      planSlug: plan.slug,
-      planRevision: plan.publishedRevision,
+    const pendingSubmission = await planSubmission(plan.slug, {
       submissionToken: token,
     });
 

@@ -36,5 +36,11 @@ export default async function EditPlanPage({
     );
   }
 
-  return <PlanEditor plan={result.plan} justCreated={created === '1'} />;
+  return (
+    <PlanEditor
+      plan={result.plan}
+      justCreated={created === '1'}
+      nowIso={new Date().toISOString()}
+    />
+  );
 }

@@ -35,6 +35,35 @@ export const adminRequestsUi = {
   noBusinessActivity: 'غير مذكور',
   contactDetails: 'بيانات التواصل',
   offerSnapshot: 'العرض المختار وقت الإرسال',
+  historicalOfferTitle: 'بيانات العرض التاريخية',
+  historicalOfferNote:
+    'هذه القيم محفوظة وقت الإرسال ولا تُحدَّث من الباقة الحالية. تبقى الباقة المنشورة الآن منفصلة عن هذه اللقطة.',
+  historicalOriginalMonthly: 'السعر الشهري الأصلي وقت الإرسال',
+  historicalOriginalYearly: 'السعر السنوي الأصلي وقت الإرسال',
+  historicalEffectiveMonthly: 'السعر الشهري بعد الخصم وقت الإرسال',
+  historicalEffectiveYearly: 'السعر السنوي بعد الخصم وقت الإرسال',
+  historicalPromotion: 'العرض المطبق وقت الإرسال',
+  historicalPromotionLabel: 'اسم العرض',
+  historicalPromotionType: 'نوع الخصم',
+  historicalPromotionTarget: 'الفترات المشمولة',
+  historicalPromotionPeriod: 'فترة العرض',
+  historicalSavings: 'التوفير المحفوظ',
+  historicalCapturedAt: 'وقت حفظ اللقطة',
+  historicalVersion: 'بصمة العرض المحفوظة',
+  historicalNoPromotion: 'لم يكن هناك عرض فعّال وقت الإرسال؛ الأسعار المحفوظة هي الأسعار الأساسية.',
+  historicalPromotionTypes: {
+    percentage: 'نسبة مئوية',
+    fixed: 'مبلغ ثابت',
+  },
+  historicalPromotionTargets: {
+    monthly: 'الشهري فقط',
+    yearly: 'السنوي فقط',
+    both: 'الشهري والسنوي',
+  },
+  historicalSnapshotInvalid:
+    'تعذّرت قراءة لقطة العرض الكاملة المحفوظة. لا تُستنتج أي أسعار من الباقة الحالية.',
+  legacyOfferSnapshotNote:
+    'لقطة W4 القديمة تحفظ سعراً معروضاً واحداً وفترته فقط؛ لا يُحفظ السعر السنوي ولا يجوز استنتاجه من بيانات الباقة الحالية. هذا قيد مقصود في السجل القديم.',
   offerSnapshotNote:
     'هذه لقطة مختصرة للعرض وقت الإرسال ولا تتغير عند تعديل الباقة لاحقاً. تحفظ اللقطة سعراً معروضاً واحداً وفترته فقط؛ عند حفظ السعر الشهري لا يُحفظ السعر السنوي ولا يجوز استنتاجه من بيانات الباقة الحالية. هذا قيد مقصود في MVP.',
   noPlanSnapshotNote:

@@ -221,10 +221,9 @@ export async function POST(request: Request): Promise<NextResponse> {
           currentPlan: {
             slug: error.currentPlan.slug,
             name: error.currentPlan.name,
-            monthlyPriceMinor: error.currentPlan.monthlyPriceMinor,
-            yearlyPriceMinor: error.currentPlan.yearlyPriceMinor,
             currency: error.currentPlan.currency,
             publishedRevision: error.currentPlan.publishedRevision,
+            offer: error.currentPlan.offer,
           },
         },
       );

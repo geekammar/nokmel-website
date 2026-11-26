@@ -26,6 +26,7 @@ A simple, professional, mobile-first SaaS marketing website with a lightweight o
 
 ## Status
 
+- **W4.1 (Scheduled promotional pricing & historical offer integrity): IMPLEMENTED** on `feature/w41-scheduled-promotional-pricing` (draft PR). One optional scheduled percentage/fixed discount per plan (monthly/yearly/both), Cairo scheduling, automatic activation/expiration, draft/published lifecycle, owner preview, shared effective-offer resolver/version, stale-offer recovery and expanded historical snapshots. Additive migration `0004_w41-scheduled-promotional-pricing`; no new runtime grant expected. Local unit 210/210, PostgreSQL 160/160, Playwright 101/101; hosted activation/acceptance external. See `docs/ARCHITECTURE.md` W4.1.
 - **W4 (Marketing plans, pricing & early-access join requests): CONDITIONAL ACCEPT for Preview** on `feature/w4-plans-join-requests` (draft PR; hosted Development activated; final product-consistency closure). Owner-only Plans & Pricing with draft/publish/hide lifecycle, exact minor-unit monthly/yearly prices (or an explicit unpriced state), accessible feature/order editing, owner preview, public pricing cards, `/join?plan=<slug>` preselection, and a fail-closed (`JOIN_INTAKE_ENABLED`) durable join-request intake with rate limiting, idempotency and historical offer snapshots. Owner-only Join Requests includes filters, bounded pagination, search, status and internal notes. Additive migration `0003_w4-plans-join-requests` is applied on hosted Development; Production intake, privacy/retention approval and all W6 launch gates remain external.
 - **W3.3 (Page-level SEO & social metadata): merged** via PR #6 (accepted HEAD `dcf1f8d9ede739a29bd48d036df1a1d5cd9f28bf`, merge commit `0020ddacdd54b3c23471b58b17b54fda1c1a0ae1`). No migration.
 - **W3.2 (Lightweight CMS, content publishing & mobile admin navigation): merged** via PR #5 (accepted HEAD `fb677dabc82f2c60a6301d862314142805fba0f8`). Owner-only Content & SEO section with predefined page editors, validated drafts, atomic page publication, protected preview, homepage FAQ management, stale-write protection, safe public defaults, and a compact mobile admin drawer. Additive migration `0002_w32-content-cms`. Hosted migration was completed by the external lead; production is deferred to W6. See `docs/ARCHITECTURE.md` and `docs/CURRENT_STATE.md`.
@@ -58,7 +59,7 @@ pnpm dev:postgres  # start a disposable local PostgreSQL 18 for DB tests/e2e
 
 `DATABASE_URL_DIRECT` is operator-only (migrations, owner provisioning/recovery). It must never be configured in Vercel or exposed to the deployed runtime; the runtime uses the pooled `DATABASE_URL` role. Least-privilege role SQL: `docs/DATABASE_PERMISSIONS.md`.
 
-Early-access join intake is fail-closed behind `JOIN_INTAKE_ENABLED` (`1`/`true` only; missing/invalid keeps it disabled). Enabled intake also requires a valid `BETTER_AUTH_SECRET` (32+ chars) and valid exact `BETTER_AUTH_URL`/`TRUSTED_ORIGINS`; otherwise the API returns a controlled 503 and stores nothing, even for requests without `Origin`. W4 enables it only on the isolated development Preview for acceptance. `JOIN_RATE_LIMIT_MAX` and `NOKMEL_DISPOSABLE_TEST_ENV` are disposable-test-only and must never weaken a hosted environment. QA cleanup is operator-only by exact request IDs/marker per `docs/DATABASE_PERMISSIONS.md` §3c.
+Early-access join intake is fail-closed behind `JOIN_INTAKE_ENABLED` (`1`/`true` only; missing/invalid keeps it disabled). Enabled intake also requires a valid `BETTER_AUTH_SECRET` (32+ chars) and valid exact `BETTER_AUTH_URL`/`TRUSTED_ORIGINS`; otherwise the API returns a controlled 503 and stores nothing, even for requests without `Origin`. W4 enables it only on the isolated development Preview for acceptance. `JOIN_RATE_LIMIT_MAX` and `NOKMEL_DISPOSABLE_TEST_ENV` are disposable-test-only and must never weaken a hosted environment. QA cleanup is operator-only by exact request IDs/marker per `docs/DATABASE_PERMISSIONS.md` §3d.
 
 Integration/e2e databases are refused unless they are loopback, use an approved disposable database name, and explicitly set `sslmode=disable`. Without `TEST_DATABASE_URL` the integration harness starts its own temporary embedded PostgreSQL 18. Never point tests at a hosted Neon database.
 
@@ -87,7 +88,7 @@ src/components/brand/  # Logo (Completion Mark variants), Wordmark (temporary te
 src/components/layout/ # Header, Footer
 src/i18n/              # locale config + ar messages (English-ready, no switcher yet)
 src/lib/               # site config, brand/SEO, db/auth/owner, CMS, plan and join-intake services
-src/lib/plans/         # plan model/currencies/validation + owner/public DB service
+src/lib/plans/         # plan model/currencies/validation, promotion resolver, owner/public DB service
 src/lib/join/          # intake gate, join validation/phone, origin/identity, rate limit, request service
 src/content/           # Arabic default content + admin/public operational strings
 src/content/cms/       # predefined page/section registry, editable fields, defaults, validation
