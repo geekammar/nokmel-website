@@ -60,6 +60,11 @@ const server = http.createServer((req, res) => {
         // fall through to summary
       }
       const dimension = request?.dimensions?.[0]?.name;
+      const metric = request?.metrics?.[0]?.name;
+      if (metric === 'sessionKeyEventRate:join_request_success') {
+        res.end(JSON.stringify({ rows: [{ metricValues: [{ value: '0.25' }] }] }));
+        return;
+      }
       if (!dimension) {
         res.end(
           JSON.stringify({
@@ -69,7 +74,6 @@ const server = http.createServer((req, res) => {
                   { value: '42' },
                   { value: '60' },
                   { value: '120' },
-                  { value: '0.025' },
                 ],
               },
             ],

@@ -30,7 +30,7 @@ export default async function PublicLayout({
       <main id="main-content" className="flex-1">
         {children}
       </main>
-      <Footer />
+      <Footer analyticsAvailable={tracking.enabled} />
       {tracking.enabled && tracking.measurementId && tracking.tagBase ? (
         <>
           <AnalyticsConsent />

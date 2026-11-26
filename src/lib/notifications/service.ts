@@ -51,7 +51,7 @@ export type NotificationDeliveryOutcome =
   | { status: 'sent'; messageId: number }
   | { status: 'skipped'; reason: 'disabled' | 'already_processed' }
   | { status: 'failed'; code: TelegramErrorCode | 'not_configured' | 'invalid_configuration' }
-  | { status: 'uncertain'; code: TelegramErrorCode }
+  | { status: 'uncertain'; code: TelegramErrorCode | 'persistence' }
   | { status: 'not_attempted' }
   | { status: 'already_sent' }
   | { status: 'in_progress' };
@@ -80,6 +80,12 @@ type ClaimedRow = {
   source: string;
   offerSnapshot: unknown;
   createdAt: Date;
+  /**
+   * Exact attempt timestamp written by the claim. Completion updates are
+   * fenced on this value so an older, delayed attempt can never overwrite a
+   * newer claim or a completed result.
+   */
+  claimedAt: Date;
 };
 
 function resolveDb(options: Deps): DbLike {
@@ -155,7 +161,8 @@ async function claimForSend(
       offerSnapshot: joinRequests.offerSnapshot,
       createdAt: joinRequests.createdAt,
     });
-  return rows[0] ?? null;
+  const row = rows[0];
+  return row ? { ...row, claimedAt: attemptedAt } : null;
 }
 
 async function currentState(
@@ -178,8 +185,13 @@ async function currentState(
   };
 }
 
-async function markSent(db: DbLike, id: string, deliveredAt: Date): Promise<void> {
-  await db
+async function markSent(
+  db: DbLike,
+  id: string,
+  claimedAt: Date,
+  deliveredAt: Date,
+): Promise<boolean> {
+  const rows = await db
     .update(joinRequests)
     .set({
       notificationState: 'sent',
@@ -187,22 +199,96 @@ async function markSent(db: DbLike, id: string, deliveredAt: Date): Promise<void
       notificationErrorCode: null,
       updatedAt: deliveredAt,
     })
-    .where(eq(joinRequests.id, id));
+    .where(
+      and(
+        eq(joinRequests.id, id),
+        eq(joinRequests.notificationState, 'sending'),
+        eq(joinRequests.notificationAttemptedAt, claimedAt),
+      ),
+    )
+    .returning({ id: joinRequests.id });
+  return rows.length > 0;
 }
 
 async function markFailure(
   db: DbLike,
   id: string,
+  claimedAt: Date,
   result: Exclude<TelegramSendResult, { kind: 'sent' }>,
-): Promise<void> {
-  await db
+): Promise<boolean> {
+  const rows = await db
     .update(joinRequests)
     .set({
       notificationState: result.kind === 'failed' ? 'failed' : 'uncertain',
       notificationErrorCode: result.code.slice(0, 40),
       updatedAt: new Date(),
     })
-    .where(eq(joinRequests.id, id));
+    .where(
+      and(
+        eq(joinRequests.id, id),
+        eq(joinRequests.notificationState, 'sending'),
+        eq(joinRequests.notificationAttemptedAt, claimedAt),
+      ),
+    )
+    .returning({ id: joinRequests.id });
+  return rows.length > 0;
+}
+
+async function markPersistenceUncertain(
+  db: DbLike,
+  id: string,
+  claimedAt: Date,
+): Promise<void> {
+  await db
+    .update(joinRequests)
+    .set({
+      notificationState: 'uncertain',
+      notificationErrorCode: 'persistence',
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(joinRequests.id, id),
+        eq(joinRequests.notificationState, 'sending'),
+        eq(joinRequests.notificationAttemptedAt, claimedAt),
+      ),
+    )
+    .returning({ id: joinRequests.id });
+}
+
+async function persistenceFailure(
+  db: DbLike,
+  id: string,
+  claimedAt: Date,
+): Promise<NotificationDeliveryOutcome> {
+  /**
+   * Best-effort durable marker. If the database is still unavailable the row
+   * remains `sending` and becomes recoverable after the stale window.
+   */
+  try {
+    await markPersistenceUncertain(db, id, claimedAt);
+  } catch {
+    // Leave the claim for the bounded stale-recovery path.
+  }
+  return { status: 'uncertain', code: 'persistence' };
+}
+
+async function supersededOutcome(
+  db: DbLike,
+  id: string,
+): Promise<NotificationDeliveryOutcome> {
+  try {
+    const state = await currentState(db, id);
+    if (state?.state === 'sent') return { status: 'already_sent' };
+    if (state?.state === 'sending') return { status: 'in_progress' };
+    return { status: 'skipped', reason: 'already_processed' };
+  } catch {
+    /**
+     * The provider operation completed but we cannot read the current state.
+     * Never report a definite failure: the outcome is unknown.
+     */
+    return { status: 'uncertain', code: 'persistence' };
+  }
 }
 
 async function deliver(
@@ -219,18 +305,40 @@ async function deliver(
   const now = deps.now ?? (() => new Date());
   const message = buildJoinNotificationMessage(contextFromRow(row), env);
   if (!message) {
-    await markFailure(db, row.id, { kind: 'failed', code: 'rejected' });
-    return { status: 'failed', code: 'invalid_configuration' };
+    try {
+      const applied = await markFailure(db, row.id, row.claimedAt, {
+        kind: 'failed',
+        code: 'rejected',
+      });
+      if (!applied) return await supersededOutcome(db, row.id);
+      return { status: 'failed', code: 'invalid_configuration' };
+    } catch {
+      return await persistenceFailure(db, row.id, row.claimedAt);
+    }
   }
   const result = await send({ token, chatId, text: message, apiBase });
   if (result.kind === 'sent') {
-    await markSent(db, row.id, now());
-    return { status: 'sent', messageId: result.messageId };
+    try {
+      const applied = await markSent(db, row.id, row.claimedAt, now());
+      if (applied) return { status: 'sent', messageId: result.messageId };
+      return await supersededOutcome(db, row.id);
+    } catch {
+      /**
+       * The provider accepted the message but the result could not be stored.
+       * Report an uncertain outcome; never claim it was unsent.
+       */
+      return await persistenceFailure(db, row.id, row.claimedAt);
+    }
   }
-  await markFailure(db, row.id, result);
-  return result.kind === 'failed'
-    ? { status: 'failed', code: result.code }
-    : { status: 'uncertain', code: result.code };
+  try {
+    const applied = await markFailure(db, row.id, row.claimedAt, result);
+    if (!applied) return await supersededOutcome(db, row.id);
+    return result.kind === 'failed'
+      ? { status: 'failed', code: result.code }
+      : { status: 'uncertain', code: result.code };
+  } catch {
+    return await persistenceFailure(db, row.id, row.claimedAt);
+  }
 }
 
 type DeliveryReady = {
@@ -336,7 +444,6 @@ export type NotificationTestResult =
   | {
       ok: false;
       code:
-        | 'disabled'
         | 'not_configured'
         | 'invalid_configuration'
         | 'rate_limited'
@@ -349,7 +456,13 @@ export type NotificationTestResult =
         | 'storage';
     };
 
-/** Owner-only explicit test message to the fixed configured destination. */
+/**
+ * Owner-only explicit test message to the fixed configured destination.
+ *
+ * Testing verifies the saved destination/token and is intentionally allowed
+ * while automatic notifications are disabled. A test never enables automatic
+ * delivery and never targets an arbitrary chat.
+ */
 export async function sendOwnerTestNotification(
   deps: Deps = {},
 ): Promise<NotificationTestResult> {
@@ -359,8 +472,8 @@ export async function sendOwnerTestNotification(
   const getMe = deps.getBotIdentity ?? getTelegramBotIdentity;
   try {
     const integration = await loadIntegrationSettings({ db });
-    if (!integration.notificationsEnabled || !integration.telegramChatId) {
-      return { ok: false, code: 'disabled' };
+    if (!integration.telegramChatId) {
+      return { ok: false, code: 'not_configured' };
     }
     const tokenConfig = resolveTelegramConfig(env);
     if (tokenConfig.status !== 'configured') {

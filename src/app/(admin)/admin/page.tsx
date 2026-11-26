@@ -418,11 +418,12 @@ function AnalyticsSection({
   }
 
   const report = analytics.report;
+  const hasJoinSuccessEvents =
+    report.events !== null && report.events.joinRequestSuccess > 0;
   const showConversion =
-    report.events !== null &&
-    report.events.joinRequestSuccess > 0 &&
+    hasJoinSuccessEvents &&
     report.totals.sessions > 0 &&
-    report.totals.sessionConversionRate !== null;
+    report.conversion.status === 'available';
   const showRatio =
     receivedInPeriod !== null &&
     report.totals.totalUsers > 0;
@@ -491,15 +492,15 @@ function AnalyticsSection({
 
       <div className="mt-5 rounded-control bg-background p-3 text-sm">
         <p className="font-semibold text-text-primary">{ui.conversionTitle}</p>
-        {showConversion && report.totals.sessionConversionRate !== null ? (
+        {showConversion && report.conversion.status === 'available' ? (
           <p className="mt-1 text-text-primary">
             {ui.conversionValue}:{' '}
-            <span dir="ltr">
-              {(report.totals.sessionConversionRate * 100).toFixed(1)}%
-            </span>
+            <span dir="ltr">{(report.conversion.rate * 100).toFixed(1)}%</span>
           </p>
         ) : (
-          <p className="mt-1 text-text-secondary">{ui.noEvents}</p>
+          <p className="mt-1 text-text-secondary">
+            {hasJoinSuccessEvents ? ui.conversionUnavailable : ui.noEvents}
+          </p>
         )}
         <p className="mt-1 text-xs leading-5 text-text-secondary">{ui.conversionNote}</p>
         <p className="mt-3 font-semibold text-text-primary">{ui.ratioLabel}</p>

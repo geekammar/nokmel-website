@@ -359,7 +359,10 @@ test('GA success, provider failure and business dashboard independence', async (
   await expect(analytics.getByText('42', { exact: true })).toBeVisible();
   await expect(analytics.getByText('60', { exact: true })).toBeVisible();
   await expect(analytics.getByText('20', { exact: true }).first()).toBeVisible();
-  await expect(analytics.getByText('2.5%')).toBeVisible();
+  await expect(
+    analytics.getByText('معدل الجلسات التي سجلت حدث الانضمام (GA4 key event)'),
+  ).toBeVisible();
+  await expect(analytics.getByText('25.0%')).toBeVisible();
   await expect(analytics.getByText('نسبة الطلبات المقبولة إلى مستخدمي GA4')).toBeVisible();
 
   await gaControl('error');

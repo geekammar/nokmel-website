@@ -62,13 +62,18 @@ W5 status (2026-11-26): implemented on
 (`d50f7d555859b5f0ee4dc5b7075127f9e02eafde`). Additive migration
 `0005_w5-settings-notifications` adds typed `site_settings` and durable
 per-request notification state, with no analytics-events table. The database
-Overview, GA4 adapter/consent gate, optional owner Telegram notifications,
-owner-only settings and the NKW-W41-001 correction are implemented. Local
-unit 267/267, PostgreSQL 180/180 and Playwright 111/111 pass; exact CI is
-checked on the final HEAD. Hosted migration 0005, runtime grant, Preview
-configuration, GA4/Telegram external activation and independent acceptance
-remain external. NKW-W41-002 stays deferred to physical Android evaluation in
-W6. Production readiness is not claimed.
+Overview, GA4 adapter/reversible consent gate, optional owner Telegram
+notifications, owner-only settings and the NKW-W41-001 correction are
+implemented. The focused W5-R01–R06 closure adds test-before-enable
+notifications, attempt-fenced completion with persistence uncertainty,
+reversible visitor consent, tag-level sanitized defaults/no-admin boundary,
+event-specific key-event conversion (or truthful unavailable state) and masked
+private-settings readback without a schema change. Local unit 274/274,
+PostgreSQL 187/187 and Playwright 117/117 pass; exact CI is checked on the
+final HEAD. Hosted migration 0005, runtime grant, Preview configuration,
+GA4/Telegram external activation and independent acceptance remain external.
+NKW-W41-002 stays deferred to physical Android evaluation in W6. Production
+readiness is not claimed.
 
 ## Standing rules
 

@@ -30,8 +30,20 @@ export type AnalyticsTotals = {
   totalUsers: number;
   sessions: number;
   screenPageViews: number;
-  sessionConversionRate: number | null;
 };
+
+/**
+ * Event-specific key-event rate for `join_request_success`.
+ *
+ * The GA4 Data API exposes `sessionKeyEventRate:<event_name>` only when that
+ * event is registered as a key event on the property. The optional report is
+ * therefore isolated from the traffic summary: a missing registration must
+ * never make valid traffic totals unavailable, and the generic
+ * `sessionConversionRate` is not presented as join-request conversion.
+ */
+export type AnalyticsJoinConversion =
+  | { status: 'available'; rate: number }
+  | { status: 'unavailable'; reason: 'not_configured' | 'provider' | 'invalid_response' };
 
 export type AnalyticsReport = {
   totals: AnalyticsTotals;
@@ -43,6 +55,7 @@ export type AnalyticsReport = {
     joinCtaClicks: number;
     joinRequestSuccess: number;
   } | null;
+  conversion: AnalyticsJoinConversion;
   partial: boolean;
   warnings: string[];
   fetchedAt: string;
@@ -253,13 +266,6 @@ function metricNumber(value: string | undefined): number {
   return parsed;
 }
 
-function optionalMetricNumber(value: string | undefined): number | null {
-  if (value === undefined) return null;
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed < 0) throw new ProviderError('invalid_response');
-  return parsed;
-}
-
 function assertRange(range: AnalyticsDateRange): void {
   if (!DATE_PATTERN.test(range.startDate) || !DATE_PATTERN.test(range.endDate)) {
     throw new ProviderError('configuration');
@@ -309,6 +315,43 @@ function parseEvents(response: GaResponse): { joinCtaClicks: number; joinRequest
   return { joinCtaClicks, joinRequestSuccess };
 }
 
+async function fetchJoinConversion(
+  config: Extract<AnalyticsReportingConfig, { status: 'ready' }>,
+  dateRanges: Array<{ startDate: string; endDate: string }>,
+  accessToken: string,
+  fetchImpl: FetchLike,
+): Promise<AnalyticsJoinConversion> {
+  try {
+    const response = await runReport(
+      config,
+      {
+        dateRanges,
+        metrics: [{ name: 'sessionKeyEventRate:join_request_success' }],
+        limit: 1,
+      },
+      accessToken,
+      fetchImpl,
+    );
+    const raw = response.rows?.[0]?.metricValues?.[0]?.value;
+    if (raw === undefined) {
+      return { status: 'unavailable', reason: 'not_configured' };
+    }
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
+      return { status: 'unavailable', reason: 'invalid_response' };
+    }
+    return { status: 'available', rate: parsed };
+  } catch (error) {
+    return {
+      status: 'unavailable',
+      reason:
+        error instanceof ProviderError && error.reason === 'invalid_response'
+          ? 'invalid_response'
+          : 'provider',
+    };
+  }
+}
+
 async function fetchReport(
   config: Extract<AnalyticsReportingConfig, { status: 'ready' }>,
   range: AnalyticsDateRange,
@@ -327,7 +370,6 @@ async function fetchReport(
           { name: 'totalUsers' },
           { name: 'sessions' },
           { name: 'screenPageViews' },
-          { name: 'sessionConversionRate' },
         ],
         limit: 1,
       },
@@ -387,14 +429,13 @@ async function fetchReport(
 
   if (summary.status === 'rejected') throw summary.reason;
   const summaryRow = summary.value.rows?.[0];
-  if (!summaryRow || !summaryRow.metricValues || summaryRow.metricValues.length < 4) {
+  if (!summaryRow || !summaryRow.metricValues || summaryRow.metricValues.length < 3) {
     throw new ProviderError('invalid_response');
   }
   const totals: AnalyticsTotals = {
     totalUsers: metricNumber(summaryRow.metricValues[0]?.value),
     sessions: metricNumber(summaryRow.metricValues[1]?.value),
     screenPageViews: metricNumber(summaryRow.metricValues[2]?.value),
-    sessionConversionRate: optionalMetricNumber(summaryRow.metricValues[3]?.value),
   };
 
   const warnings: string[] = [];
@@ -402,30 +443,50 @@ async function fetchReport(
   let pricingPageViews: number | null = null;
   let joinPageViews: number | null = null;
   if (pages.status === 'fulfilled') {
-    const allPages = parseTopPages(pages.value);
-    pricingPageViews = allPages
-      .filter((page) => page.path === '/pricing')
-      .reduce((sum, page) => sum + page.pageViews, 0);
-    joinPageViews = allPages
-      .filter((page) => page.path === '/join')
-      .reduce((sum, page) => sum + page.pageViews, 0);
-    topPages = allPages.slice(0, 7);
+    try {
+      const allPages = parseTopPages(pages.value);
+      pricingPageViews = allPages
+        .filter((page) => page.path === '/pricing')
+        .reduce((sum, page) => sum + page.pageViews, 0);
+      joinPageViews = allPages
+        .filter((page) => page.path === '/join')
+        .reduce((sum, page) => sum + page.pageViews, 0);
+      topPages = allPages.slice(0, 7);
+    } catch {
+      warnings.push('pages');
+    }
   } else {
     warnings.push('pages');
   }
 
   let sourceRows: Array<{ sourceMedium: string; sessions: number }> = [];
   if (sources.status === 'fulfilled') {
-    sourceRows = parseSources(sources.value);
+    try {
+      sourceRows = parseSources(sources.value);
+    } catch {
+      warnings.push('sources');
+    }
   } else {
     warnings.push('sources');
   }
 
   let eventCounts: AnalyticsReport['events'] = null;
   if (events.status === 'fulfilled') {
-    eventCounts = parseEvents(events.value);
+    try {
+      eventCounts = parseEvents(events.value);
+    } catch {
+      warnings.push('events');
+    }
   } else {
     warnings.push('events');
+  }
+
+  let conversion: AnalyticsJoinConversion = {
+    status: 'unavailable',
+    reason: 'not_configured',
+  };
+  if (eventCounts && eventCounts.joinRequestSuccess > 0) {
+    conversion = await fetchJoinConversion(config, dateRanges, accessToken, fetchImpl);
   }
 
   return {
@@ -435,6 +496,7 @@ async function fetchReport(
     joinPageViews,
     sources: sourceRows,
     events: eventCounts,
+    conversion,
     partial: warnings.length > 0,
     warnings,
     fetchedAt: new Date().toISOString(),

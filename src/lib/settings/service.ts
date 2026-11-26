@@ -266,13 +266,14 @@ async function readGroupRevision(
   tx: Tx,
   group: 'public' | 'notification' | 'analytics',
   expected: unknown,
-): Promise<number> {
+): Promise<{ revision: number; telegramChatId: string | null }> {
   const expectedRevision = assertRevision(expected);
   const rows = await tx
     .select({
       publicRevision: siteSettings.publicRevision,
       notificationRevision: siteSettings.notificationRevision,
       analyticsRevision: siteSettings.analyticsRevision,
+      telegramChatId: siteSettings.telegramChatId,
     })
     .from(siteSettings)
     .where(sql`${siteSettings.id} = ${SETTINGS_ROW_ID}`)
@@ -286,7 +287,7 @@ async function readGroupRevision(
         ? row?.notificationRevision ?? 0
         : row?.analyticsRevision ?? 0;
   if (current !== expectedRevision) throw new SettingsConflictError();
-  return expectedRevision;
+  return { revision: expectedRevision, telegramChatId: row?.telegramChatId ?? null };
 }
 
 export async function savePublicSettings(
@@ -299,7 +300,7 @@ export async function savePublicSettings(
   try {
     return await db.transaction(async (tx) => {
       await ensureRow(tx);
-      const revision = await readGroupRevision(tx, 'public', args.expectedRevision);
+      const { revision } = await readGroupRevision(tx, 'public', args.expectedRevision);
       const values = validation.values;
       const updated = await tx
         .update(siteSettings)
@@ -328,19 +329,41 @@ export async function savePublicSettings(
 export async function saveNotificationSettings(
   args: { expectedRevision: unknown; values: NotificationSettingsValues },
   options: SettingsServiceOptions = {},
-): Promise<{ revision: number; settings: NotificationSettingsValues }> {
+): Promise<{
+  revision: number;
+  notificationsEnabled: boolean;
+  telegramChatIdMasked: string | null;
+}> {
   const validation = validateNotificationSettingsInput(args.values);
   if (!validation.ok) throw new SettingsValidationError(validation.errors);
   const db = resolveDb(options);
   try {
     return await db.transaction(async (tx) => {
       await ensureRow(tx);
-      const revision = await readGroupRevision(tx, 'notification', args.expectedRevision);
+      const { revision, telegramChatId: previousChatId } = await readGroupRevision(
+        tx,
+        'notification',
+        args.expectedRevision,
+      );
+      const destinationChanged =
+        validation.values.telegramChatId !== previousChatId;
       const updated = await tx
         .update(siteSettings)
         .set({
           notificationsEnabled: validation.values.notificationsEnabled,
           telegramChatId: validation.values.telegramChatId,
+          ...(destinationChanged
+            ? {
+                /**
+                 * Clear the verification identity, but keep the timestamp as
+                 * the durable 30-second test rate-limit slot. The UI does not
+                 * present a last-test value without a current verification
+                 * identity, so an old destination is never shown as verified.
+                 */
+                telegramBotUsername: null,
+                telegramBotName: null,
+              }
+            : {}),
           notificationRevision: revision + 1,
           updatedAt: new Date(),
         })
@@ -348,10 +371,8 @@ export async function saveNotificationSettings(
         .returning();
       return {
         revision: updated[0].notificationRevision,
-        settings: {
-          notificationsEnabled: updated[0].notificationsEnabled,
-          telegramChatId: updated[0].telegramChatId,
-        },
+        notificationsEnabled: updated[0].notificationsEnabled,
+        telegramChatIdMasked: maskTelegramChatId(updated[0].telegramChatId),
       };
     });
   } catch (error) {
@@ -371,7 +392,7 @@ export async function saveAnalyticsSettings(
   try {
     return await db.transaction(async (tx) => {
       await ensureRow(tx);
-      const revision = await readGroupRevision(tx, 'analytics', args.expectedRevision);
+      const { revision } = await readGroupRevision(tx, 'analytics', args.expectedRevision);
       const updated = await tx
         .update(siteSettings)
         .set({

@@ -8,10 +8,16 @@ import {
   deliverNewJoinRequestNotification,
   retryJoinRequestNotification,
   joinNotificationStatus,
+  sendOwnerTestNotification,
 } from '@/lib/notifications/service';
-import type { sendTelegramMessage } from '@/lib/notifications/telegram';
+import type {
+  sendTelegramMessage,
+  TelegramGetMeResult,
+  TelegramSendResult,
+} from '@/lib/notifications/telegram';
 import { createJoinRequest, getJoinRequest } from '@/lib/join/service';
 import { parseJoinSubmission } from '@/lib/join/validation';
+import type { Db } from '@/lib/db/types';
 
 /**
  * W5 durable notification state on disposable PostgreSQL:
@@ -64,6 +70,80 @@ function mockSend(result: Awaited<ReturnType<typeof sendTelegramMessage>>, sent:
     sent.push(args);
     return result;
   }) as unknown as typeof sendTelegramMessage;
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolver) => {
+    resolve = resolver;
+  });
+  return { promise, resolve };
+}
+
+function startedSignal() {
+  const signal = deferred<void>();
+  return {
+    markStarted: () => signal.resolve(),
+    started: signal.promise,
+  };
+}
+
+/**
+ * Simulates failure to persist a completion result while keeping claim reads
+ * and the claim update itself functional. Completion updates are the only
+ * join_requests updates whose notification state is not 'sending'.
+ */
+function failingCompletionDb(
+  base: Db,
+  options: { failures?: number } = {},
+): Db {
+  let remaining = options.failures ?? Number.POSITIVE_INFINITY;
+  return new Proxy(base, {
+    get(target, property, receiver) {
+      if (property === 'update') {
+        return (table: Parameters<Db['update']>[0]) => {
+          const builder = target.update(table) as unknown as {
+            set: (values: Record<string, unknown>) => unknown;
+          };
+          const originalSet = builder.set.bind(builder);
+          builder.set = (values: Record<string, unknown>) => {
+            const next = originalSet(values) as {
+              where: (...args: unknown[]) => unknown;
+            };
+            if (
+              values &&
+              (values.notificationState === 'sent' ||
+                values.notificationState === 'failed' ||
+                values.notificationState === 'uncertain') &&
+              remaining > 0
+            ) {
+              remaining -= 1;
+              return new Proxy(next, {
+                get(nextTarget, nextProperty, nextReceiver) {
+                  if (nextProperty === 'where') {
+                    return () => {
+                      throw new Error('simulated completion storage failure');
+                    };
+                  }
+                  return Reflect.get(nextTarget, nextProperty, nextReceiver);
+                },
+              });
+            }
+            return next;
+          };
+          return builder;
+        };
+      }
+      return Reflect.get(target, property, receiver);
+    },
+  }) as Db;
+}
+
+function successfulBotIdentity(): TelegramGetMeResult {
+  return {
+    kind: 'ok',
+    bot: { id: '42', username: 'nokmel_test_bot', name: 'Nokmel Test' },
+  };
 }
 
 beforeAll(async () => {
@@ -174,6 +254,74 @@ describe('W5 owner notification delivery', () => {
       [parsed.submission.submissionToken],
     );
     expect(count.rows[0].count).toBe(1);
+  });
+
+  test('owner test succeeds while automatic delivery is disabled, never enables it, and stays rate-limited', async () => {
+    await pg.pool.query(
+      "update site_settings set notifications_enabled = false, last_notification_test_at = null where id = 'default'",
+    );
+    const sent: SentMessage[] = [];
+    let getMeCalls = 0;
+    const result = await sendOwnerTestNotification({
+      db: pg.db,
+      env,
+      sendMessage: mockSend({ kind: 'sent', messageId: 5 }, sent),
+      getBotIdentity: (async () => {
+        getMeCalls += 1;
+        return successfulBotIdentity();
+      }) as unknown as typeof import('@/lib/notifications/telegram').getTelegramBotIdentity,
+    });
+    expect(result).toEqual({
+      ok: true,
+      botUsername: 'nokmel_test_bot',
+      botName: 'Nokmel Test',
+    });
+    expect(getMeCalls).toBe(1);
+    expect(sent).toHaveLength(1);
+    expect(sent[0].chatId).toBe('9876543210123');
+    expect(sent[0].text).toContain('رسالة تجريبية');
+    expect(sent[0].text).not.toContain('Private Trader');
+    expect(sent[0].text).not.toContain('+201');
+
+    const settings = await pg.pool.query(
+      "select notifications_enabled, telegram_bot_username from site_settings where id = 'default'",
+    );
+    expect(settings.rows[0]).toEqual({
+      notifications_enabled: false,
+      telegram_bot_username: 'nokmel_test_bot',
+    });
+
+    const second = await sendOwnerTestNotification({
+      db: pg.db,
+      env,
+      sendMessage: mockSend({ kind: 'sent', messageId: 6 }, sent),
+      getBotIdentity: (async () => successfulBotIdentity()) as unknown as typeof import('@/lib/notifications/telegram').getTelegramBotIdentity,
+    });
+    expect(second).toEqual({ ok: false, code: 'rate_limited' });
+    expect(sent).toHaveLength(1);
+
+    // A new accepted request while automatic delivery is disabled makes no
+    // external call and records the truthful skipped state.
+    const notifications: SentMessage[] = [];
+    const delivery = await deliverNewJoinRequestNotification('notify-request', {
+      db: pg.db,
+      env,
+      sendMessage: mockSend({ kind: 'sent', messageId: 7 }, notifications),
+    });
+    expect(delivery).toEqual({ status: 'skipped', reason: 'disabled' });
+    expect(notifications).toHaveLength(0);
+
+    await pg.pool.query(
+      "update site_settings set telegram_chat_id = null where id = 'default'",
+    );
+    const missingDestination = await sendOwnerTestNotification({
+      db: pg.db,
+      env,
+      sendMessage: mockSend({ kind: 'sent', messageId: 8 }, sent),
+      getBotIdentity: (async () => successfulBotIdentity()) as unknown as typeof import('@/lib/notifications/telegram').getTelegramBotIdentity,
+    });
+    expect(missingDestination).toEqual({ ok: false, code: 'not_configured' });
+    expect(sent).toHaveLength(1);
   });
 
   test('disabled notifications are skipped without any external call', async () => {
@@ -290,6 +438,160 @@ describe('W5 owner notification delivery', () => {
           (outcome.status === 'skipped' && outcome.reason === 'already_processed'),
       ),
     ).toBe(true);
+  });
+
+  test('an old failed attempt cannot overwrite a newer successful claim', async () => {
+    await pg.pool.query(
+      "update join_requests set notification_state = 'failed' where id = 'notify-request'",
+    );
+    const started = startedSignal();
+    const oldResult = deferred<TelegramSendResult>();
+    const oldAttempt = retryJoinRequestNotification('notify-request', {
+      db: pg.db,
+      env,
+      sendMessage: (async () => {
+        started.markStarted();
+        return oldResult.promise;
+      }) as unknown as typeof sendTelegramMessage,
+    });
+    await started.started;
+    // Simulate the old claim becoming stale while its provider call is delayed.
+    await pg.pool.query(
+      "update join_requests set notification_attempted_at = now() - interval '10 minutes' where id = 'notify-request' and notification_state = 'sending'",
+    );
+    const newer = await retryJoinRequestNotification('notify-request', {
+      db: pg.db,
+      env,
+      sendMessage: mockSend({ kind: 'sent', messageId: 21 }, []),
+    });
+    expect(newer).toEqual({ status: 'sent', messageId: 21 });
+
+    oldResult.resolve({ kind: 'failed', code: 'rejected' });
+    const oldOutcome = await oldAttempt;
+    expect(oldOutcome).toEqual({ status: 'already_sent' });
+
+    const row = await pg.pool.query(
+      "select notification_state, notification_delivered_at, notification_error_code from join_requests where id = 'notify-request'",
+    );
+    expect(row.rows[0].notification_state).toBe('sent');
+    expect(row.rows[0].notification_delivered_at).not.toBeNull();
+    expect(row.rows[0].notification_error_code).toBeNull();
+  });
+
+  test('an old success cannot overwrite a newer in-progress claim', async () => {
+    await pg.pool.query(
+      "update join_requests set notification_state = 'failed' where id = 'notify-request'",
+    );
+    const oldStarted = startedSignal();
+    const oldResult = deferred<TelegramSendResult>();
+    const oldAttempt = retryJoinRequestNotification('notify-request', {
+      db: pg.db,
+      env,
+      sendMessage: (async () => {
+        oldStarted.markStarted();
+        return oldResult.promise;
+      }) as unknown as typeof sendTelegramMessage,
+    });
+    await oldStarted.started;
+    await pg.pool.query(
+      "update join_requests set notification_attempted_at = now() - interval '10 minutes' where id = 'notify-request' and notification_state = 'sending'",
+    );
+
+    const newerStarted = startedSignal();
+    const newerResult = deferred<TelegramSendResult>();
+    const newerAttempt = retryJoinRequestNotification('notify-request', {
+      db: pg.db,
+      env,
+      sendMessage: (async () => {
+        newerStarted.markStarted();
+        return newerResult.promise;
+      }) as unknown as typeof sendTelegramMessage,
+    });
+    await newerStarted.started;
+
+    oldResult.resolve({ kind: 'sent', messageId: 31 });
+    const oldOutcome = await oldAttempt;
+    expect(oldOutcome).toEqual({ status: 'in_progress' });
+
+    const duringNewer = await pg.pool.query(
+      "select notification_state, notification_delivered_at from join_requests where id = 'notify-request'",
+    );
+    expect(duringNewer.rows[0]).toEqual({
+      notification_state: 'sending',
+      notification_delivered_at: null,
+    });
+
+    newerResult.resolve({ kind: 'failed', code: 'rejected' });
+    const newerOutcome = await newerAttempt;
+    expect(newerOutcome).toEqual({ status: 'failed', code: 'rejected' });
+    const finalRow = await pg.pool.query(
+      "select notification_state, notification_delivered_at from join_requests where id = 'notify-request'",
+    );
+    expect(finalRow.rows[0]).toEqual({
+      notification_state: 'failed',
+      notification_delivered_at: null,
+    });
+  });
+
+  test('provider success followed by completion-storage failure is uncertain, not unsent', async () => {
+    const sent: SentMessage[] = [];
+    const outcome = await deliverNewJoinRequestNotification('notify-request', {
+      db: failingCompletionDb(pg.db),
+      env,
+      sendMessage: mockSend({ kind: 'sent', messageId: 41 }, sent),
+    });
+    expect(sent).toHaveLength(1);
+    expect(outcome).toEqual({ status: 'uncertain', code: 'persistence' });
+
+    const row = await pg.pool.query(
+      "select notification_state, notification_delivered_at from join_requests where id = 'notify-request'",
+    );
+    // The claim remains recoverable after the five-minute stale window; it is
+    // not falsely marked sent or failed.
+    expect(row.rows[0]).toEqual({
+      notification_state: 'sending',
+      notification_delivered_at: null,
+    });
+  });
+
+  test('a transient completion failure leaves a durable uncertain persistence state', async () => {
+    const sent: SentMessage[] = [];
+    const outcome = await deliverNewJoinRequestNotification('notify-request', {
+      db: failingCompletionDb(pg.db, { failures: 1 }),
+      env,
+      sendMessage: mockSend({ kind: 'sent', messageId: 42 }, sent),
+    });
+    expect(sent).toHaveLength(1);
+    expect(outcome).toEqual({ status: 'uncertain', code: 'persistence' });
+
+    const row = await pg.pool.query(
+      "select notification_state, notification_error_code, notification_delivered_at from join_requests where id = 'notify-request'",
+    );
+    expect(row.rows[0]).toEqual({
+      notification_state: 'uncertain',
+      notification_error_code: 'persistence',
+      notification_delivered_at: null,
+    });
+    const detail = await getJoinRequest('notify-request', { db: pg.db });
+    if (detail.status !== 'ok') throw new Error('missing request');
+    expect(detail.request.notification.canRetry).toBe(true);
+    expect(detail.request.notification.mayDuplicate).toBe(true);
+  });
+
+  test('a stale sending claim is recoverable with an explicit retry', async () => {
+    await pg.pool.query(
+      "update join_requests set notification_state = 'sending', notification_attempted_at = now() - interval '10 minutes' where id = 'notify-request'",
+    );
+    const outcome = await retryJoinRequestNotification('notify-request', {
+      db: pg.db,
+      env,
+      sendMessage: mockSend({ kind: 'sent', messageId: 51 }, []),
+    });
+    expect(outcome).toEqual({ status: 'sent', messageId: 51 });
+    const row = await pg.pool.query(
+      "select notification_state from join_requests where id = 'notify-request'",
+    );
+    expect(row.rows[0].notification_state).toBe('sent');
   });
 
   test('a sent notification is never automatically resent', async () => {

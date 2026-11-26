@@ -100,13 +100,19 @@ export async function savePublicSettingsAction(input: {
 export async function saveNotificationSettingsAction(input: {
   expectedRevision: number;
   values: NotificationSettingsValues;
-}): Promise<SettingsActionResult<NotificationSettingsValues & { revision: number }>> {
+}): Promise<
+  SettingsActionResult<{
+    revision: number;
+    notificationsEnabled: boolean;
+    telegramChatIdMasked: string | null;
+  }>
+> {
   const unauthorized = await ensureOwner();
   if (unauthorized) return unauthorized;
   try {
     const data = await saveNotificationSettings(input);
     revalidateSettings();
-    return { ok: true, data: { ...data.settings, revision: data.revision } };
+    return { ok: true, data };
   } catch (error) {
     return mapError('notification-save', error);
   }

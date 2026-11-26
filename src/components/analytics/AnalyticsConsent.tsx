@@ -5,7 +5,8 @@ import { useEffect, useState } from 'react';
 import {
   ANALYTICS_CONSENT_EVENT,
   ANALYTICS_CONSENT_STORAGE_KEY,
-  parseConsent,
+  readStoredConsent,
+  storeAnalyticsConsent,
   type AnalyticsConsent as ConsentValue,
 } from '@/lib/analytics/tracking';
 
@@ -14,24 +15,30 @@ export function AnalyticsConsent() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    try {
-      setDecision(parseConsent(window.localStorage.getItem(ANALYTICS_CONSENT_STORAGE_KEY)));
-    } catch {
-      setDecision(null);
-    }
+    setDecision(readStoredConsent());
+    const onConsent = (event: Event) => {
+      const detail = (event as CustomEvent<{ consent?: unknown }>).detail;
+      if (detail?.consent === 'granted' || detail?.consent === 'denied') {
+        setDecision(detail.consent);
+      }
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === ANALYTICS_CONSENT_STORAGE_KEY) {
+        setDecision(readStoredConsent());
+      }
+    };
+    window.addEventListener(ANALYTICS_CONSENT_EVENT, onConsent);
+    window.addEventListener('storage', onStorage);
     setReady(true);
+    return () => {
+      window.removeEventListener(ANALYTICS_CONSENT_EVENT, onConsent);
+      window.removeEventListener('storage', onStorage);
+    };
   }, []);
 
   function decide(value: ConsentValue) {
-    try {
-      window.localStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, value);
-    } catch {
-      // Storage may be unavailable; the in-page decision still applies.
-    }
+    storeAnalyticsConsent(value);
     setDecision(value);
-    window.dispatchEvent(
-      new CustomEvent(ANALYTICS_CONSENT_EVENT, { detail: { consent: value } }),
-    );
   }
 
   if (!ready || decision !== null) return null;
@@ -44,12 +51,16 @@ export function AnalyticsConsent() {
       className="fixed inset-x-3 bottom-3 z-50 mx-auto max-w-2xl rounded-card border border-border-subtle bg-surface p-4 shadow-lg"
     >
       <p className="text-sm leading-6 text-text-primary">
-        نستخدم تحليلات زيارات مجهولة الهوية (Google Analytics) لفهم استخدام الموقع
-        وتحسينه. لا نرسل بيانات التواصل أو الطلبات إلى خدمة التحليلات.
+        نستخدم Google Analytics لفهم استخدام الموقع وتحسينه. قد تُجمع معرّفات
+        تقنية من المتصفح. لا نرسل بيانات التواصل أو الطلبات إلى خدمة التحليلات.
       </p>
       <p className="mt-1 text-xs leading-5 text-text-secondary">
-        لن تُحمَّل التحليلات قبل موافقتك. يمكنك الرفض والمتابعة بشكل طبيعي.{' '}
-        <Link href="/privacy" className="font-semibold text-action-secondary underline-offset-4 hover:underline">
+        لن تُحمَّل التحليلات قبل موافقتك. يمكنك الرفض والمتابعة بشكل طبيعي،
+        وتغيير اختيارك لاحقاً من تذييل الموقع.{' '}
+        <Link
+          href="/privacy"
+          className="font-semibold text-action-secondary underline-offset-4 hover:underline"
+        >
           سياسة الخصوصية
         </Link>
       </p>

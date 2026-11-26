@@ -10,6 +10,7 @@ import {
 } from '@/lib/analytics/config';
 import {
   buildSanitizedPageView,
+  isAnalyticsCookieName,
   sanitizeAnalyticsEvent,
   sanitizePageLocation,
   sanitizePageReferrer,
@@ -39,7 +40,12 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-function fakeGaFetch(options: { failPages?: boolean; failSummary?: boolean; failToken?: boolean } = {}) {
+function fakeGaFetch(options: {
+  failPages?: boolean;
+  failSummary?: boolean;
+  failToken?: boolean;
+  failConversion?: boolean;
+} = {}) {
   return async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = String(input);
     if (url.endsWith('/token')) {
@@ -48,6 +54,15 @@ function fakeGaFetch(options: { failPages?: boolean; failSummary?: boolean; fail
     }
     const body = JSON.parse(String(init?.body ?? '{}')) as ReportBody;
     const dimension = body.dimensions?.[0]?.name;
+    const metric = body.metrics?.[0]?.name;
+    if (metric?.startsWith('sessionKeyEventRate:')) {
+      if (options.failConversion) {
+        return jsonResponse({ error: { code: 400, message: 'unknown metric' } }, 400);
+      }
+      return jsonResponse({
+        rows: [{ metricValues: [{ value: '0.25' }] }],
+      });
+    }
     if (!dimension) {
       if (options.failSummary) return jsonResponse({ error: { code: 500 } }, 500);
       return jsonResponse({
@@ -57,7 +72,6 @@ function fakeGaFetch(options: { failPages?: boolean; failSummary?: boolean; fail
               { value: '10' },
               { value: '20' },
               { value: '30' },
-              { value: '0.05' },
             ],
           },
         ],
@@ -239,6 +253,15 @@ describe('tracking payload sanitization', () => {
     ).toBeNull();
   });
 
+  test('only known first-party analytics cookies are cleared on withdrawal', () => {
+    expect(isAnalyticsCookieName('_ga')).toBe(true);
+    expect(isAnalyticsCookieName('_ga_ABC123')).toBe(true);
+    expect(isAnalyticsCookieName('_gid')).toBe(true);
+    expect(isAnalyticsCookieName('nokmel.analytics-consent.v1')).toBe(false);
+    expect(isAnalyticsCookieName('_gac_123')).toBe(false);
+    expect(isAnalyticsCookieName('session')).toBe(false);
+  });
+
   test('event names and payload keys are allowlisted', () => {
     expect(sanitizeAnalyticsEvent('join_cta_click', { from: '/pricing' })).toEqual({
       name: 'join_cta_click',
@@ -273,7 +296,6 @@ describe('GA4 aggregate reports', () => {
       totalUsers: 10,
       sessions: 20,
       screenPageViews: 30,
-      sessionConversionRate: 0.05,
     });
     expect(result.report.topPages).toEqual([
       { path: '/', pageViews: 5 },
@@ -283,9 +305,86 @@ describe('GA4 aggregate reports', () => {
     expect(result.report.pricingPageViews).toBe(4);
     expect(result.report.joinPageViews).toBe(3);
     expect(result.report.events).toEqual({ joinCtaClicks: 2, joinRequestSuccess: 1 });
+    expect(result.report.conversion).toEqual({ status: 'available', rate: 0.25 });
     expect(result.report.sources).toEqual([
       { sourceMedium: 'google / organic', sessions: 12 },
     ]);
+    expect(result.report.partial).toBe(false);
+  });
+
+  test('the generic session conversion rate is never requested or labelled as join conversion', async () => {
+    const requestedMetrics: string[] = [];
+    let reportCalls = 0;
+    const wrapped = fakeGaFetch();
+    const trackingFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (!url.endsWith('/token')) {
+        reportCalls += 1;
+        const body = JSON.parse(String(init?.body ?? '{}')) as ReportBody;
+        for (const metric of body.metrics ?? []) requestedMetrics.push(metric.name);
+      }
+      return wrapped(input, init);
+    }) as unknown as typeof fetch;
+    const result = await getAnalyticsReport(
+      { startDate: '2026-11-20', endDate: '2026-11-26' },
+      { env: baseEnv, fetchImpl: trackingFetch },
+    );
+    expect(result.status).toBe('ok');
+    expect(requestedMetrics).not.toContain('sessionConversionRate');
+    expect(requestedMetrics).toContain('sessionKeyEventRate:join_request_success');
+    expect(reportCalls).toBeLessThanOrEqual(5);
+  });
+
+  test('a malformed optional conversion response is unavailable while traffic stays valid', async () => {
+    const wrapped = fakeGaFetch();
+    const malformedConversionFetch = (async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      const url = String(input);
+      if (!url.endsWith('/token')) {
+        const body = JSON.parse(String(init?.body ?? '{}')) as ReportBody;
+        if (body.metrics?.[0]?.name === 'sessionKeyEventRate:join_request_success') {
+          return jsonResponse({
+            rows: [{ metricValues: [{ value: 'not-a-number' }] }],
+          });
+        }
+      }
+      return wrapped(input, init);
+    }) as unknown as typeof fetch;
+    const result = await getAnalyticsReport(
+      { startDate: '2026-11-20', endDate: '2026-11-26' },
+      { env: baseEnv, fetchImpl: malformedConversionFetch },
+    );
+    expect(result.status).toBe('ok');
+    if (result.status !== 'ok') return;
+    expect(result.report.totals.totalUsers).toBe(10);
+    expect(result.report.conversion).toEqual({
+      status: 'unavailable',
+      reason: 'invalid_response',
+    });
+  });
+
+  test('an unavailable event-specific conversion does not hide valid traffic totals', async () => {
+    const result = await getAnalyticsReport(
+      { startDate: '2026-11-20', endDate: '2026-11-26' },
+      {
+        env: baseEnv,
+        fetchImpl: fakeGaFetch({ failConversion: true }) as unknown as typeof fetch,
+      },
+    );
+    expect(result.status).toBe('ok');
+    if (result.status !== 'ok') return;
+    expect(result.report.totals).toEqual({
+      totalUsers: 10,
+      sessions: 20,
+      screenPageViews: 30,
+    });
+    expect(result.report.events).toEqual({ joinCtaClicks: 2, joinRequestSuccess: 1 });
+    expect(result.report.conversion).toEqual({
+      status: 'unavailable',
+      reason: 'provider',
+    });
     expect(result.report.partial).toBe(false);
   });
 
@@ -301,7 +400,6 @@ describe('GA4 aggregate reports', () => {
           rows: [
             {
               metricValues: [
-                { value: '0' },
                 { value: '0' },
                 { value: '0' },
                 { value: '0' },
@@ -322,11 +420,14 @@ describe('GA4 aggregate reports', () => {
       totalUsers: 0,
       sessions: 0,
       screenPageViews: 0,
-      sessionConversionRate: 0,
     });
     expect(result.report.pricingPageViews).toBe(0);
     expect(result.report.joinPageViews).toBe(0);
     expect(result.report.events).toEqual({ joinCtaClicks: 0, joinRequestSuccess: 0 });
+    expect(result.report.conversion).toEqual({
+      status: 'unavailable',
+      reason: 'not_configured',
+    });
   });
 
   test('a dimensional report failure yields an honest partial result', async () => {

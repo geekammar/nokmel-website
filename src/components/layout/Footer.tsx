@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { AnalyticsPreferences } from '@/components/analytics/AnalyticsPreferences';
 import { Logo } from '@/components/brand/Logo';
 import { Container } from '@/components/ui/Container';
 import { ar } from '@/i18n/messages/ar';
@@ -19,7 +20,11 @@ function externalProps(href: string): { target?: '_blank'; rel?: 'noopener noref
   return href.startsWith('http') ? { target: '_blank', rel: 'noopener noreferrer' } : {};
 }
 
-export async function Footer() {
+export async function Footer({
+  analyticsAvailable = false,
+}: {
+  analyticsAvailable?: boolean;
+}) {
   const result = await loadPublicSettings();
   const channels = publicSettingsChannels(result.settings);
   return (
@@ -66,6 +71,7 @@ export async function Footer() {
             </ul>
           </nav>
         ) : null}
+        <AnalyticsPreferences available={analyticsAvailable} />
         <div className="flex flex-col gap-2 border-t border-border-subtle pt-6 text-sm text-text-secondary">
           <p>{ar.footer.earlyAccessNote}</p>
           <p>{ar.footer.wordmarkNote}</p>

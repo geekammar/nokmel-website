@@ -60,6 +60,18 @@ async function submitJoin(page: Page, payload: Record<string, unknown>) {
   });
 }
 
+async function notificationSettings(): Promise<{
+  notifications_enabled: boolean;
+  telegram_chat_id: string | null;
+}> {
+  return withPool(async (pool) => {
+    const { rows } = await pool.query(
+      "select notifications_enabled, telegram_chat_id from site_settings where id = 'default'",
+    );
+    return rows[0];
+  });
+}
+
 async function requestIdForToken(token: string): Promise<string> {
   return withPool(async (pool) => {
     const { rows } = await pool.query(
@@ -106,17 +118,43 @@ test.afterAll(async () => {
   await resetData().catch(() => undefined);
 });
 
-test('owner enables notifications and sends an explicit synthetic test', async ({ page }) => {
+test('owner saves a destination, tests while automatic delivery is disabled, then enables it', async ({
+  page,
+}) => {
   await page.goto('/admin/settings');
   await expect(page.getByText('لم تُضبط وجهة بعد')).toBeVisible();
   await page.fill('#settings-telegram-chat-id', '9876543210123');
-  await page.getByTestId('settings-notifications-enabled').check();
+  // Deliberately save with automatic delivery still disabled.
+  await expect(page.getByTestId('settings-notifications-enabled')).not.toBeChecked();
   await page.getByTestId('settings-notifications-save').click();
   await expect(page.getByText('تم حفظ إعدادات الإشعارات.')).toBeVisible();
   await expect(page.getByText('وجهة محفوظة')).toBeVisible();
+  expect(await notificationSettings()).toEqual({
+    notifications_enabled: false,
+    telegram_chat_id: '9876543210123',
+  });
 
   await page.getByTestId('settings-notifications-test').click();
-  await expect(page.getByText('نجح الاختبار ووصلت الرسالة التجريبية إلى الوجهة المحفوظة.')).toBeVisible();
+  await expect(
+    page.getByText('نجح الاختبار ووصلت الرسالة التجريبية إلى الوجهة المحفوظة.', {
+      exact: false,
+    }),
+  ).toBeVisible();
+  // Testing must not enable automatic delivery as a side effect.
+  expect(await notificationSettings()).toEqual({
+    notifications_enabled: false,
+    telegram_chat_id: '9876543210123',
+  });
+  await expect(page.getByTestId('settings-notifications-enabled')).not.toBeChecked();
+
+  await page.getByTestId('settings-notifications-enabled').check();
+  await page.getByTestId('settings-notifications-save').click();
+  await expect(page.getByText('تم حفظ إعدادات الإشعارات.')).toBeVisible();
+  expect(await notificationSettings()).toEqual({
+    notifications_enabled: true,
+    telegram_chat_id: '9876543210123',
+  });
+
   await page.reload();
   await expect(page.getByText('@nokmel_e2e_bot')).toBeVisible();
 
@@ -216,6 +254,26 @@ test('a failed notification keeps the request and supports an explicit retry', a
     message.text.startsWith('طلب انضمام جديد'),
   );
   expect(messages).toHaveLength(2);
+});
+
+test('changing the destination clears verification without enabling delivery', async ({
+  page,
+}) => {
+  await page.goto('/admin/settings');
+  await page.fill('#settings-telegram-chat-id', '111222333444');
+  await page.getByTestId('settings-notifications-enabled').uncheck();
+  await page.getByTestId('settings-notifications-save').click();
+  await expect(page.getByText('تم حفظ إعدادات الإشعارات.')).toBeVisible();
+  await page.reload();
+
+  await expect(page.getByTestId('settings-bot-identity')).toContainText(
+    'تظهر بعد أول اختبار ناجح',
+  );
+  await expect(page.getByTestId('settings-last-test')).toHaveText('—');
+  expect(await notificationSettings()).toEqual({
+    notifications_enabled: false,
+    telegram_chat_id: '111222333444',
+  });
 });
 
 test('disabled notifications skip truthfully without an external call', async ({ page }) => {

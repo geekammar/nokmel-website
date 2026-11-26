@@ -98,13 +98,19 @@ describe('W5 settings persistence and projection', () => {
       'socialXUrl',
     ]);
 
-    await saveNotificationSettings(
+    const notification = await saveNotificationSettings(
       {
         expectedRevision: 0,
         values: { notificationsEnabled: true, telegramChatId: '9876543210123' },
       },
       { db: pg.db },
     );
+    expect(notification).toEqual({
+      revision: 1,
+      notificationsEnabled: true,
+      telegramChatIdMasked: '••••0123',
+    });
+    expect(JSON.stringify(notification)).not.toContain('9876543210123');
     await saveAnalyticsSettings(
       { expectedRevision: 0, values: { analyticsEnabled: true } },
       { db: pg.db },
@@ -124,6 +130,63 @@ describe('W5 settings persistence and projection', () => {
     expect(owner.settings.publicRevision).toBe(1);
     expect(owner.settings.notificationRevision).toBe(1);
     expect(owner.settings.analyticsRevision).toBe(1);
+  });
+
+  test('notification mutation returns only masked destination and clears old verification on change', async () => {
+    const initial = await saveNotificationSettings(
+      {
+        expectedRevision: 0,
+        values: { notificationsEnabled: true, telegramChatId: '9876543210123' },
+      },
+      { db: pg.db },
+    );
+    expect(initial).toEqual({
+      revision: 1,
+      notificationsEnabled: true,
+      telegramChatIdMasked: '••••0123',
+    });
+    expect(JSON.stringify(initial)).not.toContain('9876543210123');
+
+    await pg.pool.query(
+      `update site_settings
+          set telegram_bot_username = 'nokmel_bot',
+              telegram_bot_name = 'Nokmel Bot',
+              last_notification_test_at = now()
+        where id = 'default'`,
+    );
+    const beforeChange = await loadOwnerSettings({ db: pg.db });
+    if (beforeChange.status !== 'ok') throw new Error('missing settings');
+    const priorTestAt = beforeChange.settings.lastNotificationTestAt;
+    expect(priorTestAt).not.toBeNull();
+
+    const changed = await saveNotificationSettings(
+      {
+        expectedRevision: 1,
+        values: { notificationsEnabled: true, telegramChatId: '555000111222' },
+      },
+      { db: pg.db },
+    );
+    expect(changed).toEqual({
+      revision: 2,
+      notificationsEnabled: true,
+      telegramChatIdMasked: '••••1222',
+    });
+    expect(JSON.stringify(changed)).not.toContain('555000111222');
+
+    const owner = await loadOwnerSettings({ db: pg.db });
+    expect(owner.status).toBe('ok');
+    if (owner.status !== 'ok') return;
+    expect(owner.settings.telegramChatId).toBe('555000111222');
+    expect(owner.settings.telegramBotUsername).toBeNull();
+    expect(owner.settings.telegramBotName).toBeNull();
+    // The timestamp remains the durable 30-second test rate-limit slot, but
+    // the verification identity is cleared so the UI cannot present the old
+    // destination's test as verification of the new one.
+    expect(owner.settings.lastNotificationTestAt).toBe(priorTestAt);
+
+    const publicResult = await loadPublicSettings({ db: pg.db });
+    expect(JSON.stringify(publicResult)).not.toContain('555000111222');
+    expect(JSON.stringify(publicResult)).not.toContain('telegramBotUsername');
   });
 
   test('groups have independent stale revisions', async () => {

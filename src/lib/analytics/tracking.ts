@@ -124,3 +124,54 @@ export function sanitizeAnalyticsEvent(
 export function parseConsent(raw: string | null): AnalyticsConsent | null {
   return raw === 'granted' || raw === 'denied' ? raw : null;
 }
+
+export function readStoredConsent(): AnalyticsConsent | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return parseConsent(window.localStorage.getItem(ANALYTICS_CONSENT_STORAGE_KEY));
+  } catch {
+    return null;
+  }
+}
+
+export function storeAnalyticsConsent(value: AnalyticsConsent): void {
+  try {
+    window.localStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, value);
+  } catch {
+    // Storage may be unavailable; the in-page decision still applies.
+  }
+  window.dispatchEvent(
+    new CustomEvent(ANALYTICS_CONSENT_EVENT, { detail: { consent: value } }),
+  );
+}
+
+/** GA4 first-party cookies set by gtag.js on the current host. */
+export function isAnalyticsCookieName(name: string): boolean {
+  return name === '_ga' || name === '_gid' || name.startsWith('_ga_');
+}
+
+/**
+ * Expire accessible first-party analytics cookies on the current host/path.
+ * This does not claim to delete data already received by Google, nor cookies
+ * set by provider code on paths/domains outside this document's control.
+ */
+export function clearFirstPartyAnalyticsCookies(): void {
+  if (typeof document === 'undefined') return;
+  const names = document.cookie
+    .split(';')
+    .map((entry) => entry.split('=')[0]?.trim() ?? '')
+    .filter((name) => name && isAnalyticsCookieName(name));
+  if (names.length === 0) return;
+  const hostname = window.location.hostname;
+  const domainCandidates = new Set<string>(['']);
+  const labels = hostname.split('.');
+  for (let index = 1; index < labels.length - 1; index += 1) {
+    domainCandidates.add(labels.slice(index).join('.'));
+  }
+  for (const name of names) {
+    for (const domain of domainCandidates) {
+      const domainAttribute = domain ? `; domain=${domain}` : '';
+      document.cookie = `${name}=; Max-Age=0; path=/${domainAttribute}; SameSite=Lax`;
+    }
+  }
+}

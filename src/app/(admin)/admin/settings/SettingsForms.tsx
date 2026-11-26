@@ -180,7 +180,12 @@ export function SettingsForms({
       }
       setNotificationRev(result.data.revision);
       setNotificationsEnabled(result.data.notificationsEnabled);
-      setChatId(result.data.telegramChatId ?? '');
+      /**
+       * The destination is intentionally not echoed back after a mutation.
+       * Keep the owner-entered value (already local to this protected form);
+       * a server readback exposes only the masked destination.
+       */
+      setChatId((current) => current.trim());
       setNotificationBanner({
         kind: 'success',
         text: adminSettingsUi.notificationsGroup.saved,
@@ -215,13 +220,11 @@ export function SettingsForms({
       const message =
         outcome.code === 'rate_limited'
           ? adminSettingsUi.notificationsGroup.testRateLimited
-          : outcome.code === 'disabled'
-            ? adminSettingsUi.notificationsGroup.testDisabled
-            : outcome.code === 'not_configured' || outcome.code === 'invalid_configuration'
-              ? adminSettingsUi.notificationsGroup.testNotConfigured
-              : outcome.code === 'storage'
-                ? adminSettingsUi.notificationsGroup.testStorage
-                : adminSettingsUi.notificationsGroup.testFailed;
+          : outcome.code === 'not_configured' || outcome.code === 'invalid_configuration'
+            ? adminSettingsUi.notificationsGroup.testNotConfigured
+            : outcome.code === 'storage'
+              ? adminSettingsUi.notificationsGroup.testStorage
+              : adminSettingsUi.notificationsGroup.testFailed;
       setNotificationBanner({ kind: 'error', text: message });
     } catch {
       setNotificationBanner({
@@ -380,7 +383,11 @@ export function SettingsForms({
             <dt className="font-semibold text-text-secondary">
               {settings.notificationsGroup.botIdentity}
             </dt>
-            <dd className="break-all text-text-primary" dir="ltr">
+            <dd
+              className="break-all text-text-primary"
+              dir="ltr"
+              data-testid="settings-bot-identity"
+            >
               {botUsername
                 ? `@${botUsername}${botName ? ` — ${botName}` : ''}`
                 : settings.notificationsGroup.botIdentityNone}
@@ -390,8 +397,10 @@ export function SettingsForms({
             <dt className="font-semibold text-text-secondary">
               {settings.notificationsGroup.lastTest}
             </dt>
-            <dd className="text-text-primary" dir="ltr">
-              {lastTestAt ? `${lastTestAt.slice(0, 16).replace('T', ' ')} UTC` : '—'}
+            <dd className="text-text-primary" dir="ltr" data-testid="settings-last-test">
+              {botUsername && lastTestAt
+                ? `${lastTestAt.slice(0, 16).replace('T', ' ')} UTC`
+                : '—'}
             </dd>
           </div>
         </dl>
@@ -406,6 +415,9 @@ export function SettingsForms({
           />
           <span>{settings.notificationsGroup.enabled}</span>
         </label>
+        <p className="-mt-2 text-xs leading-5 text-text-secondary">
+          {settings.notificationsGroup.enabledHint}
+        </p>
 
         <Input
           id="settings-telegram-chat-id"

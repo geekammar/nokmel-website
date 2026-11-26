@@ -422,6 +422,12 @@ confirms DDL/`TRUNCATE` refusal. The W5 migration-upgrade test proves a
 populated W4.1 database keeps all existing data and that settings start empty
 (no row) with integrations disabled.
 
+The focused W5-R01–R06 reliability/privacy closure adds **no schema or grant
+change**. Notification completion is fenced using the existing
+`notification_attempted_at` claim timestamp and `notification_state =
+'sending'`; no attempt-id column is required. The same `site_settings`
+runtime grant and existing `join_requests` table DML remain sufficient.
+
 ## 4. Default privileges for future objects
 
 Migration-created objects must not inherit PUBLIC access, and the runtime must
