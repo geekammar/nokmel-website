@@ -301,7 +301,7 @@ export function SettingsForms({
             id="settings-contact-telegram"
             label={settings.publicGroup.telegram}
             dir="ltr"
-            placeholder="https://t.me/"
+            placeholder="https://t.me/nokmel"
             value={publicValues.contactTelegramUrl}
             onChange={(event) => updatePublic('contactTelegramUrl', event.target.value)}
             error={publicErrors.contactTelegramUrl}
@@ -310,7 +310,7 @@ export function SettingsForms({
             id="settings-contact-whatsapp"
             label={settings.publicGroup.whatsapp}
             dir="ltr"
-            placeholder="https://wa.me/"
+            placeholder="https://wa.me/201234567890"
             value={publicValues.contactWhatsappUrl}
             onChange={(event) => updatePublic('contactWhatsappUrl', event.target.value)}
             error={publicErrors.contactWhatsappUrl}
@@ -319,16 +319,17 @@ export function SettingsForms({
             id="settings-social-instagram"
             label={settings.publicGroup.instagram}
             dir="ltr"
-            placeholder="https://instagram.com/"
+            placeholder="https://instagram.com/nokmel.store"
             value={publicValues.socialInstagramUrl}
             onChange={(event) => updatePublic('socialInstagramUrl', event.target.value)}
+            aria-describedby="settings-instagram-help"
             error={publicErrors.socialInstagramUrl}
           />
           <Input
             id="settings-social-facebook"
             label={settings.publicGroup.facebook}
             dir="ltr"
-            placeholder="https://facebook.com/"
+            placeholder="https://facebook.com/nokmel"
             value={publicValues.socialFacebookUrl}
             onChange={(event) => updatePublic('socialFacebookUrl', event.target.value)}
             error={publicErrors.socialFacebookUrl}
@@ -337,12 +338,15 @@ export function SettingsForms({
             id="settings-social-x"
             label={settings.publicGroup.x}
             dir="ltr"
-            placeholder="https://x.com/"
+            placeholder="https://x.com/nokmel"
             value={publicValues.socialXUrl}
             onChange={(event) => updatePublic('socialXUrl', event.target.value)}
             error={publicErrors.socialXUrl}
           />
         </div>
+        <p id="settings-instagram-help" className="-mt-2 text-xs leading-5 text-text-secondary">
+          {settings.publicGroup.instagramHelp}
+        </p>
         <div>
           <Button type="button" onClick={savePublic} disabled={publicSaving} data-testid="settings-public-save">
             {publicSaving ? settings.publicGroup.saving : settings.publicGroup.save}

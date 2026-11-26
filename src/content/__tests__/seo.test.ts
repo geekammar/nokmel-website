@@ -281,5 +281,13 @@ describe('approved social image registry', () => {
       expect(asset.alt.length).toBeGreaterThan(0);
     }
     expect(SOCIAL_IMAGES.some((asset) => asset.id === 'mark-transparent-1024')).toBe(true);
+    expect(
+      SOCIAL_IMAGES.some(
+        (asset) =>
+          asset.id === 'social-card-1200x630' &&
+          asset.width === 1200 &&
+          asset.height === 630,
+      ),
+    ).toBe(true);
   });
 });

@@ -23,6 +23,9 @@ describe('public settings validation', () => {
     expect(
       validatePublicUrl('https://www.instagram.com/nokmel/', 'instagram'),
     ).toEqual({ ok: true, url: 'https://www.instagram.com/nokmel' });
+    expect(
+      validatePublicUrl('https://instagram.com/nokmel.store', 'instagram'),
+    ).toEqual({ ok: true, url: 'https://instagram.com/nokmel.store' });
     expect(validatePublicUrl('https://facebook.com/nokmel', 'facebook')).toEqual({
       ok: true,
       url: 'https://facebook.com/nokmel',

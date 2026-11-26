@@ -277,6 +277,13 @@ test('owner-only settings, save/reload, public integration and independent group
 
   await page.goto('/admin/settings');
   await expect(page.locator('main#admin-content h1')).toHaveText('الإعدادات');
+  await expect(page.locator('#settings-social-instagram')).toHaveAttribute(
+    'placeholder',
+    'https://instagram.com/nokmel.store',
+  );
+  await expect(page.locator('#settings-instagram-help')).toContainText(
+    'https://instagram.com/nokmel.store',
+  );
   await expect(page.getByText('لم تُضبط وجهة بعد')).toBeVisible();
   await expect(page.getByText('بيانات البوت مهيأة على الخادم.')).toBeVisible();
   await expect(page.getByText('مفاتيح التقارير مهيأة (قراءة فقط).')).toBeVisible();

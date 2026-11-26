@@ -9,7 +9,10 @@ import { publicSettingsChannels } from '@/lib/settings/model';
 function FooterLink({ href, label }: { href: string; label: string }) {
   return (
     <li>
-      <Link href={href} className="text-text-secondary hover:text-text-primary">
+      <Link
+        href={href}
+        className="inline-flex min-h-control items-center text-sm text-text-secondary hover:text-text-primary"
+      >
         {label}
       </Link>
     </li>
@@ -28,17 +31,19 @@ export async function Footer({
   const result = await loadPublicSettings();
   const channels = publicSettingsChannels(result.settings);
   return (
-    <footer data-theme="dark" className="bg-page text-text-primary">
-      <Container className="flex flex-col gap-10 py-12 sm:py-16">
-        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="flex flex-col gap-3 lg:col-span-2">
-            <Logo variant="dark-surface" size={40} withWordmark wordmarkLang="ar" />
-            <p className="max-w-sm leading-relaxed text-text-secondary">{ar.footer.description}</p>
-            <p className="text-brand-highlight">{ar.footer.tagline}</p>
+    <footer data-theme="dark" className="border-t border-border-subtle bg-page text-text-primary">
+      <Container className="py-10 sm:py-12">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-8 lg:grid-cols-[1.6fr_1fr_1fr] lg:gap-x-12">
+          <div className="col-span-2 flex flex-col gap-3 lg:col-span-1">
+            <Logo variant="dark-surface" size={36} withWordmark wordmarkLang="ar" />
+            <p className="max-w-sm text-sm leading-relaxed text-text-secondary">
+              {ar.footer.description}
+            </p>
+            <p className="text-sm font-semibold text-brand-highlight">{ar.footer.tagline}</p>
           </div>
           <nav aria-label={ar.nav.footerExplore}>
             <h2 className="text-sm font-bold">{ar.footer.exploreTitle}</h2>
-            <ul className="mt-3 flex list-none flex-col gap-2 p-0 text-sm">
+            <ul className="mt-2 flex list-none flex-col p-0">
               {ar.footer.explore.map((item) => (
                 <FooterLink key={item.href} {...item} />
               ))}
@@ -46,22 +51,27 @@ export async function Footer({
           </nav>
           <nav aria-label={ar.footer.legalTitle}>
             <h2 className="text-sm font-bold">{ar.footer.legalTitle}</h2>
-            <ul className="mt-3 flex list-none flex-col gap-2 p-0 text-sm">
+            <ul className="mt-2 flex list-none flex-col p-0">
               {ar.footer.legal.map((item) => (
                 <FooterLink key={item.href} {...item} />
               ))}
             </ul>
           </nav>
         </div>
+
         {channels.length > 0 ? (
-          <nav aria-label={ar.footer.contactTitle} data-testid="footer-contact">
+          <nav
+            aria-label={ar.footer.contactTitle}
+            data-testid="footer-contact"
+            className="mt-8 border-t border-border-subtle pt-5"
+          >
             <h2 className="text-sm font-bold">{ar.footer.contactTitle}</h2>
-            <ul className="mt-3 flex list-none flex-wrap gap-x-5 gap-y-2 p-0 text-sm">
+            <ul className="mt-2 flex list-none flex-wrap gap-x-5 gap-y-1 p-0 text-sm">
               {channels.map((channel) => (
                 <li key={channel.type}>
                   <a
                     href={channel.href}
-                    className="break-all text-text-secondary hover:text-text-primary"
+                    className="inline-flex min-h-control items-center break-all text-text-secondary hover:text-text-primary"
                     {...externalProps(channel.href)}
                   >
                     {channel.label}
@@ -71,12 +81,14 @@ export async function Footer({
             </ul>
           </nav>
         ) : null}
-        <AnalyticsPreferences available={analyticsAvailable} />
-        <div className="flex flex-col gap-2 border-t border-border-subtle pt-6 text-sm text-text-secondary">
-          <p>{ar.footer.earlyAccessNote}</p>
-          <p>{ar.footer.wordmarkNote}</p>
-          <p>{ar.footer.rights}</p>
+
+        <div className="mt-8 flex flex-col gap-4 border-t border-border-subtle pt-6 lg:flex-row lg:items-center lg:justify-between">
+          <AnalyticsPreferences available={analyticsAvailable} />
+          <p className="text-sm text-text-secondary">{ar.footer.rights}</p>
         </div>
+        <p className="mt-4 text-xs leading-5 text-text-secondary">
+          {ar.footer.earlyAccessNote}
+        </p>
       </Container>
     </footer>
   );

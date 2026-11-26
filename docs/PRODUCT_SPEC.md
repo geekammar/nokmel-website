@@ -72,6 +72,7 @@ Live demo, demo management, media library dashboard, security & activity dashboa
 - W4: plans editable as marketing data only; join requests captured and listed. Implemented on `feature/w4-plans-join-requests` with additive migration `0003_w4-plans-join-requests`; hosted activation and independent acceptance remain external. No billing/payment/entitlement code.
 - W4.1: one optional scheduled promotional discount per plan, shared effective-offer resolver/version, stale-offer recovery at activation/expiration, and expanded historical offer snapshots. Merged via PR #8 (accepted HEAD `7d33ab734cc84cb51f17d67aa972390559c71e86`, merge commit `d50f7d555859b5f0ee4dc5b7075127f9e02eafde`); independent live acceptance 18/18, 0 FAIL/PARTIAL/BLOCKED. W4.1 is accepted for continued development.
 - W5: business overview, external website analytics, optional owner Telegram notifications and website settings. Implemented on `feature/w5-analytics-notifications-settings` with additive migration `0005_w5-settings-notifications`; independent acceptance and hosted activation remain external. W5 does not add billing, CRM, marketing automation or a first-party analytics pipeline.
+- W2-S: premium marketing design refinement and a verified interactive product showcase on the existing seven public routes. Implemented on `feature/w2s-marketing-design-showcase`; no migration, new route, showcase backend or external activation. Independent design acceptance and owner publication of any copy/SEO changes remain external.
 - W6: launch acceptance by owner; no deployment without explicit approval.
 
 ## 10. W5 metric definitions and data-source boundaries [APPROVED for W5 implementation]
@@ -107,4 +108,5 @@ Live demo, demo management, media library dashboard, security & activity dashboa
 - ~~Delivery of `Nokmel_Deep_Brand_Kit_v2.0.zip`~~ — **RESOLVED 2026-11-24**: supplied and verified (SHA-256 match); W1 prerequisite met.
 - Final approval of headline/tagline copy.
 - ~~Choice of authentication library and external analytics provider~~ — **RESOLVED**: Better Auth 1.7.28 (W3.1) and Google Analytics 4 (W5).
+- W2-S social-sharing candidate visual approval and any owner decision to select it for a page remain open; the current default social image is unchanged.
 - Final W6 privacy/consent/retention approval for the analytics provider and owner notifications.

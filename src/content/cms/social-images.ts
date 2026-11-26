@@ -3,6 +3,7 @@ export const SOCIAL_IMAGE_IDS = [
   'mark-transparent-512',
   'app-icon-light-512',
   'app-icon-dark-512',
+  'social-card-1200x630',
 ] as const;
 
 export type SocialImageId = (typeof SOCIAL_IMAGE_IDS)[number];
@@ -50,6 +51,14 @@ export const SOCIAL_IMAGES: readonly SocialImageAsset[] = [
     width: 512,
     height: 512,
     alt: 'أيقونة نكمّل الداكنة',
+  },
+  {
+    id: 'social-card-1200x630',
+    path: '/brand/social/nokmel-social-card-1200x630.png',
+    label: 'بطاقة مشاركة نكمّل (1200 × 630)',
+    width: 1200,
+    height: 630,
+    alt: 'نكمّل — متجرك في المحادثة. وبزنسك في مكان واحد. خلي بزنسك يكمل.',
   },
 ];
 

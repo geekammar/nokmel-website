@@ -21,6 +21,8 @@ export const adminSettingsUi = {
     telegram: 'رابط تيليجرام',
     whatsapp: 'رابط واتساب',
     instagram: 'رابط إنستغرام',
+    instagramHelp:
+      'أدخل رابط الملف الشخصي كاملاً، مثال صالح: https://instagram.com/nokmel.store — بدون معاملات استعلام أو #.',
     facebook: 'رابط فيسبوك',
     x: 'رابط X',
     urlHelp: 'روابط https فقط من النطاق الرسمي للخدمة. بدون استعلامات أو بيانات دخول.',

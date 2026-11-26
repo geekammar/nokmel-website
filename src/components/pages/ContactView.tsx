@@ -20,25 +20,30 @@ export function ContactView({
       <PageHero title={content.hero.title} lead={content.hero.lead} />
 
       <Section spacing="compact">
-        <Container className="flex flex-col gap-6">
+        <Container className="flex max-w-3xl flex-col gap-6">
           <h2 className="text-xl font-bold sm:text-2xl">{content.channelsTitle}</h2>
           {effectiveChannels.length > 0 ? (
-            <ul className="flex list-none flex-col gap-3 p-0" data-testid="contact-channels">
+            <ul
+              className="flex list-none flex-col divide-y divide-border-subtle border-y border-border-subtle p-0"
+              data-testid="contact-channels"
+            >
               {effectiveChannels.map((channel) => (
-                <li key={`${channel.type}-${channel.href}`} className="text-base">
+                <li key={`${channel.type}-${channel.href}`} className="flex items-center justify-between gap-4 py-4">
+                  <span className="text-sm font-semibold text-text-primary">
+                    {channel.label}
+                  </span>
                   <a
                     href={channel.href}
-                    className="font-medium text-action-secondary underline-offset-4 hover:underline"
+                    className="min-w-0 break-all text-sm font-medium text-action-secondary underline-offset-4 hover:underline"
                     {...(channel.href.startsWith('http')
                       ? { target: '_blank', rel: 'noopener noreferrer' }
                       : {})}
                   >
-                    {channel.label}
                     {channel.value ? (
-                      <span className="ms-2 break-all text-sm text-text-secondary" dir="ltr">
-                        {channel.value}
-                      </span>
-                    ) : null}
+                      <span dir="ltr">{channel.value}</span>
+                    ) : (
+                      channel.label
+                    )}
                   </a>
                 </li>
               ))}

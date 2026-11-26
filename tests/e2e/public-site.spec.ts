@@ -79,7 +79,7 @@ test.describe('responsive layout across representative widths', () => {
 test.describe('screenshots (mobile + desktop, key routes)', () => {
   for (const vp of [
     { name: '390', width: 390, height: 844 },
-    { name: '1920', width: 1920, height: 1080 },
+    { name: '1440', width: 1440, height: 900 },
   ]) {
     for (const route of keyRoutes) {
       test(`full-page screenshot ${route} @ ${vp.name}px`, async ({ page }) => {
@@ -237,14 +237,7 @@ test.describe('homepage structure', () => {
     const headline = await page.locator('h1').first().innerText();
     expect(headline).toContain('متجرك في المحادثة');
 
-    const order = await page.evaluate(() => {
-      const sections = [...document.querySelectorAll('main > section')];
-      return sections.map((section) => {
-        const h2 = section.querySelector('h2')?.textContent?.trim() ?? '';
-        return { top: Math.round(section.getBoundingClientRect().top + window.scrollY), h2 };
-      });
-    });
-    const h2s = order.map((s) => s.h2);
+    const h2s = await page.locator('main h2').allInnerTexts();
     const indexOf = (prefix: string) => h2s.findIndex((text) => text.startsWith(prefix));
     const titleShowcase = 'الطلبات من المحادثة';
     const titleProblems = 'قبل نكمّل';
@@ -253,8 +246,17 @@ test.describe('homepage structure', () => {
     const titlePricing = 'الانضمام المبكر';
     const titleFaq = 'أسئلة شائعة';
     const titleCta = 'جاهز تخلّي';
-    expect(indexOf(titleShowcase)).toBeGreaterThan(-1);
-    expect(order[indexOf(titleShowcase)].top).toBeGreaterThan(0);
+    for (const title of [
+      titleShowcase,
+      titleProblems,
+      titleCaps,
+      titleSteps,
+      titlePricing,
+      titleFaq,
+      titleCta,
+    ]) {
+      expect(indexOf(title)).toBeGreaterThanOrEqual(0);
+    }
     for (const [first, second] of [
       [titleShowcase, titleProblems],
       [titleProblems, titleCaps],
@@ -263,22 +265,20 @@ test.describe('homepage structure', () => {
       [titlePricing, titleFaq],
       [titleFaq, titleCta],
     ] as const) {
-      expect(indexOf(first)).toBeGreaterThanOrEqual(0);
       expect(indexOf(second)).toBeGreaterThan(indexOf(first));
     }
   });
 
-  test('dark showcase illustration is the concept workflow, not a skeleton', async ({ page }) => {
+  test('the product showcase is compact, labelled and not a skeleton', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
-    const showcase = page.locator('section[data-theme="dark"]').first();
-    const panel = showcase.locator('[data-theme="light-panel"]');
-    await expect(panel).toBeVisible();
-    await expect(panel.getByRole('note')).toContainText('تصوّر مفاهيمي');
-    const bubbles = showcase.locator('[data-testid="illustration-bubble"]');
-    await expect(bubbles).toHaveCount(0);
-    const workflowItems = panel.getByRole('listitem');
-    await expect(workflowItems).toHaveCount(3);
+    const showcase = page.locator('#product-showcase');
+    await expect(showcase).toBeVisible();
+    await expect(showcase.getByText('عرض تفاعلي ببيانات اصطناعية')).toBeVisible();
+    await expect(showcase.locator('[data-testid="showcase-customer-panel"]')).toBeVisible();
+    await expect(showcase.locator('[data-testid="showcase-merchant-panel"]')).toBeVisible();
+    await expect(showcase.locator('ol > li')).toHaveCount(3);
+    await expect(showcase.locator('[data-testid="illustration-bubble"]')).toHaveCount(0);
   });
 
   test('dark showcase text keeps AA contrast including badges', async ({ page }) => {

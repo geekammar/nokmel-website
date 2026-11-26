@@ -92,3 +92,13 @@ The kit's editable-text wordmark SVGs are templates, not final outlined custom l
 - Accessible interactions: visible focus ring (3px `--color-focus-ring`), ≥44px control height, keyboard operable, labels tied to inputs
 - Nested Latin text/numbers are wrapped with `lang`/`dir` (`Wordmark lang="en"`, token names) so they don't inherit Arabic font/direction
 - No unnecessary animations or decorative complexity
+
+## W2-S marketing refinement [IMPLEMENTED]
+
+- **Direction:** premium minimal SaaS with fewer visible containers, stronger type hierarchy, generous whitespace and a mobile-first RTL reading order. Existing Brand Kit v2.0 tokens, fonts and logo assets are unchanged.
+- **Homepage:** editorial two-column problem/capability comparison, a compact product showcase near the top, combined early-access expectations with the three-step flow, a border-light FAQ and a short closing CTA. No new CMS section type, route or database content was introduced.
+- **Interactive showcase:** syntactically a client React component inside the existing design system. It uses the approved tokens, light panels inside a dark section, no external images and no network requests. Customer and merchant states are synthetic and explicitly labelled; the component does not submit a form or create an order. Desktop shows both experiences side by side; mobile uses one compact viewport with a visible customer/merchant switch.
+- **Autoplay and motion:** autoplay is opt-in, runs the complete sequence in about 12 seconds, stops at the end, pauses on visibility change and is disabled when `prefers-reduced-motion: reduce`. Manual previous/next/replay remain available.
+- **Footer:** brand block plus a compact two-column navigation/legal grid on mobile, configured public contact/social links and reversible analytics preferences. Public internal-wordmark implementation text was removed.
+- **Social-sharing candidate:** `public/brand/social/nokmel-social-card-1200x630.png`, a 1200 × 630 navy/Frost composition using the approved Completion Mark and brand typography. It is registered as `social-card-1200x630`; the existing default image and inherited social metadata are preserved. Owner approval is still required before changing any published SEO image choice.
+- **Corrections:** dirty plan editors visibly disable publish/hide with a save-first explanation (NKW-W5-001); provider URL guidance shows valid username/path examples, especially Instagram (NKW-W5-002), without weakening validation.
