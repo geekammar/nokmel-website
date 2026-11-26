@@ -1,16 +1,14 @@
 import type { Metadata } from 'next';
 import { ContactView } from '@/components/pages/ContactView';
-import { contact } from '@/content/ar/contact';
-import { getPublishedPageContent } from '@/lib/cms/service';
-import { pageMetadata } from '@/lib/seo';
+import { getPublicPageBundle } from '@/lib/cms/public-page';
+import { pageMetadataForSeo } from '@/lib/seo';
 
-export const metadata: Metadata = pageMetadata({
-  title: 'تواصل معنا — نكمّل',
-  description: contact.hero.lead,
-  path: '/contact',
-});
+export async function generateMetadata(): Promise<Metadata> {
+  const bundle = await getPublicPageBundle('contact');
+  return pageMetadataForSeo('contact', bundle.seo);
+}
 
 export default async function ContactPage() {
-  const content = await getPublishedPageContent('contact', 'ar');
+  const { content } = await getPublicPageBundle('contact');
   return <ContactView content={content} />;
 }

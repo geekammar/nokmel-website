@@ -1,16 +1,14 @@
 import type { Metadata } from 'next';
 import { LegalPageView } from '@/components/pages/LegalPageView';
-import { legal } from '@/content/ar/legal';
-import { getPublishedPageContent } from '@/lib/cms/service';
-import { pageMetadata } from '@/lib/seo';
+import { getPublicPageBundle } from '@/lib/cms/public-page';
+import { pageMetadataForSeo } from '@/lib/seo';
 
-export const metadata: Metadata = pageMetadata({
-  title: 'سياسة الخصوصية — نكمّل',
-  description: legal.privacy.intro,
-  path: '/privacy',
-});
+export async function generateMetadata(): Promise<Metadata> {
+  const bundle = await getPublicPageBundle('privacy');
+  return pageMetadataForSeo('privacy', bundle.seo);
+}
 
 export default async function PrivacyPage() {
-  const content = await getPublishedPageContent('privacy', 'ar');
+  const { content } = await getPublicPageBundle('privacy');
   return <LegalPageView content={content} />;
 }

@@ -6,15 +6,7 @@ import {
   type CmsPageKey,
   type FieldDescriptor,
 } from './registry';
-
-/**
- * Pure publication-review model (W3.2 final closure).
- *
- * The service composes and validates the saved draft and the current effective
- * published content from one database snapshot, then this module produces a
- * human-readable summary of the actual persisted differences. It never
- * compares against the client's last editor baseline.
- */
+import { resolveEffectiveSeo, type SeoStoredValues } from './seo';
 
 export type PublicationReviewFieldChange = {
   path: string;
@@ -42,11 +34,14 @@ export type PublicationReviewFaqEdit = {
 export type PublicationReviewFaqRemoval = {
   id: string;
   question: string;
+  position: number;
 };
 
 export type PublicationReviewFaqAddition = {
   id: string;
   question: string;
+  position: number;
+  visible: boolean;
 };
 
 export type PublicationReviewFaqVisibility = {
@@ -56,13 +51,42 @@ export type PublicationReviewFaqVisibility = {
   after: boolean;
 };
 
+export type PublicationReviewFaqOrderItem = {
+  id: string;
+  question: string;
+  position: number;
+};
+
 export type PublicationReviewFaq = {
   changed: boolean;
   added: PublicationReviewFaqAddition[];
   removed: PublicationReviewFaqRemoval[];
   edited: PublicationReviewFaqEdit[];
   visibilityChanged: PublicationReviewFaqVisibility[];
+  finalVisibleOrder: PublicationReviewFaqOrderItem[];
+  hidden: PublicationReviewFaqOrderItem[];
   reordered: boolean;
+};
+
+export type PublicationReviewSeoFieldKey =
+  | 'title'
+  | 'description'
+  | 'socialTitle'
+  | 'socialDescription'
+  | 'socialImage';
+
+export type PublicationReviewSeoField = {
+  key: PublicationReviewSeoFieldKey;
+  label: string;
+  before: string;
+  after: string;
+  inheritedBefore: boolean;
+  inheritedAfter: boolean;
+};
+
+export type PublicationReviewSeo = {
+  changed: boolean;
+  fields: PublicationReviewSeoField[];
 };
 
 export type PublicationReview = {
@@ -75,7 +99,16 @@ export type PublicationReview = {
   publishedSource: 'published' | 'defaults';
   hasChanges: boolean;
   sections: PublicationReviewSection[];
+  seo: PublicationReviewSeo | null;
   faq: PublicationReviewFaq | null;
+};
+
+const SEO_LABELS: Record<PublicationReviewSeoFieldKey, string> = {
+  title: 'عنوان SEO',
+  description: 'وصف SEO',
+  socialTitle: 'عنوان المشاركة',
+  socialDescription: 'وصف المشاركة',
+  socialImage: 'صورة المشاركة',
 };
 
 function joinLabel(prefix: string | null, label: string): string {
@@ -200,11 +233,22 @@ function faqChanges(
   const publishedById = new Map(publishedItems.map((item) => [item.id, item]));
 
   const added = draftItems
-    .filter((item) => !publishedById.has(item.id))
-    .map((item) => ({ id: item.id, question: item.question }));
+    .map((item, index) => ({ item, position: index + 1 }))
+    .filter(({ item }) => !publishedById.has(item.id))
+    .map(({ item, position }) => ({
+      id: item.id,
+      question: item.question,
+      position,
+      visible: item.visible,
+    }));
   const removed = publishedItems
-    .filter((item) => !draftById.has(item.id))
-    .map((item) => ({ id: item.id, question: item.question }));
+    .map((item, index) => ({ item, position: index + 1 }))
+    .filter(({ item }) => !draftById.has(item.id))
+    .map(({ item, position }) => ({
+      id: item.id,
+      question: item.question,
+      position,
+    }));
 
   const edited: PublicationReviewFaqEdit[] = [];
   const visibilityChanged: PublicationReviewFaqVisibility[] = [];
@@ -254,6 +298,18 @@ function faqChanges(
     commonDraftOrder.length === commonPublishedOrder.length &&
     commonDraftOrder.some((id, index) => id !== commonPublishedOrder[index]);
 
+  const finalVisibleOrder = draftItems
+    .filter((item) => item.visible)
+    .map((item, index) => ({ id: item.id, question: item.question, position: index + 1 }));
+  const hidden = draftItems
+    .map((item, index) => ({ item, position: index + 1 }))
+    .filter(({ item }) => !item.visible)
+    .map(({ item, position }) => ({
+      id: item.id,
+      question: item.question,
+      position,
+    }));
+
   return {
     changed:
       added.length > 0 ||
@@ -265,8 +321,73 @@ function faqChanges(
     removed,
     edited,
     visibilityChanged,
+    finalVisibleOrder,
+    hidden,
     reordered,
   };
+}
+
+function seoChanges(
+  pageKey: CmsPageKey,
+  draft: SeoStoredValues,
+  published: SeoStoredValues | null,
+): PublicationReviewSeo {
+  const before = resolveEffectiveSeo(pageKey, published);
+  const after = resolveEffectiveSeo(pageKey, draft);
+  const fields: PublicationReviewSeoField[] = [];
+
+  if (before.title !== after.title) {
+    fields.push({
+      key: 'title',
+      label: SEO_LABELS.title,
+      before: before.title,
+      after: after.title,
+      inheritedBefore: false,
+      inheritedAfter: false,
+    });
+  }
+  if (before.description !== after.description) {
+    fields.push({
+      key: 'description',
+      label: SEO_LABELS.description,
+      before: before.description,
+      after: after.description,
+      inheritedBefore: false,
+      inheritedAfter: false,
+    });
+  }
+  if (before.socialTitle !== after.socialTitle) {
+    fields.push({
+      key: 'socialTitle',
+      label: SEO_LABELS.socialTitle,
+      before: before.socialTitle,
+      after: after.socialTitle,
+      inheritedBefore: before.socialTitleInherited,
+      inheritedAfter: after.socialTitleInherited,
+    });
+  }
+  if (before.socialDescription !== after.socialDescription) {
+    fields.push({
+      key: 'socialDescription',
+      label: SEO_LABELS.socialDescription,
+      before: before.socialDescription,
+      after: after.socialDescription,
+      inheritedBefore: before.socialDescriptionInherited,
+      inheritedAfter: after.socialDescriptionInherited,
+    });
+  }
+  if (before.socialImageId !== after.socialImageId) {
+    fields.push({
+      key: 'socialImage',
+      label: SEO_LABELS.socialImage,
+      before: before.image.label,
+      after: after.image.label,
+      inheritedBefore: false,
+      inheritedAfter: false,
+    });
+  }
+
+  return { changed: fields.length > 0, fields };
 }
 
 export function buildPublicationReview(input: {
@@ -275,6 +396,7 @@ export function buildPublicationReview(input: {
   publishedContent: CmsPageContent[CmsPageKey];
   draftFaq: readonly CmsFaqItem[] | null;
   publishedFaq: readonly CmsFaqItem[] | null;
+  seo: { draft: SeoStoredValues; published: SeoStoredValues | null } | null;
   revision: number;
   publishedRevision: number | null;
   lastPublishedAt: string | null;
@@ -286,6 +408,9 @@ export function buildPublicationReview(input: {
     input.draftContent,
     input.publishedContent,
   );
+  const seo = input.seo
+    ? seoChanges(input.pageKey, input.seo.draft, input.seo.published)
+    : null;
   const faq =
     input.pageKey === 'home' && input.draftFaq && input.publishedFaq
       ? faqChanges(input.draftFaq, input.publishedFaq)
@@ -299,8 +424,9 @@ export function buildPublicationReview(input: {
     publishedRevision: input.publishedRevision,
     lastPublishedAt: input.lastPublishedAt,
     publishedSource: input.publishedSource,
-    hasChanges: sections.length > 0 || (faq?.changed ?? false),
+    hasChanges: sections.length > 0 || (seo?.changed ?? false) || (faq?.changed ?? false),
     sections,
+    seo,
     faq,
   };
 }

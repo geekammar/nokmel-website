@@ -19,9 +19,11 @@ import {
   getPublicationReview,
   publishPageContent,
   savePageDraft,
+  saveSeoDraft,
   type PublicationReviewResult,
   type PublishResult,
   type SaveDraftResult,
+  type SaveSeoResult,
 } from '@/lib/cms/service';
 import { getOwnerSession } from '@/lib/owner';
 
@@ -136,6 +138,26 @@ export async function saveDraftAction(input: {
   }
 }
 
+export async function saveSeoDraftAction(input: {
+  pageKey: string;
+  revision: number;
+  values: unknown;
+}): Promise<ContentActionResult<SaveSeoResult>> {
+  const unauthorized = await ensureOwner();
+  if (unauthorized) return unauthorized;
+  try {
+    const data = await saveSeoDraft({
+      pageKey: input.pageKey,
+      locale: 'ar',
+      expectedRevision: input.revision,
+      values: input.values,
+    });
+    return { ok: true, data };
+  } catch (error) {
+    return mapError('save-seo-draft', error);
+  }
+}
+
 export async function getPublicationReviewAction(input: {
   pageKey: string;
   revision: number;
@@ -180,6 +202,7 @@ export type DiscardActionData = {
   lastPublishedAt: string | null;
   values: unknown | null;
   faqItems: unknown | null;
+  seo: unknown | null;
 };
 
 export async function discardDraftAction(input: {
@@ -202,6 +225,7 @@ export async function discardDraftAction(input: {
         ...data,
         values: fresh.status === 'ok' ? fresh.data.values : null,
         faqItems: fresh.status === 'ok' ? fresh.data.faqItems : null,
+        seo: fresh.status === 'ok' ? fresh.data.seo : null,
       },
     };
   } catch (error) {

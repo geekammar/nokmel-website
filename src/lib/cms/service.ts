@@ -21,6 +21,16 @@ import {
   type CmsPageKey,
   type EditablePageValues,
 } from '@/content/cms/registry';
+import {
+  CMS_SEO_SECTION_KEY,
+  buildSeoPayloadFromForm,
+  parseStoredSeo,
+  resolveEffectiveSeo,
+  seoFormValuesFromStored,
+  type EffectiveSeo,
+  type SeoFormValues,
+  type SeoStoredValues,
+} from '@/content/cms/seo';
 import { buildPublicationReview, type PublicationReview } from '@/content/cms/review';
 import { ConfigError } from '@/lib/config-error';
 import { getDb } from '@/lib/db';
@@ -63,6 +73,16 @@ export type CmsStorageStatus =
   | 'unavailable'
   | 'invalid';
 
+export type EditorSeoData = {
+  values: SeoFormValues;
+  effectiveDraft: EffectiveSeo;
+  effectivePublished: EffectiveSeo;
+  hasDraft: boolean;
+  hasPublished: boolean;
+  invalidDraft: boolean;
+  invalidPublished: boolean;
+};
+
 export type EditorPageData = {
   pageKey: CmsPageKey;
   locale: CmsLocale;
@@ -70,6 +90,7 @@ export type EditorPageData = {
   publishedRevision: number | null;
   values: EditablePageValues;
   faqItems: CmsFaqItem[] | null;
+  seo: EditorSeoData;
   hasDraft: boolean;
   hasPublished: boolean;
   lastPublishedAt: string | null;
@@ -99,6 +120,20 @@ export type PublishResult = {
 };
 
 export type PublicationReviewResult = PublicationReview;
+
+export type SaveSeoResult = {
+  revision: number;
+  publishedRevision: number | null;
+  seo: EditorSeoData;
+  hasDraft: boolean;
+  hasPublished: boolean;
+  lastPublishedAt: string | null;
+};
+
+export type PublishedPageBundle<K extends CmsPageKey = CmsPageKey> = {
+  content: CmsPageContent[K];
+  seo: EffectiveSeo;
+};
 
 export type DiscardResult = {
   revision: number;
@@ -130,6 +165,10 @@ type RenderablePublishedFaq = {
   question: string;
   answer: string;
   visible: boolean;
+};
+type SeoPayloadRow = {
+  draftPayload: Record<string, unknown> | null;
+  publishedPayload: Record<string, unknown> | null;
 };
 
 function resolveDb(options: CmsServiceOptions): Db {
@@ -249,6 +288,7 @@ function effectiveSectionPayloads(
 ): Record<string, Record<string, unknown>> {
   const result: Record<string, Record<string, unknown>> = {};
   for (const row of rows) {
+    if (row.sectionKey === CMS_SEO_SECTION_KEY) continue;
     const value =
       mode === 'draft' ? (row.draftPayload ?? row.publishedPayload) : row.publishedPayload;
     if (value === null || value === undefined) continue;
@@ -279,6 +319,58 @@ function defaultPageContent<K extends CmsPageKey>(pageKey: K): CmsPageContent[K]
     defaultSectionPayloads(pageKey),
     DEFAULT_FAQ_FOR_RENDER,
   ) as unknown as CmsPageContent[K];
+}
+
+function seoRow(rows: readonly SectionRow[]): SeoPayloadRow | undefined {
+  return rows.find((row) => row.sectionKey === CMS_SEO_SECTION_KEY);
+}
+
+function editorSeoData(pageKey: CmsPageKey, row: SeoPayloadRow | undefined): EditorSeoData {
+  const draftPresent = row?.draftPayload !== null && row?.draftPayload !== undefined;
+  const publishedPresent = row?.publishedPayload !== null && row?.publishedPayload !== undefined;
+  const draftParsed = draftPresent ? parseStoredSeo(row?.draftPayload) : null;
+  const publishedParsed = publishedPresent ? parseStoredSeo(row?.publishedPayload) : null;
+  const draftStored = draftParsed?.ok ? draftParsed.value : null;
+  const publishedStored = publishedParsed?.ok ? publishedParsed.value : null;
+  const baseStored = draftStored ?? publishedStored;
+  return {
+    values: seoFormValuesFromStored(pageKey, baseStored),
+    effectiveDraft: resolveEffectiveSeo(pageKey, baseStored),
+    effectivePublished: resolveEffectiveSeo(pageKey, publishedStored),
+    hasDraft: draftPresent,
+    hasPublished: publishedPresent,
+    invalidDraft: draftPresent && !draftParsed?.ok,
+    invalidPublished: publishedPresent && !publishedParsed?.ok,
+  };
+}
+
+function publishedSeo(pageKey: CmsPageKey, rows: readonly PublishedSectionRow[]): EffectiveSeo {
+  const row = rows.find((candidate) => candidate.sectionKey === CMS_SEO_SECTION_KEY);
+  if (row?.publishedPayload === null || row?.publishedPayload === undefined) {
+    return resolveEffectiveSeo(pageKey, null);
+  }
+  const parsed = parseStoredSeo(row.publishedPayload);
+  if (!parsed.ok) {
+    console.error('[cms] public-seo invalid', { pageKey });
+    return resolveEffectiveSeo(pageKey, null);
+  }
+  return resolveEffectiveSeo(pageKey, parsed.value);
+}
+
+function reviewSeoValues(
+  rows: readonly SectionRow[],
+): { draft: SeoStoredValues; published: SeoStoredValues | null } | null {
+  const row = seoRow(rows);
+  if (row?.draftPayload === null || row?.draftPayload === undefined) return null;
+  const draft = parseStoredSeo(row.draftPayload);
+  if (!draft.ok) {
+    throw new CmsValidationError('بيانات SEO المحفوظة غير صالحة. لم يتم تنفيذ العملية.');
+  }
+  const published = row.publishedPayload ? parseStoredSeo(row.publishedPayload) : null;
+  return {
+    draft: draft.value,
+    published: published?.ok ? published.value : null,
+  };
 }
 
 /**
@@ -416,6 +508,7 @@ export async function getEditorPageData(
         publishedRevision: currentPublishedRevision(rows),
         values,
         faqItems: pageKey === 'home' ? (faq ?? []) : null,
+        seo: editorSeoData(pageKey, seoRow(rows)),
         hasDraft,
         hasPublished: hasPublishedContent(rows, faqRows),
         lastPublishedAt: lastPublished(rows, faqRows),
@@ -430,16 +523,20 @@ export async function getEditorPageData(
   }
 }
 
-export async function getPublishedPageContent<K extends CmsPageKey>(
+export async function getPublishedPageBundle<K extends CmsPageKey>(
   rawPageKey: K,
   rawLocale: unknown = 'ar',
   options: CmsServiceOptions = {},
-): Promise<CmsPageContent[K]> {
+): Promise<PublishedPageBundle<K>> {
   const pageKey = assertCmsPageKey(rawPageKey);
   const locale = assertCmsLocale(rawLocale);
+  const fallback = {
+    content: defaultPageContent(pageKey),
+    seo: resolveEffectiveSeo(pageKey, null),
+  } as unknown as PublishedPageBundle<K>;
 
   if (!options.db && !process.env.DATABASE_URL?.trim()) {
-    return defaultPageContent(pageKey) as unknown as CmsPageContent[K];
+    return fallback;
   }
 
   let db: Db;
@@ -447,11 +544,12 @@ export async function getPublishedPageContent<K extends CmsPageKey>(
     db = resolveDb(options);
   } catch (error) {
     logCmsFailure('public-load', pageKey, error);
-    return defaultPageContent(pageKey) as unknown as CmsPageContent[K];
+    return fallback;
   }
 
+  let snapshot: { sectionRows: PublishedSectionRow[]; faqRows: PublishedFaqRow[] };
   try {
-    const snapshot = await db.transaction(
+    snapshot = await db.transaction(
       async (tx) => {
         const sectionRows = await readPublishedSectionRows(tx, pageKey, locale);
         let faqRows: PublishedFaqRow[] = [];
@@ -463,7 +561,14 @@ export async function getPublishedPageContent<K extends CmsPageKey>(
       },
       { isolationLevel: 'repeatable read', accessMode: 'read only' },
     );
+  } catch (error) {
+    logCmsFailure('public-load', pageKey, error);
+    return fallback;
+  }
 
+  const seo = publishedSeo(pageKey, snapshot.sectionRows);
+  let content: CmsPageContent[CmsPageKey];
+  try {
     const overrides = effectiveSectionPayloads(snapshot.sectionRows, 'published');
     let faqForRender = DEFAULT_FAQ_FOR_RENDER;
 
@@ -474,11 +579,31 @@ export async function getPublishedPageContent<K extends CmsPageKey>(
       faqForRender = visible.map(({ question, answer }) => ({ question, answer }));
     }
 
-    return composeValidated(pageKey, overrides, faqForRender) as unknown as CmsPageContent[K];
+    content = composeValidated(pageKey, overrides, faqForRender) as CmsPageContent[CmsPageKey];
   } catch (error) {
     logCmsFailure('public-load', pageKey, error);
-    return defaultPageContent(pageKey) as unknown as CmsPageContent[K];
+    content = defaultPageContent(pageKey) as CmsPageContent[CmsPageKey];
   }
+
+  return { content, seo } as PublishedPageBundle<K>;
+}
+
+export async function getPublishedPageContent<K extends CmsPageKey>(
+  rawPageKey: K,
+  rawLocale: unknown = 'ar',
+  options: CmsServiceOptions = {},
+): Promise<CmsPageContent[K]> {
+  const bundle = await getPublishedPageBundle(rawPageKey, rawLocale, options);
+  return bundle.content;
+}
+
+export async function getPublishedPageSeo<K extends CmsPageKey>(
+  rawPageKey: K,
+  rawLocale: unknown = 'ar',
+  options: CmsServiceOptions = {},
+): Promise<EffectiveSeo> {
+  const bundle = await getPublishedPageBundle(rawPageKey, rawLocale, options);
+  return bundle.seo;
 }
 
 export async function getPreviewPageContent<K extends CmsPageKey>(
@@ -550,6 +675,7 @@ export async function getPublicationReview(
     const faqDiffers = pageKey === 'home' && faqDraftDiffers(faqRows);
     const hasSectionDraft = rows.some((row) => row.draftPayload !== null);
     if (!hasSectionDraft && !faqDiffers) throw new CmsNoDraftError();
+    const seo = reviewSeoValues(rows);
 
     const draftFaq =
       pageKey === 'home'
@@ -581,6 +707,7 @@ export async function getPublicationReview(
       publishedContent,
       draftFaq,
       publishedFaq,
+      seo,
       revision,
       publishedRevision: currentPublishedRevision(rows),
       lastPublishedAt: lastPublished(rows, faqRows),
@@ -689,6 +816,67 @@ export async function savePageDraft(
   });
 }
 
+export async function saveSeoDraft(
+  args: {
+    pageKey: unknown;
+    locale: unknown;
+    expectedRevision: unknown;
+    values: unknown;
+  },
+  options: CmsServiceOptions = {},
+): Promise<SaveSeoResult> {
+  const pageKey = assertCmsPageKey(args.pageKey);
+  const locale = assertCmsLocale(args.locale);
+  const expectedRevision = assertExpectedRevision(args.expectedRevision);
+  const seoValues = buildSeoPayloadFromForm(args.values);
+  assertEditablePayloadSize(seoValues);
+  const db = resolveDb(options);
+
+  return db.transaction(async (tx) => {
+    await lockPage(tx, pageKey, locale);
+    const rows = await readSectionRows(tx, pageKey, locale);
+    if (maxRevision(rows) !== expectedRevision) {
+      throw new CmsConflictError();
+    }
+    const faqRows = pageKey === 'home' ? await readFaqRows(tx, locale) : [];
+    const existingSeo = seoRow(rows);
+    const nextRevision = expectedRevision + 1;
+    const now = new Date();
+
+    await tx
+      .insert(contentSections)
+      .values({
+        id: `${pageKey}:${CMS_SEO_SECTION_KEY}:${locale}`,
+        pageKey,
+        sectionKey: CMS_SEO_SECTION_KEY,
+        locale,
+        draftPayload: seoValues,
+        draftRevision: nextRevision,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: [contentSections.pageKey, contentSections.sectionKey, contentSections.locale],
+        set: {
+          draftPayload: seoValues,
+          draftRevision: nextRevision,
+          updatedAt: now,
+        },
+      });
+
+    return {
+      revision: nextRevision,
+      publishedRevision: currentPublishedRevision(rows),
+      seo: editorSeoData(pageKey, {
+        draftPayload: seoValues,
+        publishedPayload: existingSeo?.publishedPayload ?? null,
+      }),
+      hasDraft: true,
+      hasPublished: hasPublishedContent(rows, faqRows),
+      lastPublishedAt: lastPublished(rows, faqRows),
+    };
+  });
+}
+
 async function syncFaqDrafts(
   tx: QueryDb,
   locale: CmsLocale,
@@ -783,6 +971,14 @@ export async function publishPageContent(
     const hasSectionDraft = rows.some((row) => row.draftPayload !== null);
     if (!hasSectionDraft && !faqDiffers) {
       throw new CmsNoDraftError();
+    }
+    const seoDraft = seoRow(rows);
+    if (
+      seoDraft?.draftPayload !== null &&
+      seoDraft?.draftPayload !== undefined &&
+      !parseStoredSeo(seoDraft.draftPayload).ok
+    ) {
+      throw new CmsValidationError('بيانات SEO المحفوظة غير صالحة. لم يتم نشر أي تغيير.');
     }
 
     const overrides = effectiveSectionPayloads(rows, 'draft');

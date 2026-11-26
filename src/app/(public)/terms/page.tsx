@@ -1,16 +1,14 @@
 import type { Metadata } from 'next';
 import { LegalPageView } from '@/components/pages/LegalPageView';
-import { legal } from '@/content/ar/legal';
-import { getPublishedPageContent } from '@/lib/cms/service';
-import { pageMetadata } from '@/lib/seo';
+import { getPublicPageBundle } from '@/lib/cms/public-page';
+import { pageMetadataForSeo } from '@/lib/seo';
 
-export const metadata: Metadata = pageMetadata({
-  title: 'الشروط والأحكام — نكمّل',
-  description: legal.terms.intro,
-  path: '/terms',
-});
+export async function generateMetadata(): Promise<Metadata> {
+  const bundle = await getPublicPageBundle('terms');
+  return pageMetadataForSeo('terms', bundle.seo);
+}
 
 export default async function TermsPage() {
-  const content = await getPublishedPageContent('terms', 'ar');
+  const { content } = await getPublicPageBundle('terms');
   return <LegalPageView content={content} />;
 }

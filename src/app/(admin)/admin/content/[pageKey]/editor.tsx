@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { PublicationReviewPanel } from '@/components/admin/PublicationReviewPanel';
+import { SeoEditorPanel } from '@/components/admin/SeoEditorPanel';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
@@ -17,13 +18,15 @@ import {
   type FieldDescriptor,
 } from '@/content/cms/registry';
 import { adminContentUi } from '@/content/ar/admin-content';
+import { seoFormSchema, type SeoFormValues } from '@/content/cms/seo';
 import type { PublicationReview } from '@/content/cms/review';
-import type { EditorPageData } from '@/lib/cms/service';
+import type { EditorPageData, EditorSeoData } from '@/lib/cms/service';
 import {
   discardDraftAction,
   getPublicationReviewAction,
   publishContentAction,
   saveDraftAction,
+  saveSeoDraftAction,
 } from '@/app/(admin)/admin/content/actions';
 
 type FaqEditorItem = CmsFaqItem & { isNew?: boolean };
@@ -42,6 +45,20 @@ function serializeState(values: EditablePageValues, faqItems: FaqEditorItem[]): 
       visible: item.visible,
     })),
   });
+}
+
+function serializeSeo(values: SeoFormValues): string {
+  return JSON.stringify(values);
+}
+
+type EditorTab = 'content' | 'seo';
+
+function tabClass(active: boolean): string {
+  return `min-h-control rounded-control px-4 text-sm font-semibold ${
+    active
+      ? 'bg-action-primary-bg text-action-primary-fg'
+      : 'border border-border-interactive bg-transparent text-text-primary hover:bg-background'
+  }`;
 }
 
 function setAtPath(
@@ -101,7 +118,18 @@ export function ContentEditor({
       (initial.faqItems ?? []).map((item) => ({ ...item })),
     ),
   );
+  const [activeTab, setActiveTab] = useState<EditorTab>('content');
+  const [seoValues, setSeoValues] = useState<SeoFormValues>(initial.seo.values);
+  const [seoBaseline, setSeoBaseline] = useState(() => serializeSeo(initial.seo.values));
+  const [seoHasDraft, setSeoHasDraft] = useState(initial.seo.hasDraft);
+  const [seoHasPublished, setSeoHasPublished] = useState(initial.seo.hasPublished);
+  const [seoInvalidDraft, setSeoInvalidDraft] = useState(initial.seo.invalidDraft);
+  const [seoInvalidPublished, setSeoInvalidPublished] = useState(
+    initial.seo.invalidPublished,
+  );
+  const [seoErrors, setSeoErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [savingSeo, setSavingSeo] = useState(false);
   const [reviewing, setReviewing] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [discarding, setDiscarding] = useState(false);
@@ -113,8 +141,10 @@ export function ContentEditor({
   const newItemCounter = useRef(0);
   const publishButtonRef = useRef<HTMLButtonElement>(null);
 
-  const busy = saving || reviewing || publishing || discarding;
-  const dirty = serializeState(values, faqItems) !== baseline;
+  const busy = saving || savingSeo || reviewing || publishing || discarding;
+  const contentDirty = serializeState(values, faqItems) !== baseline;
+  const seoDirty = serializeSeo(seoValues) !== seoBaseline;
+  const dirty = contentDirty || seoDirty;
   const previewHref = `/admin/content/${pageKey}/preview`;
 
   useEffect(() => {
@@ -238,6 +268,75 @@ export function ContentEditor({
     }
   }
 
+  function updateSeo(next: SeoFormValues) {
+    invalidateReview();
+    setSeoValues(next);
+    setSeoErrors({});
+  }
+
+  async function handleSaveSeo() {
+    if (busy) return;
+    setBanner(null);
+    setReview(null);
+    const parsed = seoFormSchema.safeParse(seoValues);
+    if (!parsed.success) {
+      const errors: Record<string, string> = {};
+      for (const issue of parsed.error.issues) {
+        const key = String(issue.path[0] ?? 'form');
+        errors[key] ??= issueMessage(issue);
+      }
+      setSeoErrors(errors);
+      setBanner({ kind: 'error', text: adminContentUi.messages.fixFields });
+      const focusId =
+        errors.title
+          ? 'seo-title'
+          : errors.description
+            ? 'seo-description'
+            : errors.socialTitle
+              ? 'seo-social-title'
+              : errors.socialDescription
+                ? 'seo-social-description'
+                : errors.socialImage
+                  ? 'seo-social-image'
+                  : null;
+      if (focusId) document.getElementById(focusId)?.focus();
+      return;
+    }
+
+    setSavingSeo(true);
+    try {
+      const result = await saveSeoDraftAction({
+        pageKey,
+        revision,
+        values: parsed.data,
+      });
+      if (!result.ok) {
+        setBanner({
+          kind: result.code === 'conflict' ? 'conflict' : 'error',
+          text: result.message,
+        });
+        return;
+      }
+      setSeoValues(result.data.seo.values);
+      setSeoBaseline(serializeSeo(result.data.seo.values));
+      setSeoHasDraft(result.data.seo.hasDraft);
+      setSeoHasPublished(result.data.seo.hasPublished);
+      setSeoInvalidDraft(result.data.seo.invalidDraft);
+      setSeoInvalidPublished(result.data.seo.invalidPublished);
+      setRevision(result.data.revision);
+      setPublishedRevision(result.data.publishedRevision);
+      setHasDraft(result.data.hasDraft);
+      setHasPublished(result.data.hasPublished);
+      setLastPublishedAt(result.data.lastPublishedAt);
+      setSeoErrors({});
+      setBanner({ kind: 'success', text: adminContentUi.seo.saveSuccess });
+    } catch {
+      setBanner({ kind: 'error', text: adminContentUi.messages.unexpected });
+    } finally {
+      setSavingSeo(false);
+    }
+  }
+
   async function handlePublish() {
     if (busy) return;
     if (dirty) {
@@ -292,6 +391,13 @@ export function ContentEditor({
       setReview(null);
       setHasDraft(false);
       setHasPublished(true);
+      setSeoBaseline(serializeSeo(seoValues));
+      setSeoHasDraft(false);
+      if (seoHasDraft) {
+        setSeoHasPublished(true);
+        setSeoInvalidDraft(false);
+        setSeoInvalidPublished(false);
+      }
       setPublishedRevision(result.data.publishedRevision);
       setLastPublishedAt(result.data.lastPublishedAt);
       setBanner({ kind: 'success', text: adminContentUi.messages.publishSuccess });
@@ -346,7 +452,17 @@ export function ContentEditor({
       } else {
         setBanner({ kind: 'success', text: adminContentUi.messages.discardSuccess });
       }
+      if (result.data.seo) {
+        const freshSeo = result.data.seo as EditorSeoData;
+        setSeoValues(freshSeo.values);
+        setSeoBaseline(serializeSeo(freshSeo.values));
+        setSeoHasDraft(freshSeo.hasDraft);
+        setSeoHasPublished(freshSeo.hasPublished);
+        setSeoInvalidDraft(freshSeo.invalidDraft);
+        setSeoInvalidPublished(freshSeo.invalidPublished);
+      }
       setFieldErrors({});
+      setSeoErrors({});
     } catch {
       setBanner({ kind: 'error', text: adminContentUi.messages.unexpected });
     } finally {
@@ -535,6 +651,33 @@ export function ContentEditor({
         </p>
       </div>
 
+      <div role="tablist" aria-label={adminContentUi.tabs.label} className="mt-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          role="tab"
+          id="page-tab-content"
+          aria-selected={activeTab === 'content'}
+          aria-controls="page-panel-content"
+          data-testid="editor-tab-content"
+          className={tabClass(activeTab === 'content')}
+          onClick={() => setActiveTab('content')}
+        >
+          {adminContentUi.tabs.content}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          id="page-tab-seo"
+          aria-selected={activeTab === 'seo'}
+          aria-controls="page-panel-seo"
+          data-testid="editor-tab-seo"
+          className={tabClass(activeTab === 'seo')}
+          onClick={() => setActiveTab('seo')}
+        >
+          {adminContentUi.tabs.seo}
+        </button>
+      </div>
+
       <div className="mt-4 rounded-card border border-border-subtle bg-surface p-4">
         <p className="text-sm font-semibold text-text-primary" data-testid="editor-status">
           {statusText}
@@ -563,14 +706,25 @@ export function ContentEditor({
         ) : null}
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <Button
-            type="button"
-            onClick={handleSave}
-            disabled={busy || !dirty}
-            data-testid="save-draft"
-          >
-            {saving ? adminContentUi.actions.saving : adminContentUi.actions.saveDraft}
-          </Button>
+          {activeTab === 'content' ? (
+            <Button
+              type="button"
+              onClick={handleSave}
+              disabled={busy || !contentDirty}
+              data-testid="save-draft"
+            >
+              {saving ? adminContentUi.actions.saving : adminContentUi.actions.saveDraft}
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              onClick={handleSaveSeo}
+              disabled={busy || !seoDirty}
+              data-testid="save-seo-draft"
+            >
+              {savingSeo ? adminContentUi.actions.savingSeo : adminContentUi.actions.saveSeoDraft}
+            </Button>
+          )}
           <Button
             ref={publishButtonRef}
             type="button"
@@ -590,19 +744,21 @@ export function ContentEditor({
           >
             {discarding ? adminContentUi.actions.discarding : adminContentUi.actions.discard}
           </Button>
-          <Link
-            href={previewHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={confirmLeave}
-            data-testid="preview-link"
-            className="inline-flex min-h-control items-center rounded-control border border-border-interactive px-4 text-sm font-semibold text-text-primary hover:bg-background"
-          >
-            {adminContentUi.preview}
-          </Link>
+          {activeTab === 'content' ? (
+            <Link
+              href={previewHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={confirmLeave}
+              data-testid="preview-link"
+              className="inline-flex min-h-control items-center rounded-control border border-border-interactive px-4 text-sm font-semibold text-text-primary hover:bg-background"
+            >
+              {adminContentUi.preview}
+            </Link>
+          ) : null}
         </div>
 
-        {dirty ? (
+        {activeTab === 'content' && contentDirty ? (
           <p className="mt-2 text-xs text-text-secondary">
             {adminContentUi.hints.previewSavedOnly}
           </p>
@@ -619,6 +775,19 @@ export function ContentEditor({
         ) : !hasDraft ? (
           <p className="mt-1 text-xs text-text-secondary">{adminContentUi.hints.noDraft}</p>
         ) : null}
+        {activeTab === 'content' && seoDirty ? (
+          <p className="mt-1 text-xs font-semibold text-status-warning">
+            {adminContentUi.seo.otherTabUnsaved}
+          </p>
+        ) : null}
+        {activeTab === 'seo' && contentDirty ? (
+          <p className="mt-1 text-xs font-semibold text-status-warning">
+            {adminContentUi.seo.otherTabUnsaved}
+          </p>
+        ) : null}
+        <p className="mt-1 text-xs text-text-secondary">
+          {adminContentUi.seo.publishStatement}
+        </p>
 
         {review ? (
           <PublicationReviewPanel
@@ -696,7 +865,13 @@ export function ContentEditor({
         </div>
       </div>
 
-      <div className="mt-8 flex flex-col gap-8">
+      {activeTab === 'content' ? (
+      <div
+        id="page-panel-content"
+        role="tabpanel"
+        aria-labelledby="page-tab-content"
+        className="mt-8 flex flex-col gap-8"
+      >
         {page.sections.map((section) => {
           const sectionValues =
             values[section.key] && typeof values[section.key] === 'object'
@@ -875,14 +1050,13 @@ export function ContentEditor({
             </div>
           </section>
         ) : null}
-      </div>
 
       <div className="mt-8 rounded-card border border-border-subtle bg-surface p-4">
         <div className="flex flex-wrap items-center gap-3">
           <Button
             type="button"
             onClick={handleSave}
-            disabled={busy || !dirty}
+            disabled={busy || !contentDirty}
             data-testid="save-draft-bottom"
           >
             {saving ? adminContentUi.actions.saving : adminContentUi.actions.saveDraft}
@@ -899,6 +1073,58 @@ export function ContentEditor({
           <span className="text-xs text-text-secondary">{adminContentUi.previewNewTabHint}</span>
         </div>
       </div>
+      </div>
+      ) : (
+        <div
+          id="page-panel-seo"
+          role="tabpanel"
+          aria-labelledby="page-tab-seo"
+          className="mt-8 flex flex-col gap-4"
+        >
+          <div className="rounded-card border border-border-subtle bg-surface p-4">
+            <p className="text-sm font-semibold text-text-primary" data-testid="seo-status">
+              {seoHasDraft
+                ? adminContentUi.seo.draftExists
+                : seoHasPublished
+                  ? adminContentUi.seo.publishedExists
+                  : adminContentUi.seo.noOverride}
+            </p>
+            {seoInvalidDraft ? (
+              <p role="alert" className="mt-2 text-sm leading-6 text-status-error">
+                {adminContentUi.seo.invalidDraft}
+              </p>
+            ) : null}
+            {seoInvalidPublished ? (
+              <p role="alert" className="mt-2 text-sm leading-6 text-status-error">
+                {adminContentUi.seo.invalidPublished}
+              </p>
+            ) : null}
+            <p className="mt-1 text-xs leading-6 text-text-secondary">
+              {adminContentUi.seo.publishStatement}
+            </p>
+          </div>
+
+          <SeoEditorPanel
+            pageKey={pageKey}
+            values={seoValues}
+            errors={seoErrors}
+            dirty={seoDirty}
+            onChange={updateSeo}
+            disabled={busy}
+          />
+
+          <div className="rounded-card border border-border-subtle bg-surface p-4">
+            <Button
+              type="button"
+              onClick={handleSaveSeo}
+              disabled={busy || !seoDirty}
+              data-testid="save-seo-draft-bottom"
+            >
+              {savingSeo ? adminContentUi.actions.savingSeo : adminContentUi.actions.saveSeoDraft}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
