@@ -1,5 +1,62 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
+import { defaultSectionPayload } from '../../src/content/cms/registry';
+import {
+  assertDestructiveTestTargetIsStillSafe,
+  openDisposableTestPool,
+} from '../../src/lib/db/disposable-test-database';
+
+const enabled = Boolean(process.env.E2E_OWNER_PASSWORD && process.env.DATABASE_URL);
+
+test.skip(!enabled, 'Showcase e2e requires the disposable CMS database fixture');
+
+async function writePublishedShowcaseVisibility(visible: boolean): Promise<void> {
+  const { target, pool } = openDisposableTestPool(process.env.DATABASE_URL, { max: 1 });
+  try {
+    assertDestructiveTestTargetIsStillSafe(target);
+    const payload = defaultSectionPayload('home', 'showcase');
+    payload.visible = visible;
+    const now = new Date();
+    await pool.query(
+      `insert into content_sections
+        (id, page_key, section_key, locale, draft_payload, published_payload,
+         draft_revision, published_revision, updated_at, published_at)
+       values ('home:showcase:ar', 'home', 'showcase', 'ar', null, $1::jsonb, 0, 1, $2, $2)
+       on conflict (page_key, section_key, locale) do update set
+         draft_payload = null,
+         published_payload = excluded.published_payload,
+         draft_revision = 0,
+         published_revision = 1,
+         updated_at = excluded.updated_at,
+         published_at = excluded.published_at`,
+      [JSON.stringify(payload), now],
+    );
+  } finally {
+    await pool.end();
+  }
+}
+
+async function removeShowcaseOverride(): Promise<void> {
+  const { target, pool } = openDisposableTestPool(process.env.DATABASE_URL, { max: 1 });
+  try {
+    assertDestructiveTestTargetIsStillSafe(target);
+    await pool.query(
+      "delete from content_sections where page_key = 'home' and section_key = 'showcase' and locale = 'ar'",
+    );
+  } finally {
+    await pool.end();
+  }
+}
+
+test.beforeAll(async () => {
+  if (!enabled) return;
+  await writePublishedShowcaseVisibility(true);
+});
+
+test.afterAll(async () => {
+  if (!enabled) return;
+  await removeShowcaseOverride();
+});
 
 async function scrollToShowcase(page: import('@playwright/test').Page) {
   const showcase = page.locator('#product-showcase');

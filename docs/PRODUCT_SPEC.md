@@ -26,6 +26,7 @@ Pages:
 
 - Primary CTA: **Request to Join (اطلب الانضمام)** — highly visible throughout, especially on mobile.
 - No demo or demo page.
+- The homepage interactive product showcase is retained but **hidden by default** at initial launch and controlled by one CMS visibility field on the existing homepage showcase section. Hiding keeps all configured content and CTA data. The owner has not approved the current showcase placement/presentation for launch. A future compact phone-based automatically animated walkthrough (optimized silent WebM/MP4 preferred over GIF, verified merchant capabilities, reduced-motion/pause controls) is a potential direction, not approved scope or a launch blocker. No generic media library or page builder is approved.
 
 ## 4. Admin scope [APPROVED]
 
@@ -72,7 +73,7 @@ Live demo, demo management, media library dashboard, security & activity dashboa
 - W4: plans editable as marketing data only; join requests captured and listed. Implemented on `feature/w4-plans-join-requests` with additive migration `0003_w4-plans-join-requests`; hosted activation and independent acceptance remain external. No billing/payment/entitlement code.
 - W4.1: one optional scheduled promotional discount per plan, shared effective-offer resolver/version, stale-offer recovery at activation/expiration, and expanded historical offer snapshots. Merged via PR #8 (accepted HEAD `7d33ab734cc84cb51f17d67aa972390559c71e86`, merge commit `d50f7d555859b5f0ee4dc5b7075127f9e02eafde`); independent live acceptance 18/18, 0 FAIL/PARTIAL/BLOCKED. W4.1 is accepted for continued development.
 - W5: business overview, external website analytics, optional owner Telegram notifications and website settings. Implemented on `feature/w5-analytics-notifications-settings` with additive migration `0005_w5-settings-notifications`; hosted integration activation remains external. The owner-supplied independent acceptance record reports 20/20 PASS. W5 does not add billing, CRM, marketing automation or a first-party analytics pipeline.
-- W2-S: premium marketing design refinement and a verified interactive product showcase on the existing seven public routes. Implemented on `feature/w2s-marketing-design-showcase`; no migration, new route, showcase backend or external activation. Independent design acceptance and owner publication of any copy/SEO changes remain external.
+- W2-S: premium marketing design refinement and a verified interactive product showcase on the existing seven public routes, with owner-controlled visibility (default hidden). Implemented on `feature/w2s-marketing-design-showcase`; no migration, new route, showcase backend or external activation. Independent design acceptance and owner publication of any copy/SEO changes remain external.
 - W6: launch acceptance by owner; no deployment without explicit approval.
 
 ## 10. W5 metric definitions and data-source boundaries [APPROVED for W5 implementation]

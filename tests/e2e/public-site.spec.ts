@@ -1,4 +1,23 @@
 import { expect, test } from '@playwright/test';
+import {
+  assertDestructiveTestTargetIsStillSafe,
+  openDisposableTestPool,
+} from '../../src/lib/db/disposable-test-database';
+
+const databaseFixtureEnabled = Boolean(
+  process.env.E2E_OWNER_PASSWORD && process.env.DATABASE_URL,
+);
+
+test.beforeAll(async () => {
+  if (!databaseFixtureEnabled) return;
+  const { target, pool } = openDisposableTestPool(process.env.DATABASE_URL, { max: 1 });
+  try {
+    assertDestructiveTestTargetIsStillSafe(target);
+    await pool.query('truncate table content_sections, faq_items');
+  } finally {
+    await pool.end();
+  }
+});
 
 const CTA = 'اطلب الانضمام';
 const base = 'http://127.0.0.1:3100';
@@ -239,7 +258,6 @@ test.describe('homepage structure', () => {
 
     const h2s = await page.locator('main h2').allInnerTexts();
     const indexOf = (prefix: string) => h2s.findIndex((text) => text.startsWith(prefix));
-    const titleShowcase = 'الطلبات من المحادثة';
     const titleProblems = 'قبل نكمّل';
     const titleCaps = 'ماذا يقدم';
     const titleSteps = 'كيف يعمل';
@@ -247,7 +265,6 @@ test.describe('homepage structure', () => {
     const titleFaq = 'أسئلة شائعة';
     const titleCta = 'جاهز تخلّي';
     for (const title of [
-      titleShowcase,
       titleProblems,
       titleCaps,
       titleSteps,
@@ -258,7 +275,6 @@ test.describe('homepage structure', () => {
       expect(indexOf(title)).toBeGreaterThanOrEqual(0);
     }
     for (const [first, second] of [
-      [titleShowcase, titleProblems],
       [titleProblems, titleCaps],
       [titleCaps, titleSteps],
       [titleSteps, titlePricing],
@@ -267,21 +283,37 @@ test.describe('homepage structure', () => {
     ] as const) {
       expect(indexOf(second)).toBeGreaterThan(indexOf(first));
     }
+    await expect(page.locator('#product-showcase')).toHaveCount(0);
   });
 
-  test('the product showcase is compact, labelled and not a skeleton', async ({ page }) => {
+  test('showcase is hidden by default without an empty container or broken anchor', async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
-    const showcase = page.locator('#product-showcase');
-    await expect(showcase).toBeVisible();
-    await expect(showcase.getByText('عرض تفاعلي موجّه ببيانات اصطناعية')).toBeVisible();
-    await expect(showcase.locator('[data-testid="showcase-customer-panel"]')).toBeVisible();
-    await expect(showcase.locator('[data-testid="showcase-merchant-panel"]')).toBeVisible();
-    await expect(showcase.locator('ol > li')).toHaveCount(3);
-    await expect(showcase.locator('[data-testid="illustration-bubble"]')).toHaveCount(0);
+    await expect(page.locator('#product-showcase')).toHaveCount(0);
+    await expect(page.locator('[data-testid="product-showcase"]')).toHaveCount(0);
+    await expect(page.locator('a[href="#product-showcase"]')).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'شوف كيف يعمل' })).toHaveAttribute(
+      'href',
+      '#how-it-works',
+    );
+    await expect(page.locator('#how-it-works')).toBeVisible();
+    expect(await page.content()).not.toContain('عرض تفاعلي موجّه ببيانات اصطناعية');
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({
+      path: 'test-results/screenshots/w2s-home-showcase-hidden-390.png',
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.screenshot({
+      path: 'test-results/screenshots/w2s-home-showcase-hidden-1440.png',
+      fullPage: true,
+    });
   });
 
-  test('dark showcase text keeps AA contrast including badges', async ({ page }) => {
+  test('dark sections keep AA contrast including badges', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
     const ratios = await page.evaluate(() => {
