@@ -22,7 +22,8 @@
     "test:db": "vitest run --config vitest.integration.config.ts",
     "owner:provision": "tsx scripts/provision-owner.ts",
     "owner:reset-password": "tsx scripts/provision-owner.ts --reset-password",
-    "dev:postgres": "tsx scripts/dev-postgres.ts"
+    "dev:postgres": "tsx scripts/dev-postgres.ts",
+    "qa:cleanup-w4": "tsx scripts/cleanup-w4-qa-requests.ts"
   },
   "dependencies": {
     "@fontsource-variable/alexandria": "5.3.0",

@@ -29,9 +29,9 @@ export function CmsPageView({
     case 'features':
       return <FeaturesView content={content as FeaturesContent} />;
     case 'pricing':
-      return <PricingView content={content as PricingContent} />;
+      return <PricingView content={content as PricingContent} plans={[]} />;
     case 'join':
-      return <JoinView content={content as JoinContent} />;
+      return <JoinView content={content as JoinContent} preview />;
     case 'contact':
       return <ContactView content={content as ContactContent} />;
     case 'privacy':

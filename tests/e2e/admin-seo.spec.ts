@@ -286,7 +286,7 @@ test.describe('NKW-W32-005 final FAQ ordering evidence', () => {
     await page.getByTestId('publish-content').click();
     await expect(page.getByTestId('publication-review')).toBeVisible();
     await expect(page.getByTestId('review-faq-final-order')).toBeVisible();
-    await expect(page.getByTestId('review-faq-summary')).toContainText('الموضع 5');
+    await expect(page.getByTestId('review-faq-summary')).toContainText('الموضع داخل المحرر 5');
     const finalItems = page.getByTestId('review-faq-final-order-item');
     await expect(finalItems).toHaveCount(before + 1);
     await expect(finalItems.nth(4)).toHaveText(newQuestion);

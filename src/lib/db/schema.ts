@@ -159,6 +159,177 @@ export const contentSections = pgTable(
  * `draft_deleted` marks a previously published item that is removed in the
  * draft; unpublished draft-only items are deleted physically on discard.
  */
+/**
+ * Marketing plans (W4).
+ *
+ * Marketing data only: never authoritative for billing, subscriptions,
+ * entitlements or merchant permissions. Each plan keeps independent draft and
+ * published values. Public pricing/selection reads only `published_*` columns
+ * while `status = 'published'`; owner edits never change the public offer until
+ * the owner explicitly publishes. `draft_revision` is the per-plan optimistic
+ * concurrency counter (edits, publication and hide all advance it).
+ */
+export const plans = pgTable(
+  'plans',
+  {
+    id: text('id').primaryKey(),
+    slug: text('slug').notNull(),
+    draftName: text('draft_name').notNull(),
+    draftDescription: text('draft_description').notNull(),
+    draftFeatures: jsonb('draft_features').$type<string[]>().notNull().default([]),
+    draftMonthlyPriceMinor: integer('draft_monthly_price_minor'),
+    draftYearlyPriceMinor: integer('draft_yearly_price_minor'),
+    draftCurrency: text('draft_currency').notNull(),
+    draftCtaLabel: text('draft_cta_label').notNull(),
+    draftFeatured: boolean('draft_featured').notNull().default(false),
+    draftDisplayOrder: integer('draft_display_order').notNull().default(0),
+    publishedName: text('published_name'),
+    publishedDescription: text('published_description'),
+    publishedFeatures: jsonb('published_features').$type<string[]>(),
+    publishedMonthlyPriceMinor: integer('published_monthly_price_minor'),
+    publishedYearlyPriceMinor: integer('published_yearly_price_minor'),
+    publishedCurrency: text('published_currency'),
+    publishedCtaLabel: text('published_cta_label'),
+    publishedFeatured: boolean('published_featured'),
+    publishedDisplayOrder: integer('published_display_order'),
+    status: text('status').notNull().default('draft'),
+    draftRevision: integer('draft_revision').notNull().default(0),
+    publishedRevision: integer('published_revision'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    publishedAt: timestamp('published_at', { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex('plans_slug_unique').on(table.slug),
+    index('plans_public_order_idx').on(table.status, table.publishedDisplayOrder),
+    check('plans_status_valid', sql`${table.status} in ('draft', 'published', 'hidden')`),
+    check('plans_draft_revision_nonnegative', sql`${table.draftRevision} >= 0`),
+    check(
+      'plans_draft_monthly_price_nonnegative',
+      sql`${table.draftMonthlyPriceMinor} is null or ${table.draftMonthlyPriceMinor} >= 0`,
+    ),
+    check(
+      'plans_draft_yearly_price_nonnegative',
+      sql`${table.draftYearlyPriceMinor} is null or ${table.draftYearlyPriceMinor} >= 0`,
+    ),
+    check(
+      'plans_published_monthly_price_nonnegative',
+      sql`${table.publishedMonthlyPriceMinor} is null or ${table.publishedMonthlyPriceMinor} >= 0`,
+    ),
+    check(
+      'plans_published_yearly_price_nonnegative',
+      sql`${table.publishedYearlyPriceMinor} is null or ${table.publishedYearlyPriceMinor} >= 0`,
+    ),
+    check(
+      'plans_display_order_range',
+      sql`${table.draftDisplayOrder} between 0 and 9999 and (${table.publishedDisplayOrder} is null or ${table.publishedDisplayOrder} between 0 and 9999)`,
+    ),
+    check('plans_draft_currency_format', sql`${table.draftCurrency} ~ '^[A-Z]{3}$'`),
+    check(
+      'plans_published_currency_format',
+      sql`${table.publishedCurrency} is null or ${table.publishedCurrency} ~ '^[A-Z]{3}$'`,
+    ),
+    check(
+      'plans_published_complete',
+      sql`${table.status} <> 'published' or (
+        ${table.publishedName} is not null and
+        ${table.publishedDescription} is not null and
+        ${table.publishedFeatures} is not null and
+        ${table.publishedCurrency} is not null and
+        ${table.publishedCtaLabel} is not null and
+        ${table.publishedFeatured} is not null and
+        ${table.publishedDisplayOrder} is not null and
+        ${table.publishedRevision} is not null
+      )`,
+    ),
+  ],
+);
+
+/**
+ * Early-access join requests (W4).
+ *
+ * Public write-only surface: submissions are created with status `new`,
+ * internal notes unset, server-generated IDs/timestamps, and a server-generated
+ * snapshot of the selected marketing offer. Administrative fields are never
+ * accepted from clients. `revision` protects owner status/note edits from
+ * silently overwriting a concurrent change.
+ */
+export const joinRequests = pgTable(
+  'join_requests',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    phone: text('phone').notNull(),
+    email: text('email'),
+    businessActivity: text('business_activity'),
+    planId: text('plan_id').references(() => plans.id, { onDelete: 'restrict' }),
+    planNameSnapshot: text('plan_name_snapshot'),
+    planPriceMinorSnapshot: integer('plan_price_minor_snapshot'),
+    planPricePeriodSnapshot: text('plan_price_period_snapshot'),
+    planCurrencySnapshot: text('plan_currency_snapshot'),
+    source: text('source').notNull().default('direct'),
+    utmSource: text('utm_source'),
+    utmMedium: text('utm_medium'),
+    utmCampaign: text('utm_campaign'),
+    status: text('status').notNull().default('new'),
+    notes: text('notes'),
+    submissionToken: text('submission_token').notNull(),
+    revision: integer('revision').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('join_requests_submission_token_unique').on(table.submissionToken),
+    index('join_requests_created_at_idx').on(table.createdAt),
+    index('join_requests_status_created_at_idx').on(table.status, table.createdAt),
+    index('join_requests_plan_id_idx').on(table.planId),
+    check('join_requests_status_valid', sql`${table.status} in ('new', 'contacted', 'closed')`),
+    check(
+      'join_requests_source_valid',
+      sql`${table.source} in ('direct', 'pricing', 'join')`,
+    ),
+    check('join_requests_revision_nonnegative', sql`${table.revision} >= 0`),
+    check('join_requests_phone_length', sql`char_length(${table.phone}) between 8 and 20`),
+    check(
+      'join_requests_plan_snapshot_valid',
+      sql`${table.planId} is null or (${table.planNameSnapshot} is not null and ${table.planCurrencySnapshot} is not null)`,
+    ),
+    check(
+      'join_requests_price_period_valid',
+      sql`${table.planPricePeriodSnapshot} is null or ${table.planPricePeriodSnapshot} in ('monthly', 'yearly')`,
+    ),
+    check(
+      'join_requests_price_snapshot_nonnegative',
+      sql`${table.planPriceMinorSnapshot} is null or ${table.planPriceMinorSnapshot} >= 0`,
+    ),
+    check(
+      'join_requests_notes_length',
+      sql`${table.notes} is null or char_length(${table.notes}) <= 4000`,
+    ),
+  ],
+);
+
+/**
+ * Durable join-intake rate limiting (W4).
+ *
+ * One row per derived request-identity bucket (the raw IP/header is never
+ * stored). The upsert in `src/lib/join/rate-limit.ts` is atomic; window expiry
+ * resets the counter. Obsolete rows are pruned with a bounded cleanup. This
+ * table is deliberately separate from Better Auth's `rate_limit` rows.
+ */
+export const joinIntakeRateLimits = pgTable(
+  'join_intake_rate_limits',
+  {
+    key: text('key').primaryKey(),
+    windowStart: timestamp('window_start', { withTimezone: true }).notNull(),
+    count: integer('count').notNull(),
+  },
+  (table) => [
+    index('join_intake_rate_limits_window_idx').on(table.windowStart),
+    check('join_intake_rate_limits_count_nonnegative', sql`${table.count} >= 0`),
+  ],
+);
+
 export const faqItems = pgTable(
   'faq_items',
   {

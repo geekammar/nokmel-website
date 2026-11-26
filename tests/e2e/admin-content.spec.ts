@@ -15,6 +15,9 @@ const PUBLISH_SUCCESS = 'تم نشر المحتوى وأصبحت النسخة ا
 const DISCARD_SUCCESS = 'تم تجاهل المسودة غير المنشورة. النسخة المنشورة لم تتغيّر.';
 const CONFLICT_REVIEW =
   'تغيّرت المسودة بعد إعداد المراجعة. لم يُنشر أي شيء. أعد تحميل أحدث نسخة ثم أعد المراجعة.';
+const joinIntakeEnabled = ['1', 'true'].includes(
+  (process.env.JOIN_INTAKE_ENABLED ?? '1').trim().toLowerCase(),
+);
 
 test.skip(!enabled, 'Admin e2e environment is not configured');
 
@@ -368,8 +371,13 @@ test.describe('per-page editing', () => {
           await expect(visitor.getByText('نُسخة أولية قيد الإعداد')).toBeVisible();
         }
         if (pageCase.key === 'join') {
-          await expect(visitor.locator('button', { hasText: 'اطلب الانضمام' })).toBeDisabled();
-          await expect(visitor.locator('#join-name')).toBeDisabled();
+          if (joinIntakeEnabled) {
+            await expect(visitor.locator('button', { hasText: 'اطلب الانضمام' })).toBeEnabled();
+            await expect(visitor.locator('#join-name')).toBeEnabled();
+          } else {
+            await expect(visitor.locator('button', { hasText: 'اطلب الانضمام' })).toBeDisabled();
+            await expect(visitor.locator('#join-name')).toBeDisabled();
+          }
         }
       } finally {
         await anonymous.close();

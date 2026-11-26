@@ -1,0 +1,19 @@
+/**
+ * Public marketing-plan labels (W4). Code-controlled operational copy; plan
+ * names/descriptions/prices/features/CTAs come from published plan data.
+ */
+
+export const publicPlansUi = {
+  sectionTitle: 'باقات الانضمام المبكر',
+  sectionLead:
+    'باقات تعريفية لمرحلة الانضمام المبكر. الأسعار، عند عرضها، تعريفية فقط ولا تُفعّل اشتراكاً أو التزاماً بدفع.',
+  monthly: 'شهرياً',
+  yearly: 'سنوياً',
+  priceLater: 'يُعلن لاحقاً',
+  featured: 'مميّزة',
+  marketingNote:
+    'الشراء والاشتراك غير مفعّلين. هذه الباقات تعريفية للانضمام المبكر ولا تُنشئ التزاماً تجارياً.',
+  noPurchaseWithPlans:
+    'الشراء والاشتراك غير مفعّلين في هذه المرحلة. الباقات المعروضة تعريفية فقط، وأي سعر يظهر لا يُنشئ التزاماً بدفع.',
+  previewCtaNote: 'هذا عرض معاينة للمالك فقط؛ زر الانضمام معطّل.',
+} as const;

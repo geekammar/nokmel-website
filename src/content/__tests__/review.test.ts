@@ -65,7 +65,13 @@ describe('FAQ publication review final order (NKW-W32-005)', () => {
       publishedFaq[3],
     ]);
     expect(review.faq?.added).toEqual([
-      { id: 'x', question: 'سؤال جديد في المنتصف', position: 3, visible: true },
+      {
+        id: 'x',
+        question: 'سؤال جديد في المنتصف',
+        position: 3,
+        visiblePosition: 3,
+        visible: true,
+      },
     ]);
     expect(review.faq?.removed).toEqual([]);
     expect(visibleIds(review)).toEqual(['a', 'b', 'x', 'c', 'd']);
@@ -77,7 +83,7 @@ describe('FAQ publication review final order (NKW-W32-005)', () => {
   it('shows removal positions and shifts later final visible positions', () => {
     const review = buildFaqReview([publishedFaq[1], publishedFaq[2], publishedFaq[3]]);
     expect(review.faq?.removed).toEqual([
-      { id: 'a', question: 'السؤال أ', position: 1 },
+      { id: 'a', question: 'السؤال أ', position: 1, visiblePosition: 1 },
     ]);
     expect(visibleIds(review)).toEqual(['b', 'c', 'd']);
     expect(review.faq?.finalVisibleOrder.map((item) => item.position)).toEqual([1, 2, 3]);
@@ -107,6 +113,44 @@ describe('FAQ publication review final order (NKW-W32-005)', () => {
     ]);
     expect(review.faq?.visibilityChanged).toEqual([
       { id: 'b', question: 'السؤال ب', before: true, after: false },
+    ]);
+  });
+
+  it('separates editor positions from visitor positions when hidden items exist (NKW-W33-001)', () => {
+    const hiddenDraft = faq('b', 'السؤال ب', false);
+    const inserted = faq('x', 'سؤال مضاف بعد المخفي');
+    const review = buildFaqReview([
+      publishedFaq[0],
+      hiddenDraft,
+      inserted,
+      publishedFaq[2],
+      publishedFaq[3],
+    ]);
+    expect(review.faq?.added).toEqual([
+      {
+        id: 'x',
+        question: 'سؤال مضاف بعد المخفي',
+        position: 3,
+        visiblePosition: 2,
+        visible: true,
+      },
+    ]);
+    expect(review.faq?.hidden).toEqual([
+      { id: 'b', question: 'السؤال ب', position: 2 },
+    ]);
+    expect(visibleIds(review)).toEqual(['a', 'x', 'c', 'd']);
+  });
+
+  it('does not assign a visitor position to a hidden removal', () => {
+    const publishedWithHidden = [
+      publishedFaq[0],
+      faq('b', 'السؤال ب', false),
+      publishedFaq[2],
+      publishedFaq[3],
+    ];
+    const review = buildFaqReview([publishedFaq[0], publishedFaq[2], publishedFaq[3]], publishedWithHidden);
+    expect(review.faq?.removed).toEqual([
+      { id: 'b', question: 'السؤال ب', position: 2, visiblePosition: null },
     ]);
   });
 

@@ -34,13 +34,19 @@ export type PublicationReviewFaqEdit = {
 export type PublicationReviewFaqRemoval = {
   id: string;
   question: string;
+  /** One-based position among all published items (editor order). */
   position: number;
+  /** One-based position among published visible items, or null if hidden. */
+  visiblePosition: number | null;
 };
 
 export type PublicationReviewFaqAddition = {
   id: string;
   question: string;
+  /** One-based position among all draft items (editor order). */
   position: number;
+  /** One-based position among visible draft items, or null if hidden. */
+  visiblePosition: number | null;
   visible: boolean;
 };
 
@@ -232,6 +238,15 @@ function faqChanges(
   const draftById = new Map(draftItems.map((item) => [item.id, item]));
   const publishedById = new Map(publishedItems.map((item) => [item.id, item]));
 
+  const draftVisiblePositions = new Map<string, number>();
+  draftItems
+    .filter((item) => item.visible)
+    .forEach((item, index) => draftVisiblePositions.set(item.id, index + 1));
+  const publishedVisiblePositions = new Map<string, number>();
+  publishedItems
+    .filter((item) => item.visible)
+    .forEach((item, index) => publishedVisiblePositions.set(item.id, index + 1));
+
   const added = draftItems
     .map((item, index) => ({ item, position: index + 1 }))
     .filter(({ item }) => !publishedById.has(item.id))
@@ -239,6 +254,7 @@ function faqChanges(
       id: item.id,
       question: item.question,
       position,
+      visiblePosition: item.visible ? draftVisiblePositions.get(item.id) ?? null : null,
       visible: item.visible,
     }));
   const removed = publishedItems
@@ -248,6 +264,7 @@ function faqChanges(
       id: item.id,
       question: item.question,
       position,
+      visiblePosition: publishedVisiblePositions.get(item.id) ?? null,
     }));
 
   const edited: PublicationReviewFaqEdit[] = [];

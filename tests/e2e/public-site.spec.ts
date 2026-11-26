@@ -324,16 +324,39 @@ test.describe('homepage structure', () => {
   });
 });
 
-test.describe('join form (W2: disabled preview state)', () => {
-  test('all controls are disabled with a disabled submit', async ({ page }) => {
+const authE2eConfigured = Boolean(process.env.E2E_OWNER_PASSWORD && process.env.DATABASE_URL);
+const joinIntakeEnabled = ['1', 'true'].includes(
+  (process.env.JOIN_INTAKE_ENABLED ?? (authE2eConfigured ? '1' : ''))
+    .trim()
+    .toLowerCase(),
+);
+
+test.describe('join form state', () => {
+  test('keeps the disabled preview state or the explicitly enabled intake state', async ({
+    page,
+  }) => {
     await page.goto('/join');
     const inputs = page.getByTestId('join-form').locator('input, textarea');
     await expect(inputs).toHaveCount(4);
     for (const input of await inputs.all()) {
-      await expect(input).toBeDisabled();
+      if (joinIntakeEnabled) {
+        await expect(input).toBeEnabled();
+      } else {
+        await expect(input).toBeDisabled();
+      }
     }
     const submit = page.getByTestId('join-form').getByRole('button', { name: CTA });
-    await expect(submit).toBeDisabled();
+    if (joinIntakeEnabled) {
+      await expect(submit).toBeEnabled();
+      await expect(page.getByTestId('join-intake-notice')).toContainText(
+        'استلام طلبات الانضمام مفعّل',
+      );
+    } else {
+      await expect(submit).toBeDisabled();
+      await expect(page.getByTestId('join-intake-notice')).toContainText(
+        'غير مفعّل',
+      );
+    }
   });
 
   test('labels are associated and ids unique', async ({ page }) => {

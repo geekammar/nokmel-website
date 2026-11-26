@@ -195,13 +195,17 @@ export function PublicationReviewPanel({
                     <li key={item.id}>
                       {item.question}{' '}
                       <span className="text-xs text-text-secondary">
-                        ({adminContentUi.review.faqAddedPosition.replace('{position}', String(item.position))})
-                      </span>
-                      {!item.visible ? (
-                        <span className="ms-1 text-xs text-status-warning">
-                          — {adminContentUi.review.hidden}
+                        ({adminContentUi.review.faqEditorPosition.replace('{position}', String(item.position))})
+                      </span>{' '}
+                      {item.visible && item.visiblePosition !== null ? (
+                        <span className="text-xs text-text-secondary">
+                          ({adminContentUi.review.faqVisitorPosition.replace('{position}', String(item.visiblePosition))})
                         </span>
-                      ) : null}
+                      ) : (
+                        <span className="text-xs text-status-warning">
+                          — {adminContentUi.review.faqHiddenNoVisitor}
+                        </span>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -217,7 +221,12 @@ export function PublicationReviewPanel({
                     <li key={item.id}>
                       {item.question}{' '}
                       <span className="text-xs text-text-secondary">
-                        ({adminContentUi.review.faqRemovedPosition.replace('{position}', String(item.position))})
+                        ({adminContentUi.review.faqEditorPosition.replace('{position}', String(item.position))})
+                      </span>{' '}
+                      <span className="text-xs text-text-secondary">
+                        ({item.visiblePosition !== null
+                          ? adminContentUi.review.faqVisitorPosition.replace('{position}', String(item.visiblePosition))
+                          : adminContentUi.review.faqRemovedHidden})
                       </span>
                     </li>
                   ))}

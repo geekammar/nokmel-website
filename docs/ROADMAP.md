@@ -25,15 +25,23 @@ W3.2 status (2026-11-25): merged via PR #5 (accepted HEAD
 development. Additive migration `0002_w32-content-cms` is applied on hosted
 development by the external lead.
 
-W3.3 status (2026-11-25): implementation complete on
-`feature/w33-seo-management` (draft PR pending independent acceptance). Adds
-owner-only page-level SEO/social metadata editing for the seven existing routes
-on the reused `content_sections` draft/publication model, with published-only
-public metadata generation, approved social-image registry, combined publication
-review, and the NKW-W32-005 FAQ final-order correction. No schema migration;
-existing W3.2 records remain valid. Hosted Preview branch configuration and
-independent/live acceptance remain external; production and indexing stay at W6.
-Plans/join-request storage W4; analytics/settings W5; launch W6.
+W3.3 status (2026-11-25): merged via PR #6 and accepted for continued
+development (accepted HEAD `dcf1f8d9ede739a29bd48d036df1a1d5cd9f28bf`, merge
+commit `0020ddacdd54b3c23471b58b17b54fda1c1a0ae1`). No schema migration.
+
+W4 status (2026-11-26): **CONDITIONAL ACCEPT for Preview** after hosted
+Development activation and independent live acceptance (22 cases: 17 PASS,
+4 PARTIAL, 1 BLOCKED, 0 FAIL). Authorized alias resolves to configured
+deployment `dpl_5Qz8bZ3SUCFoFjQ7rbB5VYcR5crc`, READY, exact expected HEAD.
+Migration `0003_w4-plans-join-requests` is applied on hosted Development. The
+final product-consistency closure addresses NKW-W4-001 source attribution,
+NKW-W4-002 owner FAQ correction, NKW-W4-003 snapshot limitation wording,
+NKW-W4-004 recovery-option synchronization and NKW-W4-005 requested-plan notice
+with no migration/grant change. Focused hosted retest, raw hosted metadata,
+forwarded-header/security evidence, physical Android acceptance, final
+privacy/retention approval and explicit launch approval remain external.
+NKW-W33-001 labels corrected; NKW-W33-002 revision behavior preserved.
+Analytics/settings remain W5; launch W6.
 
 ## Standing rules
 

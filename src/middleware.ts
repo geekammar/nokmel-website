@@ -16,17 +16,22 @@ import { getSessionCookie } from 'better-auth/cookies';
 const LOGIN_PATH = '/admin/login';
 const COOKIE_PREFIX = 'nokmel';
 
+function privateResponse(response: NextResponse): NextResponse {
+  response.headers.set('cache-control', 'no-store');
+  return response;
+}
+
 export function middleware(request: NextRequest) {
   if (request.nextUrl.pathname === LOGIN_PATH) {
-    return NextResponse.next();
+    return privateResponse(NextResponse.next());
   }
   const hasSessionCookie = Boolean(
     getSessionCookie(request, { cookiePrefix: COOKIE_PREFIX }),
   );
   if (!hasSessionCookie) {
-    return NextResponse.redirect(new URL(LOGIN_PATH, request.nextUrl.origin));
+    return privateResponse(NextResponse.redirect(new URL(LOGIN_PATH, request.nextUrl.origin)));
   }
-  return NextResponse.next();
+  return privateResponse(NextResponse.next());
 }
 
 export const config = {

@@ -57,7 +57,7 @@ beforeAll(async () => {
   );
   await pg.pool.query('revoke all on all tables in schema public from public');
   await pg.pool.query(
-    `grant select, insert, update, delete on table "user", "session", "account", "verification", "rate_limit", "content_sections", "faq_items" to ${quoteIdentifier(roleName)}`,
+    `grant select, insert, update, delete on table "user", "session", "account", "verification", "rate_limit", "content_sections", "faq_items", "plans", "join_requests", "join_intake_rate_limits" to ${quoteIdentifier(roleName)}`,
   );
 });
 
@@ -164,11 +164,51 @@ describe('restricted runtime database role', () => {
       );
       await runtimePool.query("delete from faq_items where id = 'faq-runtime-probe'");
 
+      // Intended W4 plan/join/rate-limit DML is allowed with explicit grants.
+      await runtimePool.query(
+        `insert into plans (id, slug, draft_name, draft_description, draft_currency, draft_cta_label, draft_revision)
+         values ('plan-runtime-probe', 'runtime-probe', 'باقة', 'وصف', 'EGP', 'اطلب الانضمام', 1)`,
+      );
+      await runtimePool.query(
+        "update plans set draft_revision = 2 where id = 'plan-runtime-probe'",
+      );
+      const planRead = await runtimePool.query(
+        "select draft_revision from plans where id = 'plan-runtime-probe'",
+      );
+      expect(planRead.rows[0].draft_revision).toBe(2);
+      await runtimePool.query(
+        `insert into join_requests (id, name, phone, plan_id, plan_name_snapshot, plan_currency_snapshot, submission_token)
+         values ('request-runtime-probe', 'Synthetic Trader', '+201000000000', 'plan-runtime-probe', 'باقة', 'EGP', 'runtime-probe-token')`,
+      );
+      const requestRead = await runtimePool.query(
+        "select status, notes, revision from join_requests where id = 'request-runtime-probe'",
+      );
+      expect(requestRead.rows[0]).toEqual({ status: 'new', notes: null, revision: 0 });
+      await runtimePool.query(
+        "update join_requests set notes = 'probe', revision = 1 where id = 'request-runtime-probe'",
+      );
+      await runtimePool.query(
+        `insert into join_intake_rate_limits (key, window_start, count)
+         values ('join-intake:v1:runtime-probe', now(), 1)
+         on conflict (key) do update set count = join_intake_rate_limits.count + 1`,
+      );
+      await runtimePool.query(
+        "delete from join_intake_rate_limits where key = 'join-intake:v1:runtime-probe'",
+      );
+      await runtimePool.query("delete from join_requests where id = 'request-runtime-probe'");
+      await runtimePool.query("delete from plans where id = 'plan-runtime-probe'");
+
       await expect(
         runtimePool.query('create table "runtime_ddl_probe" (id integer)'),
       ).rejects.toThrow(/permission denied/i);
       await expect(
         runtimePool.query('truncate table content_sections'),
+      ).rejects.toThrow(/permission denied/i);
+      await expect(
+        runtimePool.query('truncate table plans'),
+      ).rejects.toThrow(/permission denied/i);
+      await expect(
+        runtimePool.query('truncate table join_requests'),
       ).rejects.toThrow(/permission denied/i);
       await expect(
         runtimePool.query('alter table "user" add column "runtime_probe" integer'),
