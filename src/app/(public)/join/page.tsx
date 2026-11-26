@@ -36,9 +36,11 @@ export default async function JoinPage({
     planSlug === null
       ? null
       : plansResult.plans.find((plan) => plan.slug === planSlug) ?? null;
-  const explicitSource = sanitizeJoinSource(params.source);
-  const source =
-    params.source === undefined && selectedPlan ? 'pricing' : explicitSource;
+  // Acquisition source is an independent bounded hint. Plan preselection never
+  // implies a pricing-page origin; only an explicit valid source does.
+  const source = sanitizeJoinSource(params.source);
+  const requestedPlanUnavailable =
+    params.plan !== undefined && selectedPlan === null;
   const storageReady =
     plansResult.status === 'ok' || plansResult.status === 'invalid';
   const intakeSecurityConfigured =
@@ -53,6 +55,7 @@ export default async function JoinPage({
     utmSource: sanitizeUtmValue(params.utm_source),
     utmMedium: sanitizeUtmValue(params.utm_medium),
     utmCampaign: sanitizeUtmValue(params.utm_campaign),
+    requestedPlanUnavailable,
   };
 
   return <JoinView content={bundle.content} intake={intake} />;

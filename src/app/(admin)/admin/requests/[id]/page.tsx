@@ -55,8 +55,9 @@ export default async function AdminRequestDetailPage({
   }
 
   const request = result.request;
+  const hasPlanSnapshot = request.planNameSnapshot !== null;
   const price =
-    request.planNameSnapshot && request.planCurrencySnapshot
+    hasPlanSnapshot && request.planCurrencySnapshot
       ? formatPriceMinor(request.planPriceMinorSnapshot, request.planCurrencySnapshot)
       : null;
   const pricePeriod =
@@ -65,6 +66,12 @@ export default async function AdminRequestDetailPage({
       : request.planPricePeriodSnapshot === 'yearly'
         ? adminRequestsUi.priceYearly
         : null;
+  const priceLabel =
+    request.planPricePeriodSnapshot === 'monthly'
+      ? adminRequestsUi.priceMonthlySnapshot
+      : request.planPricePeriodSnapshot === 'yearly'
+        ? adminRequestsUi.priceYearlySnapshot
+        : adminRequestsUi.priceSnapshot;
 
   return (
     <div className="mx-auto w-full max-w-3xl">
@@ -129,11 +136,15 @@ export default async function AdminRequestDetailPage({
               </dd>
             </div>
             <div>
-              <dt className="font-semibold text-text-secondary">{adminRequestsUi.priceSnapshot}</dt>
-              <dd className="text-text-primary" dir="ltr">
-                {price
-                  ? `${price}${pricePeriod ? ` · ${pricePeriod}` : ''}`
-                  : adminRequestsUi.priceNotAnnounced}
+              <dt className="font-semibold text-text-secondary">
+                {hasPlanSnapshot ? priceLabel : adminRequestsUi.priceSnapshot}
+              </dt>
+              <dd className="text-text-primary" dir={price ? 'ltr' : undefined}>
+                {!hasPlanSnapshot
+                  ? adminRequestsUi.priceNotApplicable
+                  : price
+                    ? `${price}${pricePeriod ? ` · ${pricePeriod}` : ''}`
+                    : adminRequestsUi.priceNotAnnounced}
               </dd>
             </div>
             <div>
@@ -142,7 +153,9 @@ export default async function AdminRequestDetailPage({
             </div>
           </dl>
           <p className="mt-3 text-xs leading-5 text-text-secondary">
-            {adminRequestsUi.offerSnapshotNote}
+            {hasPlanSnapshot
+              ? adminRequestsUi.offerSnapshotNote
+              : adminRequestsUi.noPlanSnapshotNote}
           </p>
         </section>
       </div>

@@ -11,8 +11,9 @@ CREATE; the migrator retains `public`/`drizzle` schema privileges and its
 temporary database-level CREATE was revoked after migration. The external lead
 reports W3.2 `0002_w32-content-cms` applied on hosted development, CMS runtime
 grants configured, and database-level CREATE revoked. W4 migration
-`0003_w4-plans-join-requests` is prepared but **not applied** by the coding
-agent; hosted activation remains external. No credentials are recorded here.
+`0003_w4-plans-join-requests`, runtime grants and branch Preview intake
+configuration were activated externally; the coding agent did not connect to
+hosted Neon. No credentials are recorded here.
 
 ## Roles
 
@@ -200,8 +201,9 @@ SELECT has_table_privilege('nokmel_runtime', 'public.content_sections', 'SELECT'
 
 ## 3b. W4 plans, join requests and intake rate-limit privileges
 
-After `0003_w4-plans-join-requests` is applied, grant only the DML the W4
-features use. The runtime reads published plans on public requests, performs
+Hosted Development activation of `0003_w4-plans-join-requests` is reported
+complete by the external lead. For a fresh environment, grant only the DML the
+W4 features use. The runtime reads published plans on public requests, performs
 owner-authorized plan draft/publication/hide writes, creates public join
 requests, updates them from owner-authorized pages/actions, and maintains the
 dedicated intake limiter bucket:

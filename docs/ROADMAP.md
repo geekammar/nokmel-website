@@ -29,14 +29,17 @@ W3.3 status (2026-11-25): merged via PR #6 and accepted for continued
 development (accepted HEAD `dcf1f8d9ede739a29bd48d036df1a1d5cd9f28bf`, merge
 commit `0020ddacdd54b3c23471b58b17b54fda1c1a0ae1`). No schema migration.
 
-W4 status (2026-11-26): implementation complete on
-`feature/w4-plans-join-requests` (draft PR; external acceptance pending). Adds
-owner-managed marketing plans with draft/publish/hide and exact minor-unit
-prices, public pricing integration and `/join?plan=` selection, a fail-closed
-durable early-access intake with rate limiting/idempotency/offer snapshots, and
-owner-only Join Requests status/notes. Additive migration
-`0003_w4-plans-join-requests`; hosted activation, Preview intake enablement,
-approved privacy/retention and all production/launch gates remain external.
+W4 status (2026-11-26): **CONDITIONAL ACCEPT for Preview** after hosted
+Development activation and independent live acceptance (22 cases: 17 PASS,
+4 PARTIAL, 1 BLOCKED, 0 FAIL). Authorized alias resolves to configured
+deployment `dpl_5Qz8bZ3SUCFoFjQ7rbB5VYcR5crc`, READY, exact expected HEAD.
+Migration `0003_w4-plans-join-requests` is applied on hosted Development. The
+final product-consistency closure addresses NKW-W4-001 source attribution,
+NKW-W4-002 owner FAQ correction, NKW-W4-003 snapshot limitation wording,
+NKW-W4-004 recovery-option synchronization and NKW-W4-005 requested-plan notice
+with no migration/grant change. Focused hosted retest, raw hosted metadata,
+forwarded-header/security evidence, physical Android acceptance, final
+privacy/retention approval and explicit launch approval remain external.
 NKW-W33-001 labels corrected; NKW-W33-002 revision behavior preserved.
 Analytics/settings remain W5; launch W6.
 

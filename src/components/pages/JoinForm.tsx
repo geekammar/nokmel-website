@@ -51,6 +51,17 @@ const FIELD_IDS: Record<string, string> = {
   planRevision: 'join-plan',
 };
 
+function toPlanSource(plan: PublicPlan): PlanSource {
+  return {
+    slug: plan.slug,
+    name: plan.name,
+    monthlyPriceMinor: plan.monthlyPriceMinor,
+    yearlyPriceMinor: plan.yearlyPriceMinor,
+    currency: plan.currency,
+    publishedRevision: plan.publishedRevision,
+  };
+}
+
 function priceSummary(plan: PlanSource): string {
   const monthly = formatPriceMinor(plan.monthlyPriceMinor, plan.currency);
   const yearly = formatPriceMinor(plan.yearlyPriceMinor, plan.currency);
@@ -68,11 +79,13 @@ export function JoinForm({
   utmSource,
   utmMedium,
   utmCampaign,
+  requestedPlanUnavailable = false,
 }: {
   content: JoinContent;
   plans: PublicPlan[];
   initialSelectedPlan: PublicPlan | null;
   source: JoinSource;
+  requestedPlanUnavailable?: boolean;
   utmSource: string | null;
   utmMedium: string | null;
   utmCampaign: string | null;
@@ -88,8 +101,8 @@ export function JoinForm({
   const [email, setEmail] = useState('');
   const [businessActivity, setBusinessActivity] = useState('');
   const [selectedSlug, setSelectedSlug] = useState(initialSelectedPlan?.slug ?? '');
-  const [planSource, setPlanSource] = useState<PlanSource | null>(
-    initialSelectedPlan ? { ...initialSelectedPlan } : null,
+  const [planOptions, setPlanOptions] = useState<PlanSource[]>(() =>
+    plans.map(toPlanSource),
   );
   const [submissionToken, setSubmissionToken] = useState(() => crypto.randomUUID());
   const [submitting, setSubmitting] = useState(false);
@@ -108,12 +121,7 @@ export function JoinForm({
   }, [retryAfter]);
 
   const selectedPlan =
-    selectedSlug === planSource?.slug
-      ? planSource
-      : plans.find((plan) => plan.slug === selectedSlug) ?? null;
-  const planOptions = pendingPlan && !plans.some((plan) => plan.slug === pendingPlan.slug)
-    ? [...plans, pendingPlan]
-    : plans;
+    planOptions.find((plan) => plan.slug === selectedSlug) ?? null;
 
   function focusFirstError(nextErrors: Record<string, string>) {
     const firstKey = Object.keys(nextErrors)[0];
@@ -140,7 +148,6 @@ export function JoinForm({
     setSelectedSlug(value);
     setPendingPlan(null);
     setPlanUnavailable(false);
-    setPlanSource(plans.find((plan) => plan.slug === value) ?? null);
     setBanner(null);
     setErrors((current) => {
       const next = { ...current };
@@ -224,17 +231,28 @@ export function JoinForm({
         return;
       }
       if (code === 'plan_unavailable') {
+        const unavailableSlug = selection.slug;
+        setPlanOptions((current) =>
+          current.filter((plan) => plan.slug !== unavailableSlug),
+        );
         setSelectedSlug('');
-        setPlanSource(null);
         setPendingPlan(null);
         setPlanUnavailable(true);
         setBanner({ kind: 'error', text: publicJoinUi.errors.planUnavailable });
         return;
       }
       if (code === 'plan_changed' && apiError?.currentPlan) {
-        setPendingPlan(apiError.currentPlan);
-        setSelectedSlug(apiError.currentPlan.slug);
-        setPlanSource(apiError.currentPlan);
+        const updatedPlan = apiError.currentPlan;
+        setPlanOptions((current) => {
+          const exists = current.some((plan) => plan.slug === updatedPlan.slug);
+          if (!exists) return [...current, updatedPlan];
+          return current.map((plan) =>
+            plan.slug === updatedPlan.slug ? updatedPlan : plan,
+          );
+        });
+        setPendingPlan(updatedPlan);
+        setSelectedSlug(updatedPlan.slug);
+        setPlanUnavailable(false);
         setBanner({ kind: 'info', text: publicJoinUi.errors.planChanged });
         return;
       }
@@ -264,7 +282,6 @@ export function JoinForm({
 
   function handleContinueWithoutPlan() {
     setSelectedSlug('');
-    setPlanSource(null);
     setPendingPlan(null);
     setPlanUnavailable(false);
     setBanner(null);
@@ -274,7 +291,6 @@ export function JoinForm({
   function handleConfirmCurrentPlan() {
     if (!pendingPlan) return;
     setSelectedSlug(pendingPlan.slug);
-    setPlanSource(pendingPlan);
     setPlanUnavailable(false);
     setBanner(null);
     void send({ slug: pendingPlan.slug, plan: pendingPlan });
@@ -286,7 +302,6 @@ export function JoinForm({
     setBanner(null);
     setErrors({});
     setSelectedSlug('');
-    setPlanSource(null);
     setPendingPlan(null);
     setPlanUnavailable(false);
     setName('');
@@ -321,6 +336,16 @@ export function JoinForm({
   return (
     <Card className="flex flex-col gap-5" data-testid="join-form">
       <h2 className="text-xl font-bold sm:text-2xl">{content.formTitle}</h2>
+
+      {requestedPlanUnavailable ? (
+        <p
+          role="note"
+          data-testid="requested-plan-unavailable"
+          className="rounded-card border-s-4 border-status-warning bg-background p-4 text-sm leading-6 text-text-primary"
+        >
+          {publicJoinUi.requestedPlanUnavailable}
+        </p>
+      ) : null}
 
       {selectedPlan ? (
         <div

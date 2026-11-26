@@ -21,6 +21,7 @@ export type JoinIntakeViewState = {
   utmSource: string | null;
   utmMedium: string | null;
   utmCampaign: string | null;
+  requestedPlanUnavailable?: boolean;
 };
 
 type JoinMode = 'enabled' | 'disabled' | 'storage_unavailable' | 'preview';
@@ -93,6 +94,7 @@ export function JoinView({
               utmSource={intake.utmSource}
               utmMedium={intake.utmMedium}
               utmCampaign={intake.utmCampaign}
+              requestedPlanUnavailable={intake.requestedPlanUnavailable === true}
             />
           ) : (
             <Card className="flex flex-col gap-5" data-testid="join-form">

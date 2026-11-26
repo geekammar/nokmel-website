@@ -265,6 +265,39 @@ describe('FAQ draft and publication semantics', () => {
     );
   });
 
+  test('does not auto-rewrite a previously published stale join-availability FAQ answer', async () => {
+    const staleAnswer =
+      'ليس بعد. النموذج معطّل حالياً وسيُفعَّل مع اقتراب موعد الإطلاق.';
+    const items = defaultFaqInput();
+    const target = items.find((item) => item.question.includes('نموذج طلب الانضمام'));
+    if (!target) throw new Error('join availability FAQ missing');
+    target.answer = staleAnswer;
+    await saveHome(0, 'عنوان مع إجابة قديمة', items);
+    await publishPageContent(
+      { pageKey: 'home', locale: 'ar', expectedRevision: 1 },
+      { db: pg.db },
+    );
+
+    const publicBefore = await getPublishedPageContent('home', 'ar', { db: pg.db });
+    expect(
+      publicBefore.faq.items.find((item) => item.question === target.question)?.answer,
+    ).toBe(staleAnswer);
+
+    const stored = await pg.pool.query(
+      'select published_answer from faq_items where published_question = $1',
+      [target.question],
+    );
+    expect(stored.rows[0].published_answer).toBe(staleAnswer);
+
+    // Rendering must not silently mutate the owner-published CMS row.
+    await getPublishedPageContent('home', 'ar', { db: pg.db });
+    const storedAfter = await pg.pool.query(
+      'select published_answer from faq_items where published_question = $1',
+      [target.question],
+    );
+    expect(storedAfter.rows[0].published_answer).toBe(staleAnswer);
+  });
+
   test('removing a published FAQ item removes it only after publication', async () => {
     const items = defaultFaqInput();
     await saveHome(0, 'عنوان', items);
