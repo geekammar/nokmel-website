@@ -5,20 +5,34 @@ import {
 } from '@/content/cms/social-images';
 import { getPageDefinition, type CmsPageKey } from '@/content/cms/registry';
 import type { EffectiveSeo } from '@/content/cms/seo';
+import { isPublicIndexingEnabled } from '@/lib/launch-controls';
 import { siteUrl } from '@/lib/site';
 
 /**
  * Pre-launch indexing barrier.
  *
- * While `PRE_LAUNCH` is `true` every public page is served with
- * `noindex, nofollow`, and `public/robots.txt` disallows all crawlers.
- * This is an intentional, centralized launch gate — not a permanent
- * noindex rule. Public indexing is switched on only with explicit launch
- * approval (W6) by:
- *   1. setting `PRE_LAUNCH = false` here, and
- *   2. replacing `public/robots.txt` with the launch indexing rules.
+ * Public pages are `noindex, nofollow` unless the explicit, runtime-only
+ * `SITE_INDEXING_ENABLED` release flag is set in a non-Preview deployment.
+ * `PRE_LAUNCH` mirrors that decision for existing callers/tests. `robots.txt`
+ * and `sitemap.xml` are generated from the same gate, so metadata, robots and
+ * sitemap can never disagree.
+ *
+ * Admin/login/protected-preview paths stay `noindex, nofollow` unconditionally,
+ * even after public indexing is enabled.
  */
-export const PRE_LAUNCH = true;
+export const PRE_LAUNCH = !isPublicIndexingEnabled();
+const PRIVATE_PATH_PREFIX = '/admin';
+
+export function robotsForPath(
+  path: string,
+  indexingEnabled: boolean,
+): Metadata['robots'] {
+  const privatePath =
+    path === PRIVATE_PATH_PREFIX || path.startsWith(`${PRIVATE_PATH_PREFIX}/`);
+  return indexingEnabled && !privatePath
+    ? { index: true, follow: true }
+    : { index: false, follow: false };
+}
 
 type PageMetadataInput = {
   title: string;
@@ -49,7 +63,7 @@ export function pageMetadata({
     title: { absolute: title },
     description,
     alternates: { canonical: path },
-    robots: PRE_LAUNCH ? { index: false, follow: false } : { index: true, follow: true },
+    robots: robotsForPath(path, !PRE_LAUNCH),
     openGraph: {
       title: effectiveSocialTitle,
       description: effectiveSocialDescription,

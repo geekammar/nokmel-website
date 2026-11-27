@@ -277,6 +277,12 @@ test('owner-only settings, save/reload, public integration and independent group
 
   await page.goto('/admin/settings');
   await expect(page.locator('main#admin-content h1')).toHaveText('الإعدادات');
+  await expect(page.getByTestId('release-app-version')).toHaveText('0.1.0');
+  await expect(page.getByTestId('release-environment')).toContainText('بناء إنتاجي محلي');
+  await expect(page.getByTestId('release-commit')).toHaveText('غير متاح في هذه البيئة');
+  await expect(page.getByTestId('release-deployment-id')).toHaveText(
+    'غير متاح في هذه البيئة',
+  );
   await expect(page.locator('#settings-social-instagram')).toHaveAttribute(
     'placeholder',
     'https://instagram.com/nokmel.store',

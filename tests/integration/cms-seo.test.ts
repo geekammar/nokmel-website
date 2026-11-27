@@ -108,7 +108,7 @@ describe('SEO defaults and backward compatibility', () => {
       const seo = await getPublishedPageSeo(pageKey, 'ar', { db: pg.db });
       expect(seo.title).toBe(SEO_PAGE_DEFAULTS[pageKey].title);
       expect(seo.description).toBe(SEO_PAGE_DEFAULTS[pageKey].description);
-      expect(seo.socialImageId).toBe('mark-transparent-1024');
+      expect(seo.socialImageId).toBe('social-card-1200x630');
     }
   });
 

@@ -446,6 +446,7 @@ export type NotificationTestResult =
       code:
         | 'not_configured'
         | 'invalid_configuration'
+        | 'configuration_changed'
         | 'rate_limited'
         | 'unauthorized'
         | 'timeout'
@@ -490,6 +491,18 @@ export async function sendOwnerTestNotification(
       const code = me.code === 'invalid_response' ? 'invalid_response' : me.code;
       return { ok: false, code };
     }
+
+    /**
+     * The owner may save a new destination while `getMe` is in flight. Never
+     * send the test to the old destination after the destination changed, and
+     * never mark a destination as verified unless it is the one that was
+     * actually tested (the completion record is also a compare-and-set).
+     */
+    const current = await loadIntegrationSettings({ db });
+    if (current.telegramChatId !== integration.telegramChatId) {
+      return { ok: false, code: 'configuration_changed' };
+    }
+
     const result = await send({
       token: tokenConfig.token,
       chatId: integration.telegramChatId,
@@ -499,10 +512,13 @@ export async function sendOwnerTestNotification(
     if (result.kind !== 'sent') {
       return { ok: false, code: result.code };
     }
-    await recordTelegramBotIdentity(
+    const recorded = await recordTelegramBotIdentity(
       { username: me.bot.username, name: me.bot.name },
-      { db },
+      { db, expectedChatId: integration.telegramChatId },
     );
+    if (!recorded) {
+      return { ok: false, code: 'configuration_changed' };
+    }
     return { ok: true, botUsername: me.bot.username, botName: me.bot.name };
   } catch {
     return { ok: false, code: 'storage' };

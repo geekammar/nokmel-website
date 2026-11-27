@@ -4,20 +4,19 @@ Status: reviewed plan for W3.1 hardening. Execute only on the dedicated
 `nokmel-website` Neon project (development branch first) with explicit owner
 approval. Never run against `Nokmel_prod`, `Nokmel_dev`, or any other project.
 
-Current development state (2026-11-26, external configuration): roles
-`nokmel_migrator` and `nokmel_runtime` exist; W3.1 migrations `0000`/`0001` are
-applied; the QA owner is provisioned; the runtime role has no database/schema
-CREATE; the migrator retains `public`/`drizzle` schema privileges and its
-temporary database-level CREATE was revoked after migration. The external lead
-reports W3.2 `0002_w32-content-cms`, W4 `0003_w4-plans-join-requests` and W4.1
-`0004_w41-scheduled-promotional-pricing` applied on hosted Development with the
-documented runtime grants and revoke-after-migration sequence. W4.1 is merged
-and accepted for continued development. W5 migration
-`0005_w5-settings-notifications` is **not applied on hosted Development**; it
-adds one new table (`site_settings`) plus nullable columns/checks on the
-existing `join_requests` table, so it requires one new runtime table grant.
-The coding agent did not connect to hosted Neon. No credentials are recorded
-here.
+Current development state (2026-11-27, external record): roles
+`nokmel_migrator` and `nokmel_runtime` exist; migrations `0000`–`0005` are
+applied on hosted Development, including W3.2 CMS, W4 plan/join intake, W4.1
+promotions and W5 `site_settings`/notification columns; the runtime role has no
+database/schema CREATE; the migrator retains `public`/`drizzle` schema
+privileges and its temporary database-level CREATE is revoked after each
+migration. The runtime `site_settings` grant and revoke-after-migration sequence
+are recorded in §3e. The coding agent never connected to hosted Neon and no
+credentials are recorded here.
+
+Migrations `0000`–`0005` are immutable history: W6 did not modify them and added
+no migration. Production must use an independent database branch and dedicated
+Production credentials; see `docs/W6_LAUNCH_READINESS.md` §3.
 
 ## Roles
 
@@ -392,7 +391,8 @@ REVOKE CREATE ON DATABASE nokmel_website FROM nokmel_migrator;
 ```
 
 Do not run this against Production without explicit W6 launch approval. The
-coding agent did not apply 0005 to hosted Neon.
+coding agent did not apply 0005 to hosted Neon; the external record reports it
+is applied on hosted Development.
 
 Verification (no secrets printed):
 

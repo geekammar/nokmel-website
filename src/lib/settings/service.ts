@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { ConfigError } from '@/lib/config-error';
 import { getDb } from '@/lib/db';
 import { siteSettings } from '@/lib/db/schema';
@@ -443,20 +443,37 @@ export async function claimNotificationTestSlot(
 
 export async function recordTelegramBotIdentity(
   identity: { username: string | null; name: string | null },
-  options: SettingsServiceOptions = {},
-): Promise<void> {
+  options: SettingsServiceOptions & { expectedChatId?: string | null } = {},
+): Promise<boolean> {
   const db = resolveDb(options);
   try {
-    await db
+    /**
+     * Bind the verification record to the destination that was actually
+     * tested. If the owner saves a different destination while the test is in
+     * flight, this compare-and-set affects zero rows and the new destination
+     * is never presented as verified.
+     */
+    const conditions = [eq(siteSettings.id, SETTINGS_ROW_ID)];
+    if (options.expectedChatId !== undefined) {
+      conditions.push(
+        options.expectedChatId === null
+          ? isNull(siteSettings.telegramChatId)
+          : eq(siteSettings.telegramChatId, options.expectedChatId),
+      );
+    }
+    const rows = await db
       .update(siteSettings)
       .set({
         telegramBotUsername: identity.username?.slice(0, 64) ?? null,
         telegramBotName: identity.name?.slice(0, 128) ?? null,
         updatedAt: new Date(),
       })
-      .where(sql`${siteSettings.id} = ${SETTINGS_ROW_ID}`);
+      .where(and(...conditions))
+      .returning({ id: siteSettings.id });
+    return rows.length > 0;
   } catch (error) {
     logFailure('bot-identity-save', error);
+    throw new SettingsStorageError();
   }
 }
 

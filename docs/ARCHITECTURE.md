@@ -525,21 +525,21 @@ Local verification after the focused W5-R01–R06 closure (Node 22, disposable l
 
 The focused closure adds test-before-enable notifications, attempt-fenced completion with persistence-failure uncertainty, reversible consent with footer preferences and withdrawal semantics, tag-level sanitized defaults and an explicit no-admin boundary, event-specific key-event conversion (or truthful unavailable state), and masked private-settings readback. No schema change was required beyond the existing 0005 migration; runtime grants are unchanged.
 
-Hosted activation remains external: migration 0005 with temporary migrator CREATE/revoke, runtime grant on `site_settings`, scoped Preview environment variables, GA4 property/stream/service-account setup plus enhanced-measurement/key-event verification, a dedicated Telegram website bot/private destination, explicit owner test while automatic delivery is disabled, then enablement. Production activation, real analytics/notification enablement, final privacy/retention approval, raw hosted metadata/headers, forwarded identity, exact-token hosted replay/429 headers, recovery/pooler verification, Production isolation, physical Android and explicit launch approval remain W6 gates. W2-S design refinements were merged via PR #10; W2-V product-led visual work is implemented separately on its own draft branch. The W5 PR was merged on 2026-11-26 (accepted HEAD `5fceb8e97036dfc9c2aa6ec33a03921442257295`, merge commit `4f32b94ac6943f61e96f58014672d25eaa37968e`); the owner-supplied independent acceptance record reports 20/20 PASS and the authorized QA cleanup completed, while hosted activation remains external.
+Hosted activation remains external: migration 0005 with temporary migrator CREATE/revoke, runtime grant on `site_settings`, scoped Preview environment variables, GA4 property/stream/service-account setup plus enhanced-measurement/key-event verification, a dedicated Telegram website bot/private destination, explicit owner test while automatic delivery is disabled, then enablement. Production activation, real analytics/notification enablement, final privacy/retention approval, raw hosted metadata/headers, forwarded identity, exact-token hosted replay/429 headers, recovery/pooler verification, Production isolation, physical Android and explicit launch approval remain W6 gates. W2-S design refinements were merged via PR #10; W2-V was merged via PR #11 and externally accepted. The W5 PR was merged on 2026-11-26 (accepted HEAD `5fceb8e97036dfc9c2aa6ec33a03921442257295`, merge commit `4f32b94ac6943f61e96f58014672d25eaa37968e`); the owner-supplied independent acceptance record reports 20/20 PASS and the authorized QA cleanup completed, while hosted activation remains external.
 
-## W2-S — Marketing design and showcase removal [IMPLEMENTED; draft PR]
+## W2-S — Marketing design and showcase removal [MERGED & ACCEPTED]
 
-- **Scope:** presentation-only refinement of the existing seven public routes. No backend, migration, route, CMS section type, pricing/offer rule, join-validation rule, SEO default or admin information-architecture change. W5 remains the merged/accepted baseline; W2-S is a separate draft branch from `main`.
+- **Scope:** presentation-only refinement of the existing seven public routes. No backend, migration, route, CMS section type, pricing/offer rule, join-validation rule, SEO default or admin information-architecture change. W5 remains the merged/accepted baseline; W2-S was merged via PR #10.
 - **Removal:** the owner rejected the interactive product showcase. `src/components/sections/ProductShowcase.tsx`, its unit/e2e tests and all rendered homepage references were removed. Synthetic scene state, fake commerce interactions, autoplay timers, navigation controls and obsolete styles are gone. No other public route referenced the showcase. The homepage keeps the brand-only hero and no replacement GIF/video/mockup was added. The hero secondary CTA remains `#how-it-works`; no dead `#product-showcase` anchor is emitted.
 - **Preserved CMS data:** the existing showcase fields (title, body, three steps, caption, CTA) and the `showcase.visible` preference remain in the existing typed JSONB model. Visibility is hidden by default; legacy payloads without it remain valid and normalize to hidden without a backfill or content reset. Draft/preview/review/publication, revision locks and stale-write rejection are unchanged. No stored CMS data was deleted and no migration was added.
-- **Unavailable state:** the admin editor description and visibility help state that the visible showcase is currently unavailable and that the stored preference does not create a public section. Enabling/publishing the preference does not render an empty container or broken anchor; the public homepage stays showcase-free until a replacement visual is approved and implemented. No generic section-visibility system, media library or page builder exists.
+- **Unavailable state:** the admin editor description and visibility help state that the visible showcase is currently unavailable and that the stored preference does not create a public section. Enabling/publishing the preference does not render an empty container or broken anchor. The approved W2-V static composition later superseded this unavailable state. No generic section-visibility system, media library or page builder exists.
 - **Future direction [SUPERSEDED by W2-V]:** a lightweight static composition using verified Telegram customer-shopping screenshots and merchant order-management UI, consistent synthetic product/order data and mobile-first art direction. Optimized static WebP/AVIF assets are preferred initially; optional subtle motion may follow visual approval and must respect reduced-motion and provide pause controls. It must not claim unsupported capabilities. It is not a launch blocker.
 - **Verified capability reference:** the earlier read-only merchant-app evidence remains the reference for future visuals (`geekammar/nokmel@74e864dacfa0e6598bb01e99402946e27a94216f`): Telegram storefront/product buttons, quantity/cart, phone/address, COD, order creation/status and merchant accept/prepare/hand-off/deliver/collect. WhatsApp/Meta, free-text AI ordering, online card payment and shipping automation remain excluded unless separately verified.
-- **Social-sharing candidate:** a 1200 × 630 PNG under `public/brand/social/` is registered in the existing approved local-image registry with real dimensions and alt text. `DEFAULT_SOCIAL_IMAGE_ID` and all existing SEO choices are unchanged; owner approval for default use remains a W6 decision.
-- **Focused corrections:** NKW-W5-001 disables plan publish/hide controls while the editor has unsaved changes and explains the save-first requirement; server-side stale-write/publication protection is unchanged. NKW-W5-002 provides valid provider URL examples (notably `https://instagram.com/nokmel.store`) without relaxing host/path/scheme validation. NKW-W5-004 and NKW-W41-002 remain deferred.
-- **Verification:** unit, disposable-PostgreSQL integration and packaged Playwright suites cover the removed-showcase homepage, preserved CMS content/visibility compatibility, draft/preview/review/publication behavior, stale revisions, no empty container/broken anchor, responsive public layout, settings, pricing/join, analytics preferences and the two focused corrections. Local totals are unit 283/283, PostgreSQL 192/192 and Playwright 119/119; exact remote CI on the final HEAD is recorded in the draft PR/handoff. Screenshots at 390/1440 are synthetic browser evidence only; no physical Android acceptance is claimed.
+- **Social-sharing asset:** the 1200 × 630 PNG under `public/brand/social/` is registered in the approved local-image registry with real dimensions and alt text. The owner approved `social-card-1200x630` as the code-controlled default in W6-A01; explicit published CMS image selections still override it.
+- **Focused corrections:** NKW-W5-001 disables plan publish/hide controls while the editor has unsaved changes and explains the save-first requirement; server-side stale-write/publication protection is unchanged. NKW-W5-002 provides valid provider URL examples (notably `https://instagram.com/nokmel.store`) without relaxing host/path/scheme validation. NKW-W5-004 was closed in W6-B04 (read-only release identity); NKW-W41-002 remains deferred to physical Android functional acceptance.
+- **Verification:** unit, disposable-PostgreSQL integration and packaged Playwright suites cover the removed-showcase homepage, preserved CMS content/visibility compatibility, draft/preview/review/publication behavior, stale revisions, no empty container/broken anchor, responsive public layout, settings, pricing/join, analytics preferences and the two focused corrections. Local totals were unit 283/283, PostgreSQL 192/192 and Playwright 119/119; exact remote CI on the accepted HEAD is recorded in PR #10/handoff. Screenshots at 390/1440 are synthetic browser evidence only; no physical Android acceptance is claimed.
 
-## W2-V — Product-led visual design and mobile-first homepage [IMPLEMENTED; draft PR]
+## W2-V — Product-led visual design and mobile-first homepage [MERGED & ACCEPTED]
 
 - **Baseline:** merged W2-S `main` merge commit `f1aeb5c04ee6660d149d492bf2bb5c2d7f3704d7` (accepted W2-S HEAD `dd71987cce35e3cf1981e42f87b638e3bcdbbdc3`). W2-V is presentation-only from that baseline; no migration, route, admin-section, pricing/offer, join-validation or SEO-default-registry change.
 - **Homepage composition:** `HomeView` now composes `ProductHero`, `BenefitsGrid`, `HowItWorks`, `EarlyAccessCallout`, the existing FAQ and the existing final CTA in that order. The old problems/capabilities columns are no longer rendered, but the persisted `problems`/`capabilities` CMS fields remain in the typed JSONB schema and are preserved. The four benefits are derived from the four `direction` capability records already stored in the CMS; planned capabilities remain primarily on `/features`.
@@ -559,7 +559,7 @@ Hosted activation remains external: migration 0005 with temporary migrator CREAT
 - **V06/V07:** at 390/430px the merchant secondary order is a compact hint (total hidden), at ≤380px only the simplified order card remains (summary/secondary/nav hidden, COD on its own line), and essential merchant type is tested at ≥9.5px. Captions are centered beneath each device inside the stage, with the accessible summary and disclosure preserved.
 - **V08:** `demo-data.ts` selects an explicit `EG:EGP` fixture and rejects any other market/currency with `UnsupportedDemoMarketError`; no silent relabelling of 65000 EGP minor units. The Intl formatter remains generic for future/three-decimal currencies, with no GeoIP, conversion, selector or regional plan pricing.
 - **V14:** public composition preserves legacy stored hero destinations (`#how-it-works` remains valid for existing payloads). The CMS exposes CTA labels only; saving a new page draft rebuilds the hero payload from current code defaults, so the secondary destination resolves to `/features` while the stored label is preserved. Publishing applies the whole page draft atomically. Unit + PostgreSQL integration tests cover this legacy-to-new transition; hosted content was not mutated.
-- **Verification:** unit 299/299, PostgreSQL 193/193, Playwright 119/119 locally; exact CI on the final HEAD is recorded in PR #11/report. Lab performance improved versus the prior W2-V HEAD (visible 390 LCP ~748ms vs ~1172ms; 1440 ~1048ms vs ~1180ms; CLS ≤0.019); these are lab measurements only.
+- **Verification:** unit 299/299, PostgreSQL 193/193, Playwright 119/119 locally on the W2-V HEAD; accepted CI run `46042089986`. Lab performance improved versus the prior W2-V HEAD (visible 390 LCP ~748ms vs ~1172ms; 1440 ~1048ms vs ~1180ms; CLS ≤0.019); these are lab measurements only.
 
 
 ### W2-V mobile visual balance refinement (2026-11-27)
@@ -569,4 +569,52 @@ Hosted activation remains external: migration 0005 with temporary migrator CREAT
 - **Authentic Telegram:** verified `/start` and welcome semantics from `geekammar/nokmel@49b7dadfe10cae1403179bf9e2de7afdcacf6db9` (`managed-webhook.ts`, `managed-commerce-copy.ts`); visual sequence includes outgoing `/start` + read/timestamp, incoming welcome, product, add-to-cart, cart/COD summary, `NW-1042` confirmation and a decorative non-input composer. No natural-language purchase request or AI interpretation.
 - **Merchant app:** full phone at every width; actual supported status/payment/stock labels, main order details, synthetic illustrative customer block (non-identifying), secondary preparing order with illustrative timeline, and back-to-store hint. Secondary data contracts below 390px; no filters/analytics/unsupported nav.
 - **Spacing/connector:** sapphire left-pointing 16–24px connector in a responsive 12–20px gutter at vertical center; hero copy→visual 32–40px; device→caption 12–14px; visual→disclosure 16px; hero→benefits 48–56px via section padding.
-- **Verification:** unit 299/299, PostgreSQL 193/193, Playwright 119/119; exact CI on the final HEAD is recorded in PR #11/report. Lab performance on the final code: 390 LCP ~0.88s / CLS ~0.091, 1440 LCP ~0.88s / CLS ~0.024 vs same-run previous b31e6e8 390 ~1.22s / 0.091 and 1440 ~1.26s / 0.006. LCP improved; CLS remains below 0.1. Lab only.
+- **Verification:** unit 299/299, PostgreSQL 193/193, Playwright 119/119 on the accepted HEAD; accepted CI run `46042089986`. Lab performance on the final code: 390 LCP ~0.88s / CLS ~0.091, 1440 LCP ~0.88s / CLS ~0.024 vs same-run previous b31e6e8 390 ~1.22s / 0.091 and 1440 ~1.26s / 0.006. LCP improved; CLS remained below 0.1. Lab only.
+
+
+## W6 — Launch readiness engineering delivery [IMPLEMENTED on feature branch]
+
+Status: engineering delivery on `feature/w6-launch-readiness` from merged main
+`53157b9e79f93cea2d9cd922072e8a49d2ce393f`. No merge, Production deployment,
+hosted database mutation, DNS change, indexing/analytics/Telegram activation,
+credential rotation or session revocation. Production is not configured or
+accepted. See `docs/SECURITY.md` and `docs/W6_LAUNCH_READINESS.md`.
+
+### Security and release controls
+
+- Baseline response headers are set in `next.config.ts`: `nosniff`,
+  `X-Frame-Options: DENY`, strict referrer policy, restrictive
+  `Permissions-Policy`, COOP, one-year HSTS, a framing/object/base/form CSP and
+  `poweredByHeader: false`. `/admin/*` additionally receives
+  `X-Robots-Tag: noindex, nofollow` and `Cache-Control: no-store`.
+- Public indexing is controlled by the runtime-only `SITE_INDEXING_ENABLED`
+  flag. It is effective only outside Vercel Preview/development deployments.
+  `src/lib/launch-controls.ts` builds `robots.txt`, `sitemap.xml` and metadata
+  policy from one gate; `src/lib/seo.ts` always marks `/admin` private.
+- Protected Settings shows read-only release identity from committed package
+  version and trusted Vercel runtime metadata (`VERCEL_GIT_COMMIT_SHA`,
+  `VERCEL_ENV`, `VERCEL_DEPLOYMENT_ID`); malformed/missing values render as
+  unavailable, never fabricated (`src/lib/deployment-info.ts`).
+
+### Telegram verification correction
+
+`sendOwnerTestNotification` re-reads the saved destination after `getMe` and
+before sending, and `recordTelegramBotIdentity` performs a compare-and-set on
+the tested chat ID. A destination saved while the test is in flight is never
+marked verified; the UI reports a controlled `configuration_changed` result.
+
+### Social-sharing default
+
+The owner-approved `social-card-1200x630` asset is the code-controlled default
+social image in the CMS SEO registry and root Open Graph fallback. Explicit
+published per-page CMS image selections continue to override it. No hosted SEO
+content was published.
+
+### Production readiness
+
+A fresh disposable PostgreSQL 18 run from migration zero verifies the complete
+11-table schema, six immutable migrations, no sequences, empty CMS/settings
+state and owner provisioning. Runtime least privilege remains verified by the
+existing synthetic-role integration test. Production isolation, narrow content
+transfer, hosted auth/recovery and identity/join checks, indexing launch and
+rollback are documented in `docs/W6_LAUNCH_READINESS.md`.

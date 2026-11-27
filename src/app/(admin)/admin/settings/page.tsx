@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { adminSettingsUi } from '@/content/ar/admin-settings';
 import { analyticsConfigurationSummary } from '@/lib/analytics/service';
+import { resolveDeploymentInfo } from '@/lib/deployment-info';
 import { resolveTelegramConfig } from '@/lib/notifications/config';
 import { requireOwner } from '@/lib/owner';
 import { pageMetadata } from '@/lib/seo';
@@ -29,6 +30,8 @@ export default async function AdminSettingsPage() {
   const analyticsSummary = analyticsConfigurationSummary();
   const telegram = resolveTelegramConfig();
   const telegramServerConfigured = telegram.status === 'configured';
+  const deployment = resolveDeploymentInfo();
+  const unavailable = adminSettingsUi.releaseGroup.unavailable;
 
   return (
     <div className="mx-auto w-full max-w-4xl">
@@ -123,6 +126,62 @@ export default async function AdminSettingsPage() {
         </dl>
         <p className="mt-4 text-xs leading-5 text-text-secondary">
           {adminSettingsUi.ownerGroup.securityNote}
+        </p>
+      </section>
+
+      <section className="mt-5 rounded-card border border-border-subtle bg-surface p-5">
+        <h2 className="text-lg font-bold text-text-primary">
+          {adminSettingsUi.releaseGroup.title}
+        </h2>
+        <p className="mt-1 text-sm leading-6 text-text-secondary">
+          {adminSettingsUi.releaseGroup.description}
+        </p>
+        <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+          <div>
+            <dt className="font-semibold text-text-secondary">
+              {adminSettingsUi.releaseGroup.appVersion}
+            </dt>
+            <dd className="text-text-primary" dir="ltr" data-testid="release-app-version">
+              {deployment.appVersion ?? unavailable}
+            </dd>
+          </div>
+          <div>
+            <dt className="font-semibold text-text-secondary">
+              {adminSettingsUi.releaseGroup.environment}
+            </dt>
+            <dd className="text-text-primary" data-testid="release-environment">
+              {deployment.environment
+                ? adminSettingsUi.releaseGroup.environments[deployment.environment]
+                : unavailable}
+            </dd>
+          </div>
+          <div>
+            <dt className="font-semibold text-text-secondary">
+              {adminSettingsUi.releaseGroup.commitSha}
+            </dt>
+            <dd
+              className="break-all text-text-primary"
+              dir="ltr"
+              data-testid="release-commit"
+            >
+              {deployment.commitSha ?? unavailable}
+            </dd>
+          </div>
+          <div>
+            <dt className="font-semibold text-text-secondary">
+              {adminSettingsUi.releaseGroup.deploymentId}
+            </dt>
+            <dd
+              className="break-all text-text-primary"
+              dir="ltr"
+              data-testid="release-deployment-id"
+            >
+              {deployment.deploymentId ?? unavailable}
+            </dd>
+          </div>
+        </dl>
+        <p className="mt-4 text-xs leading-5 text-text-secondary">
+          {adminSettingsUi.releaseGroup.note}
         </p>
       </section>
     </div>

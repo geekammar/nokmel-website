@@ -220,11 +220,13 @@ export function SettingsForms({
       const message =
         outcome.code === 'rate_limited'
           ? adminSettingsUi.notificationsGroup.testRateLimited
-          : outcome.code === 'not_configured' || outcome.code === 'invalid_configuration'
-            ? adminSettingsUi.notificationsGroup.testNotConfigured
-            : outcome.code === 'storage'
-              ? adminSettingsUi.notificationsGroup.testStorage
-              : adminSettingsUi.notificationsGroup.testFailed;
+          : outcome.code === 'configuration_changed'
+            ? adminSettingsUi.notificationsGroup.testConfigurationChanged
+            : outcome.code === 'not_configured' || outcome.code === 'invalid_configuration'
+              ? adminSettingsUi.notificationsGroup.testNotConfigured
+              : outcome.code === 'storage'
+                ? adminSettingsUi.notificationsGroup.testStorage
+                : adminSettingsUi.notificationsGroup.testFailed;
       setNotificationBanner({ kind: 'error', text: message });
     } catch {
       setNotificationBanner({

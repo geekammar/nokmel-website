@@ -93,7 +93,7 @@ The kit's editable-text wordmark SVGs are templates, not final outlined custom l
 - Nested Latin text/numbers are wrapped with `lang`/`dir` (`Wordmark lang="en"`, token names) so they don't inherit Arabic font/direction
 - No unnecessary animations or decorative complexity
 
-## W2-S marketing refinement [IMPLEMENTED; interactive showcase removed]
+## W2-S marketing refinement [MERGED & ACCEPTED; interactive showcase removed]
 
 - **Direction:** premium minimal SaaS with fewer visible containers, stronger type hierarchy, generous whitespace and a mobile-first RTL reading order. Existing Brand Kit v2.0 tokens, fonts and logo assets are unchanged.
 - **Homepage:** brand-only hero presentation, editorial two-column problem/capability comparison, combined early-access expectations with the three-step flow, a border-light FAQ and a short closing CTA. The rejected interactive product showcase is removed; no replacement GIF, video or mockup is present. No new CMS section type, route or database content was introduced.
@@ -101,11 +101,12 @@ The kit's editable-text wordmark SVGs are templates, not final outlined custom l
 - **CMS compatibility:** the existing showcase content fields and `showcase.visible` preference remain in the typed JSONB CMS. Visibility is hidden by default; legacy payloads normalize to hidden without a backfill or content reset. Draft/preview/review/publication and stale-write protection are preserved. The admin editor explicitly states that the visible showcase is unavailable and that enabling the preference does not create a public section. No stored CMS data was deleted and no migration was added.
 - **Future static composition [SUPERSEDED by W2-V]:** a lightweight static marketing composition may use verified Telegram customer-shopping screenshots and merchant order-management UI, with consistent synthetic product/order data and mobile-first art direction. Optimized static WebP/AVIF assets are preferred initially; optional subtle motion may follow visual approval and must respect reduced-motion and provide pause controls. It must not claim unsupported merchant capabilities. It is not a launch blocker; no generic media library or page builder is approved.
 - **Footer:** brand block plus a compact two-column navigation/legal grid on mobile, configured public contact/social links and reversible analytics preferences. Public internal-wordmark implementation text was removed.
-- **Social-sharing candidate:** `public/brand/social/nokmel-social-card-1200x630.png`, a 1200 × 630 navy/Frost composition using the approved Completion Mark and brand typography. It is registered as `social-card-1200x630`; the existing default image and inherited social metadata are preserved. Owner approval for default use is a W6 decision.
+- **Social-sharing asset:** `public/brand/social/nokmel-social-card-1200x630.png`, a 1200 × 630 navy/Frost composition using the approved Completion Mark and brand typography. The owner approved it as the code-controlled default (`social-card-1200x630`) in W6-A01; explicit published CMS image selections still override it.
 - **Corrections:** dirty plan editors visibly disable publish/hide with a save-first explanation (NKW-W5-001); provider URL guidance shows valid username/path examples, especially Instagram (NKW-W5-002), without weakening validation.
 
-## W2-V product-led home visual [IMPLEMENTED; draft PR]
+## W2-V product-led home visual [MERGED & ACCEPTED]
 
+- **Status (2026-11-27):** merged via PR #11 and externally accepted; owner physical Android visual acceptance 7/7. No design restart in W6.
 - **Direction:** Deep Sapphire Navy & Frost, premium and restrained. Uses the existing Brand Kit v2.0 tokens and fonts only: page `#F5F7FB`, surface `#FFFFFF`, primary text `#1C2940`, secondary `#606D80`, border `#DCE3EE`, sapphire `#526CB5`, frost `#A9BCE5`, navy `#192B50`, success `#16734C`; card radius 16px, control radius 12px, controls ≥44px.
 - **Hero:** mobile-first centered copy (eyebrow, headline, tagline, supporting copy, primary CTA to `/join`, secondary CTA to `/features`, concise early-access note) with the visual immediately following the copy block. Desktop ≥1024px uses an RTL two-column layout: copy on the right, visual on the left, approximately 46/54, 40–56px gap and a ≤1200px container. Headline `clamp` targets 28–34px mobile and 42–52px desktop; supporting copy 15–16px mobile and 17–18px desktop.
 - **Composition:** two light-bezel phone frames on a pale Frost stage. Right: simplified Telegram bot conversation with store title, local synthetic hoodie illustration, product name, formatted price, quantity, COD chip, decorative add-to-cart control and order confirmation with the shared reference. Left: compact Nokmel merchant order preview with the approved mark, title, new state, shared reference, thumbnail/name/quantity, COD, same formatted total and one decorative accept action. A restrained left-pointing arrow communicates the flow. Visible captions separate the customer and merchant roles; a disclosure states the data is illustrative.
@@ -116,7 +117,7 @@ The kit's editable-text wordmark SVGs are templates, not final outlined custom l
 - **Assets:** local 480×480 synthetic hoodie illustration (`hoodie.avif` ~4.5KB, `hoodie.webp` ~7.8KB) and inline local SVG icons. No external images, fonts or runtime.
 
 
-## W2-V focused visual polish [IMPLEMENTED; draft PR #11]
+## W2-V focused visual polish [MERGED & ACCEPTED via PR #11]
 
 - **Desktop hero (V01):** balanced RTL columns (roughly 0.98/1.02), 32–48px gap, no 13ch/14ch headline cap; 40–48px headline at ≥1024px with 1.27 line height and natural balanced wrapping (two lines at 1440px with the approved copy). Owner-edited longer copy wraps naturally.
 - **Merchant preview (V02):** top-aligned, not vertically centered. Full frame at ≥640px includes the approved mark/title, a noninteractive status summary using `جديد` and the verified merchant label `قيد التجهيز`, the main new order, a secondary fictional preparing order (`NW-1041`, `قبعة قطنية`), a compact breakdown (`المجموع الفرعي`, `التوصيل`, total, COD), and the verified `العودة إلى المتجر` hint. No filters, analytics, customer CRM or unsupported navigation were invented. At 390/430px the secondary order becomes a compact hint; at ≤380px only the simplified main order card remains.
@@ -128,7 +129,7 @@ The kit's editable-text wordmark SVGs are templates, not final outlined custom l
 - **Motion:** entry motion remains CSS-only but starts from readable opacity (0.94 stage, 0.90 merchant card) with small translation, so above-the-fold content is never hidden at opacity zero. Reduced motion disables it.
 
 
-## W2-V mobile visual balance [IMPLEMENTED; PR #11]
+## W2-V mobile visual balance [MERGED & ACCEPTED via PR #11]
 
 - **Equal devices (M01/M02):** one shared grid (`1fr` / connector / `1fr`) with stretched wrappers and flex-filled screens keeps both outer phone frames equal in width, height, top and bottom from 320px through 1440px. Both use the same light bezel, corner radius, decorative status bar (09:41, signal/Wi-Fi/battery), top detail and home indicator. Captions sit in a parallel two-column row so both begin at the same y.
 - **Authentic chat (M03):** Telegram preview now shows the verified `/start` outgoing bubble, the verified incoming welcome (`مرحبًا بك في متجرك.`), product message, add-to-cart, cart/COD summary, `NW-1042` confirmation and a decorative `رسالة...` composer with attachment/mic hints. Timestamps/read indicator appear when space permits (hidden below 390px). The composer is a non-focusable surface, never an input.

@@ -324,6 +324,71 @@ describe('W5 owner notification delivery', () => {
     expect(sent).toHaveLength(1);
   });
 
+  test('a destination changed during identity verification is never marked verified', async () => {
+    const envWithDb = { db: pg.db, env };
+
+    // Destination changes while getMe is in flight: the test must not be sent
+    // to the old destination and no verification is recorded.
+    await pg.pool.query(
+      "update site_settings set telegram_chat_id = '9876543210123', telegram_bot_username = null, telegram_bot_name = null, last_notification_test_at = null where id = 'default'",
+    );
+    let sends = 0;
+    const changedDuringGetMe = await sendOwnerTestNotification({
+      ...envWithDb,
+      sendMessage: (async () => {
+        sends += 1;
+        return { kind: 'sent', messageId: 61 };
+      }) as unknown as typeof sendTelegramMessage,
+      getBotIdentity: (async () => {
+        await pg.pool.query(
+          "update site_settings set telegram_chat_id = '5550001112223' where id = 'default'",
+        );
+        return successfulBotIdentity();
+      }) as unknown as typeof import('@/lib/notifications/telegram').getTelegramBotIdentity,
+    });
+    expect(changedDuringGetMe).toEqual({ ok: false, code: 'configuration_changed' });
+    expect(sends).toBe(0);
+    const afterGetMeChange = await pg.pool.query(
+      "select telegram_chat_id, telegram_bot_username, telegram_bot_name from site_settings where id = 'default'",
+    );
+    expect(afterGetMeChange.rows[0]).toEqual({
+      telegram_chat_id: '5550001112223',
+      telegram_bot_username: null,
+      telegram_bot_name: null,
+    });
+
+    // Destination changes after getMe but during sendMessage: the old
+    // destination may have received the synthetic test, but the new one is not
+    // recorded as verified.
+    await pg.pool.query(
+      "update site_settings set telegram_chat_id = '9876543210123', telegram_bot_username = null, telegram_bot_name = null, last_notification_test_at = null where id = 'default'",
+    );
+    const sent: SentMessage[] = [];
+    const changedDuringSend = await sendOwnerTestNotification({
+      ...envWithDb,
+      getBotIdentity: (async () =>
+        successfulBotIdentity()) as unknown as typeof import('@/lib/notifications/telegram').getTelegramBotIdentity,
+      sendMessage: (async (args: SentMessage) => {
+        sent.push(args);
+        await pg.pool.query(
+          "update site_settings set telegram_chat_id = '5550001112223' where id = 'default'",
+        );
+        return { kind: 'sent', messageId: 62 };
+      }) as unknown as typeof sendTelegramMessage,
+    });
+    expect(changedDuringSend).toEqual({ ok: false, code: 'configuration_changed' });
+    expect(sent).toHaveLength(1);
+    expect(sent[0].chatId).toBe('9876543210123');
+    const afterSendChange = await pg.pool.query(
+      "select telegram_chat_id, telegram_bot_username, telegram_bot_name from site_settings where id = 'default'",
+    );
+    expect(afterSendChange.rows[0]).toEqual({
+      telegram_chat_id: '5550001112223',
+      telegram_bot_username: null,
+      telegram_bot_name: null,
+    });
+  });
+
   test('disabled notifications are skipped without any external call', async () => {
     await pg.pool.query('delete from site_settings');
     let calls = 0;
