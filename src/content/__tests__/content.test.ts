@@ -21,9 +21,10 @@ describe('structured content', () => {
   });
 
   it('exposes the working approved headline and tagline on the homepage', () => {
-    expect(home.hero.headline).toBe('متجرك في المحادثة. وبزنسك في مكان واحد.');
+    expect(home.hero.headline).toBe('متجرك في المحادثة. وإدارة طلباتك في مكان واحد.');
     expect(home.hero.tagline).toBe('خلي بزنسك يكمل.');
     expect(home.hero.primaryCta).toEqual({ label: 'اطلب الانضمام', href: '/join' });
+    expect(home.hero.secondaryCta).toEqual({ label: 'استكشف المميزات', href: '/features' });
   });
 
   it('never marks a homepage capability as available without evidence', () => {

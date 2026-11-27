@@ -165,7 +165,7 @@ describe('SEO draft and publication', () => {
     expect(publicSeo.description).toBe(SEO_PAGE_DEFAULTS.home.description);
     const publicBundle = await getPublishedPageBundle('home', 'ar', { db: pg.db });
     expect(publicBundle.content.hero.headline).toBe(
-      'متجرك في المحادثة. وبزنسك في مكان واحد.',
+      'متجرك في المحادثة. وإدارة طلباتك في مكان واحد.',
     );
     expect(JSON.stringify(publicBundle)).not.toContain('عنوان SEO مسودة');
   });
@@ -191,7 +191,7 @@ describe('SEO draft and publication', () => {
     await saveSeo(0, seoWith({ title: 'SEO فقط', description: 'وصف SEO فقط.' }));
     await publish(1);
     const content = await getPublishedPageContent('home', 'ar', { db: pg.db });
-    expect(content.hero.headline).toBe('متجرك في المحادثة. وبزنسك في مكان واحد.');
+    expect(content.hero.headline).toBe('متجرك في المحادثة. وإدارة طلباتك في مكان واحد.');
     expect(content.faq.items).toEqual(
       DEFAULT_FAQ_FOR_RENDER.map(({ question, answer }) => ({ question, answer })),
     );

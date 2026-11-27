@@ -9,7 +9,7 @@ const enabled = Boolean(process.env.E2E_OWNER_PASSWORD && process.env.DATABASE_U
 const OWNER_EMAIL = (process.env.OWNER_EMAIL ?? '').trim().toLowerCase();
 const OWNER_PASSWORD = process.env.E2E_OWNER_PASSWORD ?? '';
 
-const DEFAULT_HEADLINE = 'متجرك في المحادثة. وبزنسك في مكان واحد.';
+const DEFAULT_HEADLINE = 'متجرك في المحادثة. وإدارة طلباتك في مكان واحد.';
 const SAVE_SUCCESS = 'تم حفظ المسودة. لم يتغيّر المحتوى العام بعد.';
 const PUBLISH_SUCCESS = 'تم نشر المحتوى وأصبحت النسخة الجديدة هي المعروضة للزوار.';
 const DISCARD_SUCCESS = 'تم تجاهل المسودة غير المنشورة. النسخة المنشورة لم تتغيّر.';

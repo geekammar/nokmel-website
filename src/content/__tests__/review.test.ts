@@ -238,11 +238,11 @@ describe('showcase visibility publication review', () => {
     expect(show.sections).toEqual([
       {
         key: 'showcase',
-        label: 'العرض المفاهيمي',
+        label: 'العرض البصري للمنتج',
         fields: [
           {
             path: 'showcase.visible',
-            label: 'إظهار عرض تجربة المنتج',
+            label: 'إظهار العرض البصري للمنتج',
             before: 'مخفي',
             after: 'ظاهر',
           },
@@ -306,7 +306,7 @@ describe('SEO publication review', () => {
     ]);
     expect(review.seo?.fields.slice(2)).toEqual([
       expect.objectContaining({
-        before: 'نكمّل — متجرك في المحادثة. وبزنسك في مكان واحد.',
+        before: 'نكمّل — متجرك في المحادثة. وإدارة طلباتك في مكان واحد.',
         after: 'عنوان SEO جديد',
         inheritedAfter: true,
       }),

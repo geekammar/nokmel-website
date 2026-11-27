@@ -15,7 +15,7 @@ const CONFLICT_REVIEW =
   'تغيّرت المسودة بعد إعداد المراجعة. لم يُنشر أي شيء. أعد تحميل أحدث نسخة ثم أعد المراجعة.';
 
 const defaultTitles: Record<string, string> = {
-  '/': 'نكمّل — متجرك في المحادثة. وبزنسك في مكان واحد.',
+  '/': 'نكمّل — متجرك في المحادثة. وإدارة طلباتك في مكان واحد.',
   '/features': 'الميزات — نكمّل',
   '/pricing': 'الأسعار — نكمّل',
   '/join': 'اطلب الانضمام — نكمّل',
@@ -172,7 +172,7 @@ test.describe('page SEO editing and publication', () => {
         'https://nokmel.tech/brand/icons/app-icon-light-512.png',
       );
       await expect(visitor.locator('h1')).toHaveText(
-        'متجرك في المحادثة. وبزنسك في مكان واحد.',
+        'متجرك في المحادثة. وإدارة طلباتك في مكان واحد.',
       );
       expect(await visitor.locator('main').innerText()).not.toContain(publishedDescription);
 
@@ -241,7 +241,7 @@ test.describe('page SEO editing and publication', () => {
       await visitor.goto('/');
       await expect(visitor).toHaveTitle(defaultTitles['/']);
       await expect(visitor.locator('h1')).toHaveText(
-        'متجرك في المحادثة. وبزنسك في مكان واحد.',
+        'متجرك في المحادثة. وإدارة طلباتك في مكان واحد.',
       );
     } finally {
       await anonymous.close();

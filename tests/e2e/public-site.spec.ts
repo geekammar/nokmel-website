@@ -39,7 +39,7 @@ const viewports = [
 const keyRoutes = ['/', '/features', '/pricing', '/join'];
 
 const titleByRoute: Record<string, string> = {
-  '/': 'نكمّل — متجرك في المحادثة. وبزنسك في مكان واحد.',
+  '/': 'نكمّل — متجرك في المحادثة. وإدارة طلباتك في مكان واحد.',
   '/features': 'الميزات — نكمّل',
   '/pricing': 'الأسعار — نكمّل',
   '/join': 'اطلب الانضمام — نكمّل',
@@ -255,18 +255,17 @@ test.describe('homepage structure', () => {
     await page.goto('/');
     const headline = await page.locator('h1').first().innerText();
     expect(headline).toContain('متجرك في المحادثة');
+    expect(headline).toContain('وإدارة طلباتك في مكان واحد');
 
     const h2s = await page.locator('main h2').allInnerTexts();
     const indexOf = (prefix: string) => h2s.findIndex((text) => text.startsWith(prefix));
-    const titleProblems = 'قبل نكمّل';
-    const titleCaps = 'ماذا يقدم';
+    const titleBenefits = 'لماذا نكمّل';
     const titleSteps = 'كيف يعمل';
     const titlePricing = 'الانضمام المبكر';
     const titleFaq = 'أسئلة شائعة';
     const titleCta = 'جاهز تخلّي';
     for (const title of [
-      titleProblems,
-      titleCaps,
+      titleBenefits,
       titleSteps,
       titlePricing,
       titleFaq,
@@ -275,40 +274,52 @@ test.describe('homepage structure', () => {
       expect(indexOf(title)).toBeGreaterThanOrEqual(0);
     }
     for (const [first, second] of [
-      [titleProblems, titleCaps],
-      [titleCaps, titleSteps],
+      [titleBenefits, titleSteps],
       [titleSteps, titlePricing],
       [titlePricing, titleFaq],
       [titleFaq, titleCta],
     ] as const) {
       expect(indexOf(second)).toBeGreaterThan(indexOf(first));
     }
+    expect(h2s.some((text) => text.startsWith('قبل نكمّل'))).toBe(false);
     await expect(page.locator('#product-showcase')).toHaveCount(0);
   });
 
-  test('showcase is unavailable without an empty container or broken anchor', async ({
-    page,
-  }) => {
+  test('hidden visual leaves no empty column, asset or broken anchor', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
     await expect(page.locator('#product-showcase')).toHaveCount(0);
-    await expect(page.locator('[data-testid="product-showcase"]')).toHaveCount(0);
-    await expect(page.locator('a[href="#product-showcase"]')).toHaveCount(0);
-    await expect(page.getByRole('link', { name: 'شوف كيف يعمل' })).toHaveAttribute(
-      'href',
-      '#how-it-works',
+    await expect(page.locator('[data-testid="product-visual"]')).toHaveCount(0);
+    await expect(page.locator('img[src*="hoodie"]')).toHaveCount(0);
+    await expect(page.getByTestId('product-hero')).toHaveAttribute(
+      'data-layout',
+      'text-only',
     );
+    await expect(page.getByTestId('product-hero-copy')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'استكشف المميزات' })).toHaveAttribute(
+      'href',
+      '/features',
+    );
+    const hero = page.getByTestId('product-hero');
+    const primary = hero.getByRole('link', { name: CTA });
+    const secondary = hero.getByRole('link', { name: 'استكشف المميزات' });
+    await expect(primary).toHaveAttribute('href', '/join');
+    await expect(secondary).toHaveAttribute('href', '/features');
+    for (const control of [primary, secondary]) {
+      const box = await control.boundingBox();
+      expect(box!.height).toBeGreaterThanOrEqual(44);
+    }
     await expect(page.locator('#how-it-works')).toBeVisible();
     expect(await page.content()).not.toContain('عرض تفاعلي موجّه ببيانات اصطناعية');
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.screenshot({
-      path: 'test-results/screenshots/w2s-home-no-showcase-390.png',
+      path: 'test-results/screenshots/w2v-home-hidden-390.png',
       fullPage: true,
     });
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.screenshot({
-      path: 'test-results/screenshots/w2s-home-no-showcase-1440.png',
+      path: 'test-results/screenshots/w2v-home-hidden-1440.png',
       fullPage: true,
     });
   });
@@ -420,8 +431,7 @@ test.describe('accessibility basics', () => {
 
   test('anchor targets are not obscured by the sticky header', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 720 });
-    await page.goto('/');
-    await page.getByRole('link', { name: 'شوف كيف يعمل' }).click();
+    await page.goto('/#how-it-works');
     await expect(page.locator('#how-it-works')).toBeVisible();
     const headerBottom = await page.locator('header').evaluate((el) => el.getBoundingClientRect().bottom);
     const targetTop = await page

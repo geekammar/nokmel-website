@@ -1,0 +1,1329 @@
+.figure {
+  --pv-gutter: clamp(12px, 3.2vw, 20px);
+  --pv-stage-pad: clamp(8px, 2vw, 12px);
+  --pv-device-pad: clamp(3px, 0.7vw, 5px);
+  --pv-device-radius: clamp(18px, 3vw, 28px);
+  --pv-screen-radius: clamp(14px, 2.4vw, 22px);
+  --pv-status-h: 16px;
+  --pv-home-h: 7px;
+  --pv-fs-2xs: 8.5px;
+  --pv-fs-xs: 10px;
+  --pv-fs-sm: 10.5px;
+  --pv-fs-md: 11.5px;
+  --pv-fs-lg: 13px;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+}
+
+.stage {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: clamp(18px, 3vw, 28px);
+  background: #edf1f8;
+  padding: var(--pv-stage-pad);
+}
+
+.stageShape {
+  position: absolute;
+  inset-inline-end: -9%;
+  top: -16%;
+  width: 42%;
+  aspect-ratio: 1;
+  border-radius: 999px;
+  background: #e2e9f4;
+  opacity: 0.48;
+  pointer-events: none;
+}
+
+.devices {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--pv-gutter) minmax(0, 1fr);
+  align-items: stretch;
+  min-height: 360px;
+}
+
+.deviceColumn {
+  display: flex;
+  min-width: 0;
+}
+
+.deviceA11yWrapper {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.device {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  padding: var(--pv-device-pad);
+  border: 1px solid rgba(25, 43, 80, 0.12);
+  border-radius: var(--pv-device-radius);
+  background: #ffffff;
+  box-shadow:
+    0 18px 34px -30px rgba(25, 43, 80, 0.55),
+    0 1px 0 rgba(255, 255, 255, 0.9) inset;
+}
+
+.deviceNotch {
+  display: block;
+  flex: 0 0 auto;
+  width: 25%;
+  height: 2px;
+  margin: 0 auto 3px;
+  border-radius: 999px;
+  background: #dce3ee;
+}
+
+.screen {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--pv-screen-radius);
+  background: var(--color-background);
+}
+
+.statusBar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--pv-status-h);
+  padding: 1px 7px 0;
+  background: #ffffff;
+  color: var(--color-text-primary);
+  direction: ltr;
+}
+
+.statusTime {
+  font-family: var(--font-en);
+  font-size: 7.5px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.statusIcons {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.statusIcons svg {
+  width: 8px;
+  height: 7px;
+}
+
+.battery {
+  position: relative;
+  display: inline-block;
+  width: 10px;
+  height: 5px;
+  border: 1px solid currentColor;
+  border-radius: 1.5px;
+}
+
+.battery::after {
+  content: '';
+  position: absolute;
+  top: 1px;
+  inset-inline-end: -2px;
+  width: 1.5px;
+  height: 2.5px;
+  border-radius: 0 1px 1px 0;
+  background: currentColor;
+}
+
+.battery span {
+  display: block;
+  width: 72%;
+  height: 100%;
+  border-radius: 0.5px;
+  background: currentColor;
+}
+
+.deviceBody {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.homeIndicator {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-end;
+  justify-content: center;
+  height: var(--pv-home-h);
+  padding-bottom: 2px;
+}
+
+.homeIndicator::before {
+  content: '';
+  width: 34%;
+  max-width: 42px;
+  height: 3px;
+  border-radius: 999px;
+  background: #1c2940;
+  opacity: 0.24;
+}
+
+.telegram {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  background: #edf4fc;
+  color: var(--color-text-primary);
+}
+
+.tgHeader {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 4px 6px;
+  border-bottom: 1px solid rgba(25, 43, 80, 0.08);
+  background: #ffffff;
+}
+
+.tgBack {
+  display: inline-flex;
+  flex: 0 0 12px;
+  color: var(--color-text-secondary);
+}
+
+.tgBack svg {
+  width: 12px;
+  height: 12px;
+}
+
+.tgAvatar {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 19px;
+  height: 19px;
+  border-radius: 999px;
+  background: var(--action-secondary);
+  color: #ffffff;
+}
+
+.tgAvatar svg {
+  width: 70%;
+  height: 70%;
+}
+
+.tgHeading {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.tgTitle {
+  overflow: hidden;
+  font-size: var(--pv-fs-sm);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tgSubtitle {
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: 7.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tgMore {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-inline-end: 1px;
+}
+
+.tgMore span {
+  display: block;
+  width: 2.5px;
+  height: 2.5px;
+  border-radius: 999px;
+  background: var(--color-text-secondary);
+}
+
+.tgChat {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 5px;
+  min-height: 0;
+}
+
+.tgOutgoingRow,
+.tgIncomingRow {
+  display: flex;
+  width: 100%;
+}
+
+.tgOutgoingRow {
+  justify-content: flex-end;
+}
+
+.tgIncomingRow {
+  justify-content: flex-start;
+}
+
+.tgOutgoingBubble {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  max-width: 84%;
+  padding: 3px 6px;
+  border-radius: 10px 10px 3px 10px;
+  background: #dce9ff;
+  color: var(--color-text-primary);
+  font-size: var(--pv-fs-xs);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.tgMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--color-text-secondary);
+  font-size: 7.5px;
+  line-height: 1;
+}
+
+.tgRead {
+  color: var(--action-secondary);
+  font-size: 8px;
+  letter-spacing: -0.08em;
+}
+
+.tgTimestamp {
+  font-family: var(--font-en);
+  font-size: 7.5px;
+  line-height: 1;
+}
+
+.tgWelcomeBubble {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-width: 92%;
+  padding: 4px 6px;
+  border: 1px solid rgba(25, 43, 80, 0.06);
+  border-radius: 10px 10px 10px 3px;
+  background: #ffffff;
+  font-size: var(--pv-fs-xs);
+  line-height: 1.4;
+}
+
+.tgWelcomeMeta {
+  align-self: flex-end;
+  color: var(--color-text-secondary);
+}
+
+.tgProductBubble {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 4px;
+  border: 1px solid rgba(25, 43, 80, 0.06);
+  border-radius: 10px 10px 10px 3px;
+  background: #ffffff;
+}
+
+.productImage {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  border-radius: 7px;
+}
+
+.tgProductImage {
+  aspect-ratio: 2 / 1;
+  border-radius: 7px;
+}
+
+.tgProductName {
+  margin-top: 3px;
+  overflow: hidden;
+  font-size: var(--pv-fs-md);
+  font-weight: 700;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tgProductMeta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 3px;
+  margin-top: 1px;
+}
+
+.tgPrice {
+  color: var(--brand-primary);
+  font-size: var(--pv-fs-md);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.tgQuantity {
+  color: var(--color-text-secondary);
+  font-size: var(--pv-fs-xs);
+  white-space: nowrap;
+}
+
+.tgAddButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 20px;
+  margin-top: 4px;
+  border-radius: 6px;
+  background: var(--action-secondary);
+  color: #ffffff;
+  font-size: var(--pv-fs-xs);
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.tgCartBubble {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 4px 5px;
+  border: 1px solid rgba(25, 43, 80, 0.06);
+  border-radius: 10px 10px 10px 3px;
+  background: #ffffff;
+}
+
+.tgCartTitle {
+  font-size: var(--pv-fs-xs);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.tgCartLine {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 3px;
+  margin-top: 1px;
+  font-size: var(--pv-fs-2xs);
+  line-height: 1.35;
+}
+
+.tgCartProduct {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tgCartTotal {
+  flex: 0 0 auto;
+  color: var(--brand-primary);
+  font-size: var(--pv-fs-xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.tgPayment {
+  align-self: flex-start;
+  margin-top: 3px;
+  padding: 1px 5px;
+  border: 1px solid rgba(22, 115, 76, 0.25);
+  border-radius: 999px;
+  background: rgba(22, 115, 76, 0.07);
+  color: var(--color-success);
+  font-size: var(--pv-fs-xs);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.tgCheckoutButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 20px;
+  margin-top: 3px;
+  border-radius: 6px;
+  background: var(--brand-primary);
+  color: var(--action-primary-fg);
+  font-size: var(--pv-fs-xs);
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.tgConfirmation {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 4px 6px;
+  border: 1px solid rgba(22, 115, 76, 0.2);
+  border-radius: 10px 10px 10px 3px;
+  background: #f1faf5;
+  color: var(--color-text-primary);
+  font-size: var(--pv-fs-xs);
+  line-height: 1.3;
+}
+
+.tgCheck {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  background: var(--color-success);
+  color: #ffffff;
+}
+
+.tgCheck svg {
+  width: 10px;
+  height: 10px;
+}
+
+.tgConfirmationText {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 3px;
+}
+
+.tgOrderReference {
+  color: var(--color-success);
+  font-family: var(--font-en);
+  font-size: var(--pv-fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.tgComposer {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  min-height: 26px;
+  padding: 4px 5px;
+  border-top: 1px solid rgba(25, 43, 80, 0.08);
+  background: #ffffff;
+}
+
+.tgComposerAttach,
+.tgComposerAction {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--color-text-secondary);
+}
+
+.tgComposerAttach svg,
+.tgComposerAction svg {
+  width: 13px;
+  height: 13px;
+}
+
+.tgComposerPlaceholder {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  padding: 2px 6px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 999px;
+  color: var(--color-text-secondary);
+  font-size: var(--pv-fs-2xs);
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.merchant {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--color-background);
+}
+
+.merchantHeader {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 4px 6px;
+  border-bottom: 1px solid rgba(25, 43, 80, 0.08);
+  background: #ffffff;
+}
+
+.merchantTitle {
+  flex: 1;
+  font-size: var(--pv-fs-sm);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.merchantAvatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 999px;
+  background: #eef2fa;
+  color: var(--action-secondary);
+  font-size: var(--pv-fs-2xs);
+  font-weight: 700;
+}
+
+.merchantBody {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+  padding: 4px;
+}
+
+.merchantStatusSummary {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 5px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--color-text-secondary);
+  font-size: var(--pv-fs-xs);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.merchantSummaryItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.merchantSummaryDotNew,
+.merchantSummaryDotPreparing {
+  display: block;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+}
+
+.merchantSummaryDotNew {
+  background: var(--action-secondary);
+}
+
+.merchantSummaryDotPreparing {
+  background: var(--color-warning);
+}
+
+.merchantOrderCard {
+  display: flex;
+  flex-direction: column;
+  padding: 5px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 9px;
+  background: #ffffff;
+  box-shadow: 0 8px 18px -20px rgba(25, 43, 80, 0.4);
+}
+
+.merchantOrderTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 3px;
+}
+
+.merchantOrderTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 3px;
+}
+
+.merchantOrderTag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 4px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 999px;
+  background: #f7f9fd;
+  color: var(--color-text-secondary);
+  font-size: var(--pv-fs-2xs);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.merchantStatus {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: #eef2fa;
+  color: var(--action-secondary);
+  font-size: var(--pv-fs-xs);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.merchantReference {
+  color: var(--color-text-secondary);
+  font-family: var(--font-en);
+  font-size: var(--pv-fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.merchantProduct {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.merchantThumbnail {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+}
+
+.merchantProductInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.merchantProductName {
+  overflow: hidden;
+  font-size: var(--pv-fs-sm);
+  font-weight: 700;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.merchantQuantity {
+  color: var(--color-text-secondary);
+  font-size: var(--pv-fs-xs);
+}
+
+.merchantDivider {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--color-border-subtle);
+}
+
+.merchantBreakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 3px;
+}
+
+.merchantBreakdownRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 3px;
+  color: var(--color-text-secondary);
+  font-size: var(--pv-fs-2xs);
+  line-height: 1.3;
+}
+
+.merchantBreakdownRow span:last-child {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.merchantTotals {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  margin-top: 2px;
+}
+
+.merchantPayment {
+  color: var(--color-text-secondary);
+  font-size: var(--pv-fs-xs);
+  line-height: 1.35;
+}
+
+.merchantTotal {
+  color: var(--brand-primary);
+  font-size: var(--pv-fs-md);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.merchantCustomer {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 4px;
+  padding: 3px 4px;
+  border-radius: 6px;
+  background: #f5f7fb;
+}
+
+.merchantCustomerLabel {
+  color: var(--color-text-secondary);
+  font-size: var(--pv-fs-2xs);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.merchantCustomerName {
+  color: var(--color-text-primary);
+  font-size: var(--pv-fs-sm);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.merchantCustomerMeta {
+  color: var(--color-text-secondary);
+  font-size: var(--pv-fs-2xs);
+  line-height: 1.3;
+}
+
+.merchantAcceptButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  margin-top: 4px;
+  border-radius: 6px;
+  background: var(--action-primary-bg);
+  color: var(--action-primary-fg);
+  font-size: var(--pv-fs-xs);
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.merchantSecondaryLabel {
+  display: none;
+  margin: 1px 1px -1px;
+  color: var(--color-text-secondary);
+  font-size: var(--pv-fs-2xs);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.merchantSecondaryCard {
+  padding: 4px 5px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.merchantSecondaryTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 3px;
+}
+
+.merchantSecondaryStatus {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 4px;
+  border: 1px solid rgba(154, 98, 0, 0.22);
+  border-radius: 999px;
+  background: rgba(154, 98, 0, 0.07);
+  color: var(--color-warning);
+  font-size: var(--pv-fs-2xs);
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.merchantSecondaryProduct {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 3px;
+  margin-top: 2px;
+  color: var(--color-text-secondary);
+  font-size: var(--pv-fs-xs);
+  line-height: 1.3;
+}
+
+.merchantSecondaryProductName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.merchantSecondaryTotal {
+  display: none;
+  flex: 0 0 auto;
+  color: var(--color-text-primary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.merchantSecondaryMeta {
+  display: none;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 3px;
+  margin-top: 2px;
+  color: var(--color-text-secondary);
+  font-size: var(--pv-fs-2xs);
+  line-height: 1.3;
+}
+
+.merchantSecondaryTimeline {
+  display: none;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 3px;
+  padding-top: 3px;
+  border-top: 1px dashed rgba(25, 43, 80, 0.12);
+}
+
+.merchantSecondaryTimelineTitle {
+  color: var(--color-text-secondary);
+  font-size: var(--pv-fs-2xs);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.merchantSecondaryTimelineRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 3px;
+  color: var(--color-text-secondary);
+  font-size: var(--pv-fs-2xs);
+  line-height: 1.3;
+}
+
+.merchantSecondaryTimelineRow bdi {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.merchantFooterHint {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 3px;
+  margin-top: auto;
+  padding: 4px 5px 0;
+  border-top: 1px solid rgba(25, 43, 80, 0.08);
+  color: var(--color-text-secondary);
+  font-size: var(--pv-fs-xs);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.merchantFooterHint svg {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+}
+
+.flowColumn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.flowConnector {
+  position: relative;
+  flex: 0 0 auto;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(16px, 4.6vw, 24px);
+  height: clamp(16px, 4.6vw, 24px);
+  border: 1px solid rgba(82, 108, 181, 0.3);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--action-secondary);
+  box-shadow: 0 4px 10px -8px rgba(25, 43, 80, 0.5);
+}
+
+.flowConnector svg {
+  width: 58%;
+  height: 58%;
+}
+
+.captions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--pv-gutter) minmax(0, 1fr);
+  align-items: start;
+  margin-top: 12px;
+}
+
+.caption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: clamp(12px, 2.8vw, 13px);
+  line-height: 1.55;
+  text-align: center;
+  text-wrap: balance;
+}
+
+.caption strong {
+  color: var(--color-text-primary);
+  font-size: clamp(13px, 3vw, 14px);
+  font-weight: 700;
+}
+
+.captionSpacer {
+  display: block;
+}
+
+.disclosure {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 16px;
+  color: var(--color-text-secondary);
+  font-size: clamp(10.5px, 2.6vw, 11.5px);
+  line-height: 1.5;
+  text-align: center;
+}
+
+.disclosure svg {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+}
+
+@media (min-width: 390px) {
+  .figure {
+    --pv-device-pad: 4px;
+    --pv-status-h: 18px;
+    --pv-home-h: 8px;
+    --pv-fs-2xs: 9px;
+    --pv-fs-xs: 10.5px;
+    --pv-fs-sm: 11px;
+    --pv-fs-md: 12px;
+    --pv-fs-lg: 14px;
+  }
+
+  .devices {
+    min-height: 390px;
+  }
+
+  .statusTime {
+    font-size: 8px;
+  }
+
+  .statusIcons svg {
+    width: 9px;
+    height: 8px;
+  }
+
+  .tgHeader,
+  .merchantHeader {
+    min-height: 30px;
+    padding: 4px 7px;
+  }
+
+  .tgChat {
+    gap: 5px;
+    padding: 7px 6px;
+  }
+
+  .tgProductBubble,
+  .tgCartBubble {
+    padding: 5px;
+  }
+
+  .tgProductImage {
+    aspect-ratio: 16 / 9;
+  }
+
+  .tgAddButton,
+  .tgCheckoutButton {
+    min-height: 22px;
+  }
+
+  .tgComposer {
+    min-height: 28px;
+    padding: 4px 6px;
+  }
+
+  .merchantAvatar {
+    display: inline-flex;
+  }
+
+  .merchantBody {
+    gap: 5px;
+    padding: 5px;
+  }
+
+  .merchantOrderCard {
+    padding: 6px;
+  }
+
+  .merchantThumbnail {
+    width: 32px;
+    height: 32px;
+  }
+
+  .merchantTotals {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 3px;
+  }
+
+  .merchantSecondaryTotal {
+    display: inline;
+  }
+
+  .merchantSecondaryLabel {
+    display: block;
+  }
+
+  .merchantSecondaryMeta {
+    display: flex;
+  }
+
+  .merchantSecondaryTimeline {
+    display: flex;
+  }
+
+  .merchantFooterHint {
+    font-size: var(--pv-fs-2xs);
+  }
+
+  .caption {
+    font-size: 12px;
+  }
+}
+
+@media (min-width: 640px) {
+  .figure {
+    --pv-gutter: 20px;
+    --pv-stage-pad: 12px;
+    --pv-device-pad: 5px;
+    --pv-device-radius: 28px;
+    --pv-screen-radius: 22px;
+    --pv-status-h: 20px;
+    --pv-home-h: 10px;
+    --pv-fs-2xs: 9.5px;
+    --pv-fs-xs: 11px;
+    --pv-fs-sm: 12px;
+    --pv-fs-md: 13px;
+    --pv-fs-lg: 16px;
+  }
+
+  .stage {
+    max-width: 560px;
+    margin-inline: auto;
+  }
+
+  .devices {
+    min-height: 440px;
+  }
+
+  .caption {
+    margin-top: 14px;
+    font-size: 13px;
+  }
+
+  .caption strong {
+    font-size: 14px;
+  }
+
+  .tgHeader,
+  .merchantHeader {
+    min-height: 32px;
+    padding: 5px 8px;
+  }
+
+  .tgAvatar {
+    width: 22px;
+    height: 22px;
+  }
+
+  .tgChat {
+    gap: 6px;
+    padding: 8px 7px;
+  }
+
+  .tgProductBubble,
+  .tgCartBubble {
+    padding: 6px;
+  }
+
+  .tgProductName,
+  .tgPrice,
+  .merchantTotal {
+    font-size: var(--pv-fs-md);
+  }
+
+  .tgAddButton,
+  .tgCheckoutButton {
+    min-height: 25px;
+  }
+
+  .tgComposer {
+    min-height: 32px;
+    padding: 5px 7px;
+  }
+
+  .merchantBody {
+    gap: 7px;
+    padding: 8px;
+  }
+
+  .merchantOrderCard {
+    padding: 8px;
+  }
+
+  .merchantThumbnail {
+    width: 40px;
+    height: 40px;
+  }
+
+  .merchantBreakdown,
+  .merchantSecondaryMeta {
+    display: flex;
+  }
+
+  .merchantSecondaryCard {
+    padding: 6px;
+  }
+
+  .merchantSecondaryMeta {
+    display: flex;
+  }
+
+  .merchantAcceptButton {
+    min-height: 28px;
+  }
+
+  .merchantFooterHint {
+    font-size: 9.5px;
+    padding-top: 6px;
+  }
+
+  .flowConnector {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+@media (max-width: 389px) {
+  .tgMeta,
+  .tgWelcomeMeta {
+    display: none;
+  }
+
+  .tgComposerAttach,
+  .tgComposerAction {
+    width: 14px;
+    height: 14px;
+  }
+
+  .tgComposerPlaceholder {
+    padding-inline: 5px;
+  }
+
+  .merchantAvatar {
+    display: none;
+  }
+
+  .merchantSecondaryTotal,
+  .merchantSecondaryLabel,
+  .merchantSecondaryMeta {
+    display: none;
+  }
+
+  .merchantStatusSummary {
+    gap: 4px;
+    padding: 2px 4px;
+  }
+
+  .merchantSecondaryCard {
+    padding: 3px 4px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .flowConnector {
+    animation: connectorIn 280ms ease-out both;
+  }
+
+  .merchantOrderCard {
+    animation: orderEmphasis 320ms ease-out 80ms both;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flowConnector,
+  .merchantOrderCard {
+    animation: none;
+  }
+}
+
+@keyframes connectorIn {
+  from {
+    opacity: 0.65;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes orderEmphasis {
+  from {
+    opacity: 0.92;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
