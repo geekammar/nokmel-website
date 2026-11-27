@@ -14,7 +14,7 @@ Workstreams W0–W6. Each workstream ends with an external review gate before th
 | W4 | Pricing & Join Requests | Plans & Pricing admin (marketing data only), public join form **submission + join-request storage/management** (moved here from earlier W3 wording) | No billing integration; requests captured with plan/status |
 | W4.1 | Scheduled Promotional Pricing | One optional scheduled marketing discount per plan (percentage/fixed, monthly/yearly/both), draft/published lifecycle, owner preview, shared effective-offer resolver/version, stale-offer recovery, expanded historical offer snapshot | No billing effect; real PostgreSQL + browser coverage; hosted activation/acceptance external |
 | W5 | Analytics & Settings | Business Overview from authoritative join requests plus optional Google Analytics 4 aggregates; owner Telegram notifications; typed website settings; NKW-W41-001 correction | Database metrics match accepted requests; unavailable analytics is honest; settings persist with owner-only privacy boundaries |
-| W2-S | Marketing Design & Interactive Product Showcase | Premium RTL-first refinement of the seven public routes, focused homepage, owner-controlled hidden-by-default synthetic customer/merchant showcase, improved footer, social-sharing candidate and focused NKW-W5 corrections; no migration or new route | Design and accessibility acceptance; verified capability boundary; exact-HEAD CI green; Draft PR only |
+| W2-S | Marketing Design & Interactive Product Showcase | Premium RTL-first refinement of the seven public routes, focused brand-only homepage, removal of the owner-rejected interactive showcase while preserving CMS content/visibility compatibility, improved footer, social-sharing candidate and focused NKW-W5 corrections; no migration or new route | Design and accessibility acceptance; verified capability boundary; exact-HEAD CI green; Draft PR only |
 | W6 | Launch Acceptance | End-to-end acceptance, accessibility pass, performance pass, launch checklist | Owner approval; deployment only with explicit approval |
 
 W3.1 status (2026-11-25): merged via PR #4; accepted for continued
@@ -83,21 +83,19 @@ readiness is not claimed.
 W2-S status (2026-11-26): **implemented** on
 `feature/w2s-marketing-design-showcase` from merged W5 `main`
 (`4f32b94ac6943f61e96f58014672d25eaa37968e`). Premium marketing refinement of
-the existing seven public routes, a shorter focused homepage, an interactive
-customer/merchant showcase with direct accessible action buttons and clearly
-labelled synthetic data, an improved footer, a 1200 × 630 social-sharing
-candidate in the approved local-image registry, and the NKW-W5-001/NKW-W5-002
-corrections. The focused UX closure reduced the 390 px showcase by about
-22–27% with consistent two-unit totals and added direct-interaction,
-quantity, keyboard, reduced-motion and no-mutation coverage. A homepage CMS
-visibility checkpoint now defaults the showcase to hidden, normalizes legacy
-payloads without a backfill, isolates draft/preview changes and publishes
-visible/hidden states through the existing revision workflow. Merchant-app evidence is
-pinned to `geekammar/nokmel` commit
-`74e864dacfa0e6598bb01e99402946e27a94216f` (read-only inspection). No
-migration, no new route, no showcase backend, no real commerce mutation and no
-external provider activation. Draft PR only; independent design acceptance
-remains external.
+the seven public routes, a focused brand-only homepage, an improved footer, a
+1200 × 630 social-sharing candidate and the NKW-W5-001/NKW-W5-002 corrections.
+The owner rejected the interactive product showcase; the component and its
+targeted tests were removed, and the homepage renders no replacement visual.
+The existing showcase CMS content and hidden-by-default `showcase.visible`
+preference remain JSONB-compatible, with legacy normalization, draft/preview/
+review/publication and stale-write protection preserved; the admin UI states
+that the visible showcase is currently unavailable. Future direction is a
+static composition of verified Telegram shopping and merchant dashboard
+screenshots, with optimized WebP/AVIF and optional motion after approval; it is
+not implemented or a launch blocker. No migration, new route, showcase backend,
+real commerce mutation or external provider activation. Draft PR only;
+independent design acceptance remains external.
 
 ## Standing rules
 

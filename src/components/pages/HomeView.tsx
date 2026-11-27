@@ -1,7 +1,6 @@
 import { FaqSection } from '@/components/sections/Faq';
 import { CtaBand } from '@/components/sections/Hero';
 import { StepsFlow } from '@/components/sections/InfoSection';
-import { ProductShowcase } from '@/components/sections/ProductShowcase';
 import { StatusBadge } from '@/components/sections/StatusBadge';
 import { Button } from '@/components/ui/Button';
 import { Container } from '@/components/ui/Container';
@@ -102,10 +101,6 @@ function CapabilityColumn({ content }: { content: HomeContent['capabilities'] })
 }
 
 export function HomeView({ content }: { content: HomeContent }) {
-  const heroSecondaryHref =
-    !content.showcase.visible && content.hero.secondaryCta.href === '#product-showcase'
-      ? '#how-it-works'
-      : content.hero.secondaryCta.href;
   return (
     <>
       <Section className="!pt-10 sm:!pt-14 lg:!pt-20" spacing="compact">
@@ -130,7 +125,7 @@ export function HomeView({ content }: { content: HomeContent }) {
               <Button href={content.hero.primaryCta.href} size="lg">
                 {content.hero.primaryCta.label}
               </Button>
-              <TextLink href={heroSecondaryHref}>
+              <TextLink href={content.hero.secondaryCta.href}>
                 {content.hero.secondaryCta.label}
               </TextLink>
             </div>
@@ -160,16 +155,6 @@ export function HomeView({ content }: { content: HomeContent }) {
           </div>
         </Container>
       </Section>
-
-      {content.showcase.visible ? (
-        <ProductShowcase
-          title={content.showcase.title}
-          body={content.showcase.body}
-          steps={content.showcase.steps}
-          caption={content.showcase.caption}
-          cta={content.showcase.primaryCta}
-        />
-      ) : null}
 
       <Section spacing="compact">
         <Container className="grid gap-10 lg:grid-cols-2 lg:gap-12">

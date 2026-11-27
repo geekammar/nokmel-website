@@ -60,6 +60,17 @@ describe('CMS content registry', () => {
     expect(home.faq.items).toHaveLength(DEFAULT_FAQ_ITEMS.length);
   });
 
+  it('states that the visible showcase is unavailable while keeping the preference', () => {
+    const section = getSectionDefinition('home', 'showcase');
+    expect(section.description).toContain('غير متاح');
+    const visible = section.fields.find((field) => field.key === 'visible');
+    expect(visible?.kind).toBe('boolean');
+    if (visible?.kind === 'boolean') {
+      expect(visible.help).toContain('غير متاح');
+      expect(visible.help).toContain('لا يعرض قسماً بديلاً');
+    }
+  });
+
   it('hides the homepage showcase by default', () => {
     expect(defaultContent('home').showcase.visible).toBe(false);
     const payloads = defaultSectionPayloads('home');

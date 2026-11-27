@@ -80,7 +80,7 @@ function showcaseOf(content: CmsPageContent['home']) {
 }
 
 describe('homepage showcase visibility', () => {
-  test('is hidden by default in public, editor and preview', async () => {
+  test('stores the visibility preference as hidden by default in public, editor and preview content', async () => {
     const publicHome = await getPublishedPageContent('home', 'ar', { db: pg.db });
     const preview = await getPreviewPageContent('home', 'ar', { db: pg.db });
     const editor = await getEditorPageData('home', 'ar', { db: pg.db });
@@ -149,7 +149,7 @@ describe('homepage showcase visibility', () => {
     ]);
   });
 
-  test('publishes visible and hidden states without losing the configured showcase', async () => {
+  test('publishes the visibility preference without losing the configured showcase content', async () => {
     await saveVisibility(0, true);
     await publishHome(1);
     const visiblePublic = await getPublishedPageContent('home', 'ar', { db: pg.db });

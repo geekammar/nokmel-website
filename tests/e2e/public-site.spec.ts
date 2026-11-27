@@ -286,7 +286,7 @@ test.describe('homepage structure', () => {
     await expect(page.locator('#product-showcase')).toHaveCount(0);
   });
 
-  test('showcase is hidden by default without an empty container or broken anchor', async ({
+  test('showcase is unavailable without an empty container or broken anchor', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
@@ -303,12 +303,12 @@ test.describe('homepage structure', () => {
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.screenshot({
-      path: 'test-results/screenshots/w2s-home-showcase-hidden-390.png',
+      path: 'test-results/screenshots/w2s-home-no-showcase-390.png',
       fullPage: true,
     });
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.screenshot({
-      path: 'test-results/screenshots/w2s-home-showcase-hidden-1440.png',
+      path: 'test-results/screenshots/w2s-home-no-showcase-1440.png',
       fullPage: true,
     });
   });
@@ -428,6 +428,24 @@ test.describe('accessibility basics', () => {
       .locator('#how-it-works')
       .evaluate((el) => el.getBoundingClientRect().top);
     expect(targetTop).toBeGreaterThanOrEqual(headerBottom - 1);
+  });
+});
+
+test.describe('removed interactive showcase audit', () => {
+  test('no public route renders or links to the rejected showcase', async ({ request }) => {
+    for (const route of publicRoutes) {
+      const response = await request.get(route);
+      expect(response.status()).toBe(200);
+      const body = await response.text();
+      expect(body, `showcase markup on ${route}`).not.toContain('product-showcase');
+      expect(body, `showcase action on ${route}`).not.toContain('showcase-action');
+      expect(body, `showcase customer panel on ${route}`).not.toContain(
+        'showcase-customer-panel',
+      );
+      expect(body, `showcase merchant panel on ${route}`).not.toContain(
+        'showcase-merchant-panel',
+      );
+    }
   });
 });
 
