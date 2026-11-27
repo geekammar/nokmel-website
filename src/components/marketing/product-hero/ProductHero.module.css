@@ -80,7 +80,7 @@
 }
 
 .headline {
-  max-width: 19ch;
+  max-width: 22ch;
   margin: 0.75rem 0 0;
   color: var(--color-text-primary);
   font-size: clamp(1.75rem, 8vw, 2.125rem);
@@ -149,8 +149,8 @@
 @media (min-width: 1024px) {
   .grid {
     align-items: center;
-    grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
-    gap: clamp(2.5rem, 4.4vw, 3.5rem);
+    grid-template-columns: minmax(0, 0.98fr) minmax(0, 1.02fr);
+    gap: clamp(2rem, 3.2vw, 3rem);
   }
 
   .textOnly {
@@ -159,6 +159,7 @@
 
   .copy {
     align-items: flex-start;
+    max-width: none;
     margin-inline: 0;
     text-align: start;
   }
@@ -168,9 +169,10 @@
   }
 
   .headline {
-    max-width: 13ch;
-    font-size: clamp(2.625rem, 4.2vw, 3.25rem);
-    line-height: 1.22;
+    max-width: none;
+    font-size: clamp(2.5rem, 3.5vw, 3rem);
+    line-height: 1.27;
+    text-wrap: balance;
   }
 
   .tagline {
@@ -200,17 +202,7 @@
     justify-content: center;
   }
 
-  .textOnly .headline {
-    max-width: 16ch;
-  }
-
   .textOnly .actions {
     justify-content: center;
-  }
-}
-
-@media (min-width: 1280px) {
-  .headline {
-    max-width: 14ch;
   }
 }

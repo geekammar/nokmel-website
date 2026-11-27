@@ -147,6 +147,37 @@ describe('CMS content registry', () => {
     );
   });
 
+  it('resolves code-controlled CTA destinations from defaults when a new draft is saved', () => {
+    const legacyPayloads = defaultSectionPayloads('home');
+    (legacyPayloads.hero as Record<string, unknown>).secondaryCta = {
+      label: 'شوف كيف يعمل',
+      href: '#how-it-works',
+    };
+
+    const legacyPublic = composePageContent(
+      'home',
+      legacyPayloads,
+      DEFAULT_FAQ_FOR_RENDER,
+    );
+    expect(legacyPublic.hero.secondaryCta).toEqual({
+      label: 'شوف كيف يعمل',
+      href: '#how-it-works',
+    });
+
+    const values = extractPageValues('home', legacyPublic);
+    const rebuilt = buildSectionPayloads('home', values);
+    expect(rebuilt.hero).toMatchObject({
+      primaryCta: { label: 'اطلب الانضمام', href: '/join' },
+      secondaryCta: { label: 'شوف كيف يعمل', href: '/features' },
+    });
+
+    const published = composePageContent('home', rebuilt, DEFAULT_FAQ_FOR_RENDER);
+    expect(published.hero.secondaryCta).toEqual({
+      label: 'شوف كيف يعمل',
+      href: '/features',
+    });
+  });
+
   it('rejects extra editable fields such as links, images and status overrides', () => {
     const values = extractPageValues('home', defaultContent('home'));
     const withHref = structuredClone(values);

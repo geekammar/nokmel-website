@@ -454,3 +454,64 @@ describe('public fallback safety', () => {
     expect(payloads.cta).toHaveProperty('primaryCta.href', '/join');
   });
 });
+
+describe('code-controlled hero destinations with legacy persisted content', () => {
+  test('keeps the legacy public destination until a new draft is saved and published', async () => {
+    const heroPayload = structuredClone(defaultSectionPayloads('home').hero);
+    (heroPayload as Record<string, unknown>).secondaryCta = {
+      label: 'شوف كيف يعمل',
+      href: '#how-it-works',
+    };
+    const now = new Date();
+    await pg.pool.query(
+      `insert into content_sections
+        (id, page_key, section_key, locale, draft_payload, published_payload,
+         draft_revision, published_revision, updated_at, published_at)
+       values ($1, 'home', 'hero', 'ar', null, $2::jsonb, 0, 1, $3, $3)`,
+      ['home:hero:ar', JSON.stringify(heroPayload), now],
+    );
+
+    const before = await getPublishedPageContent('home', 'ar', { db: pg.db });
+    expect(before.hero.secondaryCta).toEqual({
+      label: 'شوف كيف يعمل',
+      href: '#how-it-works',
+    });
+
+    const editor = await getEditorPageData('home', 'ar', { db: pg.db });
+    expect(editor.status).toBe('ok');
+    if (editor.status !== 'ok') return;
+    expect(editor.data.values.hero.secondaryCta).toEqual({ label: 'شوف كيف يعمل' });
+    expect(editor.data.revision).toBe(0);
+
+    const saved = await savePageDraft(
+      {
+        pageKey: 'home',
+        locale: 'ar',
+        expectedRevision: 0,
+        values: editor.data.values,
+        faqItems: defaultFaqInput(),
+      },
+      { db: pg.db },
+    );
+    expect(saved.revision).toBe(1);
+
+    const preview = await getPreviewPageContent('home', 'ar', { db: pg.db });
+    expect(preview.hero.secondaryCta).toEqual({
+      label: 'شوف كيف يعمل',
+      href: '/features',
+    });
+
+    const stillPublished = await getPublishedPageContent('home', 'ar', { db: pg.db });
+    expect(stillPublished.hero.secondaryCta.href).toBe('#how-it-works');
+
+    await publishPageContent(
+      { pageKey: 'home', locale: 'ar', expectedRevision: 1 },
+      { db: pg.db },
+    );
+    const after = await getPublishedPageContent('home', 'ar', { db: pg.db });
+    expect(after.hero.secondaryCta).toEqual({
+      label: 'شوف كيف يعمل',
+      href: '/features',
+    });
+  });
+});

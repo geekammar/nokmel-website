@@ -10,7 +10,7 @@ import styles from './ProductVisual.module.css';
 
 export function ProductVisual({ market = DEFAULT_MARKET }: { market?: MarketContext }) {
   const demo = buildDemoOrder(market);
-  const summary = `عرض توضيحي لرحلة الطلب: يتصفح العميل المنتج ${demo.productName} بكمية ${demo.quantity} في تيليجرام ويضيفه إلى السلة، ثم يؤكد الطلب بالدفع عند الاستلام بإجمالي ${demo.formattedTotal}. يظهر الطلب نفسه في لوحة التاجر بالمرجع ${demo.orderReference} بحالة ${demo.orderStateLabel} مع إجراء ${demo.merchantActionLabel}. جميع القيم توضيحية.`;
+  const summary = `عرض توضيحي لرحلة الطلب: يتصفح العميل المنتج ${demo.productName} بكمية ${demo.quantity} في تيليجرام ويضيفه إلى السلة، ثم يؤكد الطلب بالدفع عند الاستلام بإجمالي ${demo.formattedTotal}. يظهر الطلب نفسه في لوحة التاجر بالمرجع ${demo.orderReference} بحالة ${demo.orderStateLabel} مع إجراء ${demo.merchantActionLabel}. ويظهر طلب سابق بالمرجع ${demo.secondaryOrder.orderReference} بحالة ${demo.secondaryOrder.orderStateLabel}. جميع القيم توضيحية.`;
 
   return (
     <figure
@@ -22,17 +22,22 @@ export function ProductVisual({ market = DEFAULT_MARKET }: { market?: MarketCont
         {summary}
       </p>
 
-      <div className={styles.stage} data-testid="product-visual-stage" aria-hidden="true">
-        <span className={styles.stageShapeOne} />
-        <span className={styles.stageShapeTwo} />
+      <div className={styles.stage} data-testid="product-visual-stage">
+        <span className={styles.stageShape} aria-hidden="true" />
         <div className={styles.devices}>
           <div className={styles.deviceColumn}>
-            <DeviceFrame variant="telegram">
-              <TelegramPreview demo={demo} />
-            </DeviceFrame>
+            <div className={styles.deviceA11yWrapper} aria-hidden="true">
+              <DeviceFrame variant="telegram">
+                <TelegramPreview demo={demo} />
+              </DeviceFrame>
+            </div>
+            <p className={styles.caption} data-testid="caption-customer">
+              <strong>للعميل</strong>
+              <span>يتصفح المنتجات ويطلبها من تيليجرام.</span>
+            </p>
           </div>
 
-          <div className={styles.flowArrow}>
+          <div className={styles.flowArrow} aria-hidden="true">
             <span className={styles.flowLine} />
             <svg viewBox="0 0 24 24" fill="none">
               <path
@@ -43,27 +48,20 @@ export function ProductVisual({ market = DEFAULT_MARKET }: { market?: MarketCont
                 strokeLinejoin="round"
               />
             </svg>
-            <span className={styles.flowDot} />
           </div>
 
           <div className={`${styles.deviceColumn} ${styles.merchantColumn}`}>
-            <DeviceFrame variant="merchant">
-              <MerchantPreview demo={demo} />
-            </DeviceFrame>
+            <div className={styles.deviceA11yWrapper} aria-hidden="true">
+              <DeviceFrame variant="merchant">
+                <MerchantPreview demo={demo} />
+              </DeviceFrame>
+            </div>
+            <p className={styles.caption} data-testid="caption-merchant">
+              <strong>للتاجر</strong>
+              <span>يستقبل الطلبات وينظمها ويتابعها من لوحة واحدة.</span>
+            </p>
           </div>
         </div>
-      </div>
-
-      <div className={styles.captions}>
-        <p className={styles.caption}>
-          <strong>للعميل</strong>
-          <span>يتصفح المنتجات ويطلبها من تيليجرام.</span>
-        </p>
-        <span className={styles.captionSpacer} aria-hidden="true" />
-        <p className={styles.caption}>
-          <strong>للتاجر</strong>
-          <span>يستقبل الطلبات وينظمها ويتابعها من لوحة واحدة.</span>
-        </p>
       </div>
 
       <figcaption className={styles.disclosure}>

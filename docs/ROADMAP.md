@@ -98,16 +98,19 @@ not implemented or a launch blocker. No migration, new route, showcase backend,
 real commerce mutation or external provider activation. Draft PR only;
 independent design acceptance remains external.
 
-W2-V status (2026-11-27): **implemented** on
+W2-V status (2026-11-27): **focused visual polish implemented** on
 `feature/w2v-product-led-visual-design` from merged W2-S `main`
-(`f1aeb5c04ee6660d149d492bf2bb5c2d7f3704d7`). The homepage now uses a
+(`f1aeb5c04ee6660d149d492bf2bb5c2d7f3704d7`). The homepage uses a
 mobile-first product hero with a static, noninteractive Telegram/merchant
 composition controlled by the existing CMS `showcase.visible`, four
 CMS-backed benefits, a separate three-step onboarding flow and early-access
 callout, the preserved FAQ/final CTA/footer, and a shared Egypt demo-market
-money formatter boundary. No migration, new route, hosted CMS publication,
-deployment or external activation. Visual approval and hosted activation are
-external.
+money formatter boundary. The focused polish rebalances the desktop headline,
+enriches the merchant/Telegram previews, replaces the product image with a
+navy studio-style original rendering, adds a market-fixture rejection guard,
+centers captions and simplifies narrow-width composition. No migration, new
+route, hosted CMS publication, deployment or external activation. Visual
+approval and hosted activation are external.
 
 ## Standing rules
 

@@ -52,10 +52,25 @@ export function TelegramPreview({ demo }: { demo: DemoOrder }) {
               الكمية: <span data-demo-field="quantity">{demo.quantity}</span>
             </span>
           </span>
-          <span className={styles.tgPayment}>{demo.paymentLabel}</span>
           <span className={styles.tgAddButton} data-demo-field="customer-action">
             أضف إلى السلة
           </span>
+        </div>
+
+        <div className={styles.tgCartBubble}>
+          <span className={styles.tgCartTitle}>ملخص الطلب</span>
+          <span className={styles.tgCartLine}>
+            <span className={styles.tgCartProduct}>
+              {demo.productName} × {demo.quantity}
+            </span>
+            <span className={styles.tgCartTotal} data-demo-field="total">
+              {demo.formattedTotal}
+            </span>
+          </span>
+          <span className={styles.tgPayment} data-demo-field="payment-method">
+            {demo.paymentLabel}
+          </span>
+          <span className={styles.tgCheckoutButton}>تأكيد الطلب</span>
         </div>
 
         <div className={styles.tgConfirmation}>
@@ -77,20 +92,6 @@ export function TelegramPreview({ demo }: { demo: DemoOrder }) {
             </bdi>
           </span>
         </div>
-      </div>
-
-      <div className={styles.tgComposer} aria-hidden="true">
-        <span className={styles.tgInput}>اكتب رسالة…</span>
-        <span className={styles.tgSend}>
-          <svg viewBox="0 0 18 18" fill="none">
-            <path
-              d="m3 9 11-5-2.6 10-3.1-3.3L6.4 13 6 9.7 3 9Z"
-              stroke="currentColor"
-              strokeWidth="1.3"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </span>
       </div>
     </div>
   );

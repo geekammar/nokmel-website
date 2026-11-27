@@ -15,6 +15,17 @@ export function MerchantPreview({ demo }: { demo: DemoOrder }) {
       </div>
 
       <div className={styles.merchantBody}>
+        <div className={styles.merchantStatusSummary} data-testid="merchant-status-summary">
+          <span className={styles.merchantSummaryItem}>
+            <span className={styles.merchantSummaryDotNew} aria-hidden="true" />
+            جديد
+          </span>
+          <span className={styles.merchantSummaryItem}>
+            <span className={styles.merchantSummaryDotPreparing} aria-hidden="true" />
+            قيد التجهيز
+          </span>
+        </div>
+
         <div className={styles.merchantOrderCard} data-testid="merchant-order-card">
           <div className={styles.merchantOrderTop}>
             <span className={styles.merchantStatus} data-demo-field="order-state">
@@ -39,6 +50,17 @@ export function MerchantPreview({ demo }: { demo: DemoOrder }) {
 
           <div className={styles.merchantDivider} />
 
+          <div className={styles.merchantBreakdown}>
+            <span className={styles.merchantBreakdownRow}>
+              <span>المجموع الفرعي</span>
+              <span data-demo-field="subtotal">{demo.formattedSubtotal}</span>
+            </span>
+            <span className={styles.merchantBreakdownRow}>
+              <span>التوصيل</span>
+              <span data-demo-field="delivery">{demo.formattedDelivery}</span>
+            </span>
+          </div>
+
           <div className={styles.merchantTotals}>
             <span className={styles.merchantPayment} data-demo-field="payment-method">
               {demo.paymentLabel}
@@ -52,6 +74,47 @@ export function MerchantPreview({ demo }: { demo: DemoOrder }) {
             {demo.merchantActionLabel}
           </span>
         </div>
+
+        <span className={styles.merchantSecondaryLabel}>طلب سابق</span>
+
+        <div className={styles.merchantSecondaryCard} data-testid="merchant-secondary-order">
+          <div className={styles.merchantSecondaryTop}>
+            <span className={styles.merchantSecondaryStatus} data-demo-field="secondary-order-state">
+              {demo.secondaryOrder.orderStateLabel}
+            </span>
+            <bdi
+              className={styles.merchantReference}
+              data-demo-field="secondary-order-reference"
+            >
+              {demo.secondaryOrder.orderReference}
+            </bdi>
+          </div>
+          <div className={styles.merchantSecondaryProduct}>
+            <span className={styles.merchantSecondaryProductName} data-demo-field="secondary-product-name">
+              {demo.secondaryOrder.productName} × {demo.secondaryOrder.quantity}
+            </span>
+            <span className={styles.merchantSecondaryTotal} data-demo-field="secondary-order-total">
+              {demo.secondaryOrder.formattedTotal}
+            </span>
+          </div>
+          <div className={styles.merchantSecondaryMeta}>
+            <span>{demo.secondaryOrder.paymentLabel}</span>
+            <span>محجوز</span>
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.merchantFooterHint} data-testid="merchant-footer-hint">
+        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path
+            d="M9.5 3.5 5 8l4.5 4.5"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        العودة إلى المتجر
       </div>
     </div>
   );

@@ -15,7 +15,7 @@ export function DeviceFrame({
       }`}
     >
       <span className={styles.deviceNotch} aria-hidden="true" />
-      <div className={styles.screen}>{children}</div>
+      <div className={styles.screen} data-testid="device-screen">{children}</div>
     </div>
   );
 }
