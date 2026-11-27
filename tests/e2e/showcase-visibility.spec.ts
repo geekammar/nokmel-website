@@ -129,40 +129,162 @@ async function expectDesktopHeadline(page: Page): Promise<void> {
   }
 }
 
-async function expectResponsiveVisual(page: Page, width: number): Promise<void> {
+async function expectBalancedDevices(page: Page, width: number): Promise<void> {
   await page.setViewportSize({ width, height: 900 });
   await page.goto('/');
   await expectPublicVisual(page);
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+  });
+  await settleVisualMotion(page);
   if (width >= 1024) await expectDesktopHeadline(page);
-  if (width >= 390) {
-    const screens = await page.getByTestId('device-screen').evaluateAll((elements) =>
-      elements.map((element) => {
-        const rect = element.getBoundingClientRect();
-        return { top: rect.top, height: rect.height };
-      }),
-    );
-    expect(screens).toHaveLength(2);
-    expect(Math.abs(screens[0].top - screens[1].top)).toBeLessThanOrEqual(1);
-    expect(Math.abs(screens[0].height - screens[1].height)).toBeLessThanOrEqual(24);
-  }
-  const summary = page.getByTestId('merchant-status-summary');
-  const secondary = page.getByTestId('merchant-secondary-order');
-  const footer = page.getByTestId('merchant-footer-hint');
+  await expect(page.getByTestId('tg-start')).toBeVisible();
+  await expect(page.getByTestId('tg-welcome')).toBeVisible();
+  await expect(page.getByTestId('tg-composer')).toBeVisible();
+  await expect(page.getByTestId('merchant-status-summary')).toBeVisible();
+  await expect(page.getByTestId('merchant-secondary-order')).toBeVisible();
+  await expect(page.getByTestId('merchant-footer-hint')).toBeVisible();
+  await expect(page.getByTestId('merchant-breakdown')).toBeVisible();
+
   const secondaryTotal = page.locator('[data-demo-field="secondary-order-total"]');
-  if (width <= 360) {
-    await expect(summary).toBeHidden();
-    await expect(secondary).toBeHidden();
-    await expect(footer).toBeHidden();
-    const metrics = await page.getByTestId('merchant-order-card').evaluate((element) => {
+  const secondaryLabel = page.getByTestId('merchant-secondary-label');
+  const secondaryMeta = page.getByTestId('merchant-secondary-meta');
+  const secondaryTimeline = page.getByTestId('merchant-secondary-timeline');
+  if (width <= 389) {
+    await expect(secondaryTotal).toBeHidden();
+    await expect(secondaryLabel).toBeHidden();
+    await expect(secondaryMeta).toBeHidden();
+    await expect(secondaryTimeline).toBeHidden();
+  } else {
+    await expect(secondaryTotal).toBeVisible();
+    await expect(secondaryTotal).toContainText('250');
+    await expect(secondaryLabel).toBeVisible();
+    await expect(secondaryMeta).toBeVisible();
+    await expect(secondaryTimeline).toBeVisible();
+  }
+
+  const metrics = await page.evaluate(() => {
+    const rect = (selector: string) => {
+      const element = document.querySelector(selector) as HTMLElement | null;
+      if (!element) return null;
+      const value = element.getBoundingClientRect();
+      return {
+        x: value.x,
+        y: value.y,
+        width: value.width,
+        height: value.height,
+        right: value.right,
+        bottom: value.bottom,
+      };
+    };
+    const customer = rect('[data-testid="device-frame-telegram"]');
+    const merchant = rect('[data-testid="device-frame-merchant"]');
+    const captionCustomer = rect('[data-testid="caption-customer"]');
+    const captionMerchant = rect('[data-testid="caption-merchant"]');
+    const connector = rect('[data-testid="flow-connector"]');
+    const connectorPath = document
+      .querySelector('[data-testid="flow-connector"] svg path')
+      ?.getAttribute('d');
+    const connectorDirection = document
+      .querySelector('[data-testid="flow-connector"]')
+      ?.getAttribute('data-direction');
+    const composer = document.querySelector('[data-testid="tg-composer"]') as HTMLElement | null;
+    const composerPlaceholder = composer?.textContent ?? '';
+    const essentialSelectors = [
+      '[data-testid="device-frame-telegram"] [data-demo-field="product-name"]',
+      '[data-testid="device-frame-telegram"] [data-demo-field="unit-price"]',
+      '[data-testid="device-frame-telegram"] [data-demo-field="total"]',
+      '[data-testid="device-frame-telegram"] [data-demo-field="order-reference"]',
+      '[data-testid="device-frame-merchant"] [data-demo-field="product-name"]',
+      '[data-testid="device-frame-merchant"] [data-demo-field="order-state"]',
+      '[data-testid="device-frame-merchant"] [data-demo-field="payment-method"]',
+      '[data-testid="device-frame-merchant"] [data-demo-field="total"]',
+      '[data-testid="device-frame-merchant"] [data-demo-field="order-reference"]',
+    ];
+    const essential = essentialSelectors.map((selector) => {
+      const element = document.querySelector(selector) as HTMLElement | null;
+      const frame = element?.closest('[data-testid^="device-frame-"]') as HTMLElement | null;
+      if (!element || !frame) return null;
+      const a = element.getBoundingClientRect();
+      const b = frame.getBoundingClientRect();
+      return {
+        selector,
+        inside:
+          a.left >= b.left - 1 &&
+          a.right <= b.right + 1 &&
+          a.top >= b.top - 1 &&
+          a.bottom <= b.bottom + 1,
+      };
+    });
+    const visual = document.querySelector('[data-testid="product-visual"]') as HTMLElement;
+    const interactiveCount = visual.querySelectorAll(
+      'button, a, input, select, textarea, [tabindex], [role="button"], [contenteditable="true"]',
+    ).length;
+    return {
+      customer,
+      merchant,
+      captionCustomer,
+      captionMerchant,
+      connector,
+      connectorPath,
+      connectorDirection,
+      composerTag: composer?.tagName ?? null,
+      composerIsEditable: composer?.matches(
+        'input, textarea, [contenteditable="true"], [tabindex]',
+      ) ?? null,
+      composerPlaceholder,
+      essential,
+      interactiveCount,
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    };
+  });
+
+  expect(metrics.overflow, `overflow at ${width}px`).toBeLessThanOrEqual(1);
+  expect(metrics.customer).not.toBeNull();
+  expect(metrics.merchant).not.toBeNull();
+  const customer = metrics.customer!;
+  const merchant = metrics.merchant!;
+  expect(customer.width).toBeGreaterThan(100);
+  expect(merchant.width).toBeGreaterThan(100);
+  expect(customer.height).toBeGreaterThan(300);
+  expect(merchant.height).toBeGreaterThan(300);
+  expect(Math.abs(customer.width - merchant.width)).toBeLessThanOrEqual(1.5);
+  expect(Math.abs(customer.height - merchant.height)).toBeLessThanOrEqual(1.5);
+  expect(Math.abs(customer.y - merchant.y)).toBeLessThanOrEqual(1.5);
+  expect(Math.abs(customer.bottom - merchant.bottom)).toBeLessThanOrEqual(1.5);
+  expect(customer.x).toBeGreaterThan(merchant.x);
+  expect(metrics.captionCustomer).not.toBeNull();
+  expect(metrics.captionMerchant).not.toBeNull();
+  expect(
+    Math.abs(metrics.captionCustomer!.y - metrics.captionMerchant!.y),
+  ).toBeLessThanOrEqual(1.5);
+  expect(metrics.connector).not.toBeNull();
+  const connectorCenter = metrics.connector!.x + metrics.connector!.width / 2;
+  expect(connectorCenter).toBeGreaterThan(merchant.right - 2);
+  expect(connectorCenter).toBeLessThan(customer.x + 2);
+  expect(metrics.connectorDirection).toBe('left');
+  expect(metrics.connectorPath).toContain('H5');
+  expect(metrics.composerTag).toBe('DIV');
+  expect(metrics.composerIsEditable).toBe(false);
+  expect(metrics.composerPlaceholder).toContain('رسالة...');
+  expect(metrics.interactiveCount).toBe(0);
+  for (const entry of metrics.essential) {
+    expect(entry, 'essential selector').not.toBeNull();
+    expect(entry!.inside, entry!.selector).toBe(true);
+  }
+  const captionAlignments = await page.getByTestId(/caption-(customer|merchant)/).evaluateAll(
+    (elements) => elements.map((element) => getComputedStyle(element).textAlign),
+  );
+  expect(captionAlignments).toEqual(['center', 'center']);
+
+  if (width <= 380) {
+    const sizes = await page.evaluate(() => {
+      const frame = document.querySelector(
+        '[data-testid="device-frame-merchant"]',
+      ) as HTMLElement;
       const read = (selector: string) => {
-        const node = element.querySelector(selector) as HTMLElement | null;
-        if (!node) return null;
-        const style = getComputedStyle(node);
-        return {
-          fontSize: parseFloat(style.fontSize),
-          top: node.getBoundingClientRect().top,
-          bottom: node.getBoundingClientRect().bottom,
-        };
+        const node = frame.querySelector(selector) as HTMLElement | null;
+        return node ? parseFloat(getComputedStyle(node).fontSize) : null;
       };
       return {
         status: read('[data-demo-field="order-state"]'),
@@ -171,22 +293,10 @@ async function expectResponsiveVisual(page: Page, width: number): Promise<void> 
         total: read('[data-demo-field="total"]'),
       };
     });
-    for (const value of [metrics.status, metrics.name, metrics.payment, metrics.total]) {
+    for (const value of [sizes.status, sizes.name, sizes.payment, sizes.total]) {
       expect(value).not.toBeNull();
-      expect(value!.fontSize).toBeGreaterThanOrEqual(9.5);
+      expect(value!).toBeGreaterThanOrEqual(10);
     }
-    expect(metrics.payment!.bottom).toBeLessThanOrEqual(metrics.total!.top + 1);
-  } else if (width < 640) {
-    await expect(summary).toBeVisible();
-    await expect(secondary).toBeVisible();
-    await expect(footer).toBeVisible();
-    await expect(secondaryTotal).toBeHidden();
-  } else {
-    await expect(summary).toBeVisible();
-    await expect(secondary).toBeVisible();
-    await expect(footer).toBeVisible();
-    await expect(secondaryTotal).toBeVisible();
-    await expect(secondaryTotal).toContainText('250');
   }
 }
 
@@ -198,14 +308,6 @@ async function settleVisualMotion(page: Page): Promise<void> {
         .map((animation) => animation.finished.catch(() => undefined)),
     );
   });
-}
-
-async function expectNoHorizontalOverflow(page: Page, width: number): Promise<void> {
-  await page.setViewportSize({ width, height: 900 });
-  const overflow = await page.evaluate(
-    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-  );
-  expect(overflow, `overflow at ${width}px`).toBeLessThanOrEqual(1);
 }
 
 test.beforeAll(async () => {
@@ -236,11 +338,11 @@ test('owner controls the static product visual with draft isolation and publicat
   await controlField.scrollIntoViewIfNeeded();
   await page.setViewportSize({ width: 390, height: 900 });
   await controlField.screenshot({
-    path: 'test-results/screenshots/w2v-polish-owner-control-390.png',
+    path: 'test-results/screenshots/w2v-balance-owner-control-390.png',
   });
   await page.setViewportSize({ width: 1440, height: 900 });
   await controlField.screenshot({
-    path: 'test-results/screenshots/w2v-polish-owner-control-1440.png',
+    path: 'test-results/screenshots/w2v-balance-owner-control-1440.png',
   });
 
   const anonymous = await browser.newContext();
@@ -250,12 +352,12 @@ test('owner controls the static product visual with draft isolation and publicat
     await expectNoPublicVisual(visitor);
     await visitor.setViewportSize({ width: 390, height: 844 });
     await visitor.screenshot({
-      path: 'test-results/screenshots/w2v-polish-hidden-390.png',
+      path: 'test-results/screenshots/w2v-balance-hidden-390.png',
       fullPage: true,
     });
     await visitor.setViewportSize({ width: 1440, height: 900 });
     await visitor.screenshot({
-      path: 'test-results/screenshots/w2v-polish-hidden-1440.png',
+      path: 'test-results/screenshots/w2v-balance-hidden-1440.png',
       fullPage: true,
     });
 
@@ -285,56 +387,40 @@ test('owner controls the static product visual with draft isolation and publicat
     await page.getByTestId('review-confirm-publish').click();
     await expect(page.getByText(PUBLISH_SUCCESS)).toBeVisible();
 
-    await visitor.setViewportSize({ width: 390, height: 844 });
-    await visitor.goto('/');
-    await expectPublicVisual(visitor);
-    await expectSharedDemoValues(visitor);
-    await settleVisualMotion(visitor);
-    await visitor.screenshot({
-      path: 'test-results/screenshots/w2v-polish-home-390-full.png',
-      fullPage: true,
-    });
-    await visitor.getByTestId('product-visual').screenshot({
-      path: 'test-results/screenshots/w2v-polish-visual-390.png',
-    });
-
-    for (const width of [320, 360, 390, 430, 768, 1024, 1440]) {
-      await expectNoHorizontalOverflow(visitor, width);
-      await expect(visitor.getByTestId('product-visual')).toBeVisible();
-      await expectResponsiveVisual(visitor, width);
+    const geometryWidths = [320, 360, 375, 380, 381, 390, 430, 768, 1024, 1440];
+    const screenshotWidths = new Set([320, 360, 375, 380, 390, 430, 768, 1440]);
+    for (const width of geometryWidths) {
+      await expectBalancedDevices(visitor, width);
+      if (width === 390) {
+        await expectSharedDemoValues(visitor);
+      }
+      if (screenshotWidths.has(width)) {
+        await visitor.getByTestId('product-hero-section').screenshot({
+          path: `test-results/screenshots/w2v-balance-hero-${width}.png`,
+        });
+      }
+      if (width === 390) {
+        await visitor.screenshot({
+          path: 'test-results/screenshots/w2v-balance-home-390-full.png',
+          fullPage: true,
+        });
+        await visitor.getByTestId('product-visual').screenshot({
+          path: 'test-results/screenshots/w2v-balance-visual-390.png',
+        });
+      }
+      if (width === 768) {
+        await visitor.screenshot({
+          path: 'test-results/screenshots/w2v-balance-home-768-full.png',
+          fullPage: true,
+        });
+      }
+      if (width === 1440) {
+        await visitor.screenshot({
+          path: 'test-results/screenshots/w2v-balance-home-1440-full.png',
+          fullPage: true,
+        });
+      }
     }
-
-    for (const width of [320, 360, 430, 768]) {
-      await visitor.setViewportSize({ width, height: width === 768 ? 1024 : 900 });
-      await visitor.goto('/');
-      await expectPublicVisual(visitor);
-      await settleVisualMotion(visitor);
-      await visitor.getByTestId('product-hero-section').screenshot({
-        path: `test-results/screenshots/w2v-polish-hero-${width}.png`,
-      });
-    }
-
-    await visitor.setViewportSize({ width: 768, height: 1024 });
-    await visitor.goto('/');
-    await expectPublicVisual(visitor);
-    await settleVisualMotion(visitor);
-    await visitor.screenshot({
-      path: 'test-results/screenshots/w2v-polish-home-768-full.png',
-      fullPage: true,
-    });
-
-    await visitor.setViewportSize({ width: 1440, height: 900 });
-    await visitor.goto('/');
-    await expectPublicVisual(visitor);
-    await settleVisualMotion(visitor);
-    await expectDesktopHeadline(visitor);
-    await visitor.getByTestId('product-hero-section').screenshot({
-      path: 'test-results/screenshots/w2v-polish-hero-1440.png',
-    });
-    await visitor.screenshot({
-      path: 'test-results/screenshots/w2v-polish-home-1440-full.png',
-      fullPage: true,
-    });
 
     await visitor.emulateMedia({ reducedMotion: 'reduce' });
     await visitor.reload();
@@ -344,8 +430,12 @@ test('owner controls the static product visual with draft isolation and publicat
     const reducedCardAnimation = await visitor
       .getByTestId('merchant-order-card')
       .evaluate((element) => getComputedStyle(element).animationName);
+    const reducedConnectorAnimation = await visitor
+      .getByTestId('flow-connector')
+      .evaluate((element) => getComputedStyle(element).animationName);
     expect(reducedStageAnimation).toBe('none');
     expect(reducedCardAnimation).toBe('none');
+    expect(reducedConnectorAnimation).toBe('none');
     await visitor.emulateMedia({ reducedMotion: 'no-preference' });
 
     await page.setViewportSize({ width: 390, height: 900 });

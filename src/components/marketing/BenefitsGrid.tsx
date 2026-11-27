@@ -41,7 +41,7 @@ export function BenefitsGrid({
   const items = content.items.filter((item) => item.status === 'direction').slice(0, 4);
 
   return (
-    <Section tone="surface" spacing="compact">
+    <Section tone="surface" spacing="compact" className="!pt-12 sm:!pt-12 lg:!pt-14">
       <Container>
         <div className="flex max-w-2xl flex-col gap-2">
           <h2 className="text-2xl font-bold sm:text-3xl">{content.title}</h2>

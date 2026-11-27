@@ -15,7 +15,7 @@ export function ProductHero({
   return (
     <Section
       data-testid="product-hero-section"
-      className={`${styles.hero} ${showcaseVisible ? '' : styles.textOnlySection}`}
+      className={`${styles.hero} ${showcaseVisible ? '' : styles.textOnlySection} !pb-0`}
       spacing="compact"
     >
       <span className={styles.heroShapeOne} aria-hidden="true" />

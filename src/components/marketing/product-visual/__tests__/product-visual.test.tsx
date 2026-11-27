@@ -67,6 +67,15 @@ describe('illustrative product visual', () => {
       formatMoneyMinor(25_000, DEFAULT_MARKET),
     );
     expect(demo.secondaryOrder.orderStateLabel).not.toBe(demo.orderStateLabel);
+    expect(demo.secondaryOrder.timeline).toEqual([
+      { label: 'القبول', time: '10:12' },
+      { label: 'بدء التجهيز', time: '10:18' },
+    ]);
+    expect(demo.customer).toEqual({
+      name: 'عميل توضيحي',
+      phone: '01X XXX XXXX',
+      address: 'القاهرة',
+    });
   });
 
   it('renders consistent main product, quantity, reference, payment and total values', () => {
@@ -88,6 +97,10 @@ describe('illustrative product visual', () => {
     expect(html).toContain(demo.secondaryOrder.productName);
     expect(html).toContain(demo.secondaryOrder.formattedTotal);
     expect(html).toContain(demo.secondaryOrder.orderStateLabel);
+    expect(html).toContain('طلب سابق');
+    expect(html).toContain('المسار الزمني');
+    expect(html).toContain('عميل توضيحي');
+    expect(html).toContain('01X XXX XXXX');
     expect(html).toContain('ج.م');
     expect(html).not.toContain('ر.س');
     expect(html).not.toContain('SAR');
@@ -118,11 +131,16 @@ describe('illustrative product visual', () => {
     expect(html).not.toContain('tabindex=');
     expect(html).not.toContain('role="button"');
     expect(html).toContain('aria-hidden="true"');
+    expect(html).toContain('data-testid="tg-composer"');
+    expect(html).not.toMatch(/<input\b/);
   });
 
   it('publishes a textual summary, centered captions and illustrative-data disclosure', () => {
     const html = renderToStaticMarkup(<ProductVisual />);
     expect(html).toContain('product-visual-summary');
+    expect(html).toContain('/start');
+    expect(html).toContain('مرحبًا بك في متجرك.');
+    expect(html).toContain('رسالة...');
     expect(html).toContain('للعميل');
     expect(html).toContain('يتصفح المنتجات ويطلبها من تيليجرام');
     expect(html).toContain('للتاجر');
@@ -139,5 +157,9 @@ describe('illustrative product visual', () => {
     expect(html).toContain('height="480"');
     expect(html).not.toContain('http://');
     expect(html).not.toContain('https://');
+    expect(html).toContain('data-testid="device-frame-telegram"');
+    expect(html).toContain('data-testid="device-frame-merchant"');
+    expect(html).toContain('data-testid="flow-connector"');
+    expect(html).toContain('data-direction="left"');
   });
 });

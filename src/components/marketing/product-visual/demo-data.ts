@@ -24,6 +24,11 @@ export const DEMO_SECONDARY_PRODUCT_NAME = 'قبعة قطنية';
 export const DEMO_SECONDARY_QUANTITY = 1;
 export const DEMO_SECONDARY_UNIT_AMOUNT_MINOR = 25_000;
 export const DEMO_SECONDARY_ORDER_STATE_LABEL = 'قيد التجهيز';
+export const DEMO_STOCK_LABEL = 'محجوز';
+export const DEMO_PAYMENT_STATUS_LABEL = 'بانتظار التحصيل';
+export const DEMO_CUSTOMER_NAME = 'عميل توضيحي';
+export const DEMO_CUSTOMER_PHONE = '01X XXX XXXX';
+export const DEMO_CUSTOMER_ADDRESS = 'القاهرة';
 
 export type DemoMarketFixture = {
   countryCode: 'EG';
@@ -42,6 +47,7 @@ export type DemoMarketFixture = {
     unitAmountMinor: number;
     deliveryAmountMinor: number;
     orderStateLabel: string;
+    timeline: readonly { label: string; time: string }[];
   };
 };
 
@@ -63,6 +69,10 @@ export const DEMO_MARKET_FIXTURES: Readonly<Record<string, DemoMarketFixture>> =
       unitAmountMinor: DEMO_SECONDARY_UNIT_AMOUNT_MINOR,
       deliveryAmountMinor: 0,
       orderStateLabel: DEMO_SECONDARY_ORDER_STATE_LABEL,
+      timeline: [
+        { label: 'القبول', time: '10:12' },
+        { label: 'بدء التجهيز', time: '10:18' },
+      ],
     },
   },
 };
@@ -93,6 +103,7 @@ export type DemoSecondaryOrder = {
   formattedTotal: string;
   orderStateLabel: string;
   paymentLabel: string;
+  timeline: readonly { label: string; time: string }[];
 };
 
 export type DemoOrder = {
@@ -110,6 +121,13 @@ export type DemoOrder = {
   paymentLabel: string;
   orderStateLabel: string;
   merchantActionLabel: string;
+  stockLabel: string;
+  paymentStatusLabel: string;
+  customer: {
+    name: string;
+    phone: string;
+    address: string;
+  };
   secondaryOrder: DemoSecondaryOrder;
 };
 
@@ -141,6 +159,13 @@ export function buildDemoOrder(market: MarketContext): DemoOrder {
     paymentLabel: DEMO_PAYMENT_LABEL,
     orderStateLabel: DEMO_ORDER_STATE_LABEL,
     merchantActionLabel: DEMO_MERCHANT_ACTION_LABEL,
+    stockLabel: DEMO_STOCK_LABEL,
+    paymentStatusLabel: DEMO_PAYMENT_STATUS_LABEL,
+    customer: {
+      name: DEMO_CUSTOMER_NAME,
+      phone: DEMO_CUSTOMER_PHONE,
+      address: DEMO_CUSTOMER_ADDRESS,
+    },
     secondaryOrder: {
       orderReference: secondaryOrder.reference,
       productName: secondaryOrder.productName,
@@ -151,6 +176,7 @@ export function buildDemoOrder(market: MarketContext): DemoOrder {
       formattedTotal: formatMoneyMinor(secondaryTotalAmountMinor, market),
       orderStateLabel: secondaryOrder.orderStateLabel,
       paymentLabel: DEMO_PAYMENT_LABEL,
+      timeline: secondaryOrder.timeline,
     },
   };
 }

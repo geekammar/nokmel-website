@@ -36,6 +36,11 @@ export function MerchantPreview({ demo }: { demo: DemoOrder }) {
             </bdi>
           </div>
 
+          <div className={styles.merchantOrderTags}>
+            <span className={styles.merchantOrderTag}>{demo.stockLabel}</span>
+            <span className={styles.merchantOrderTag}>{demo.paymentStatusLabel}</span>
+          </div>
+
           <div className={styles.merchantProduct}>
             <ProductThumbnail className={styles.merchantThumbnail} />
             <span className={styles.merchantProductInfo}>
@@ -50,7 +55,7 @@ export function MerchantPreview({ demo }: { demo: DemoOrder }) {
 
           <div className={styles.merchantDivider} />
 
-          <div className={styles.merchantBreakdown}>
+          <div className={styles.merchantBreakdown} data-testid="merchant-breakdown">
             <span className={styles.merchantBreakdownRow}>
               <span>المجموع الفرعي</span>
               <span data-demo-field="subtotal">{demo.formattedSubtotal}</span>
@@ -70,12 +75,20 @@ export function MerchantPreview({ demo }: { demo: DemoOrder }) {
             </span>
           </div>
 
+          <div className={styles.merchantCustomer}>
+            <span className={styles.merchantCustomerLabel}>العميل</span>
+            <span className={styles.merchantCustomerName}>{demo.customer.name}</span>
+            <span className={styles.merchantCustomerMeta}>
+              {demo.customer.phone} · {demo.customer.address}
+            </span>
+          </div>
+
           <span className={styles.merchantAcceptButton} data-demo-field="merchant-action">
             {demo.merchantActionLabel}
           </span>
         </div>
 
-        <span className={styles.merchantSecondaryLabel}>طلب سابق</span>
+        <span className={styles.merchantSecondaryLabel} data-testid="merchant-secondary-label">طلب سابق</span>
 
         <div className={styles.merchantSecondaryCard} data-testid="merchant-secondary-order">
           <div className={styles.merchantSecondaryTop}>
@@ -97,9 +110,18 @@ export function MerchantPreview({ demo }: { demo: DemoOrder }) {
               {demo.secondaryOrder.formattedTotal}
             </span>
           </div>
-          <div className={styles.merchantSecondaryMeta}>
+          <div className={styles.merchantSecondaryMeta} data-testid="merchant-secondary-meta">
             <span>{demo.secondaryOrder.paymentLabel}</span>
-            <span>محجوز</span>
+            <span>{demo.stockLabel}</span>
+          </div>
+          <div className={styles.merchantSecondaryTimeline} data-testid="merchant-secondary-timeline">
+            <span className={styles.merchantSecondaryTimelineTitle}>المسار الزمني</span>
+            {demo.secondaryOrder.timeline.map((entry) => (
+              <span key={entry.label} className={styles.merchantSecondaryTimelineRow}>
+                <span>{entry.label}</span>
+                <bdi dir="ltr">{entry.time}</bdi>
+              </span>
+            ))}
           </div>
         </div>
       </div>

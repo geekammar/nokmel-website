@@ -108,9 +108,13 @@ callout, the preserved FAQ/final CTA/footer, and a shared Egypt demo-market
 money formatter boundary. The focused polish rebalances the desktop headline,
 enriches the merchant/Telegram previews, replaces the product image with a
 navy studio-style original rendering, adds a market-fixture rejection guard,
-centers captions and simplifies narrow-width composition. No migration, new
-route, hosted CMS publication, deployment or external activation. Visual
-approval and hosted activation are external.
+centers captions and simplifies narrow-width composition. A further mobile
+visual-balance refinement makes both phone frames equal across 320–1440px,
+adds shared status/home chrome, an authentic verified `/start`/welcome chat
+with a decorative composer, a populated merchant order view, a clear left
+connector and equal caption baselines. No migration, new route, hosted CMS
+publication, deployment or external activation. Visual approval and hosted
+activation are external.
 
 ## Standing rules
 
