@@ -102,17 +102,19 @@ CMS drafts. No migration, new route, hosted CMS mutation or deployment by the
 implementation agent. Physical visual acceptance is not full Production
 functional acceptance.
 
-W6 status (2026-11-27): **engineering delivery on
-`feature/w6-launch-readiness`** from main
-`53157b9e79f93cea2d9cd922072e8a49d2ce393f`. Launch-critical source review,
-security/recovery/join-intake verification, release identity in protected
-Settings, approved social-sharing default, launch indexing controls,
-fresh-database/least-privilege verification, performance/accessibility checks
-and production activation/acceptance handoffs. No merge, Production deployment,
-hosted database mutation, DNS change, indexing/analytics/Telegram activation or
-credential/session action. Production remains unconfigured and unaccepted; the
-owner-authorized launch gate is unmet. See `docs/W6_LAUNCH_READINESS.md` and
-`docs/SECURITY.md`.
+W6 status (2026-11-27): **focused security & operational closure on
+`feature/w6-launch-readiness`** (Draft PR #12) from main
+`53157b9e79f93cea2d9cd922072e8a49d2ce393f`. R01 dependency advisories resolved
+with a clean production/full audit (Zod 4.6.7, Vitest 4.1.12, narrow
+PostCSS/esbuild overrides); R02 deterministic recovery-lock failure test; R03
+server-side Telegram test-before-enable; R04 fail-closed indexing requiring
+Vercel Production identification with HTTP matrix evidence; R05 tested
+repository content-transfer utility; R06 corrected production runbook; R07
+W2-S wording handoff; R08 approved design/routes/sections/migrations preserved.
+No merge, Production deployment, hosted database mutation, DNS change,
+indexing/analytics/Telegram activation or credential/session action. Production
+remains unconfigured/unaccepted; owner-authorized launch gate unmet. See
+`docs/SECURITY.md`, `docs/W6_LAUNCH_READINESS.md` and the Drive closure report.
 
 ## Standing rules
 

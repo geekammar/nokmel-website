@@ -18,6 +18,32 @@ describe('page metadata and pre-launch indexing safety', () => {
     expect(metadata.robots).toEqual({ index: false, follow: false });
   });
 
+  it('evaluates metadata policy from the current runtime environment, not the PRE_LAUNCH snapshot', () => {
+    const previousFlag = process.env.SITE_INDEXING_ENABLED;
+    const previousEnv = process.env.VERCEL_ENV;
+    try {
+      process.env.SITE_INDEXING_ENABLED = '1';
+      process.env.VERCEL_ENV = 'production';
+      const published = pageMetadata({
+        title: 'الميزات — نكمّل',
+        description: 'وصف',
+        path: '/features',
+      });
+      expect(published.robots).toEqual({ index: true, follow: true });
+      const privateMetadata = pageMetadata({
+        title: 'الإعدادات',
+        description: 'وصف',
+        path: '/admin/settings',
+      });
+      expect(privateMetadata.robots).toEqual({ index: false, follow: false });
+    } finally {
+      if (previousFlag === undefined) delete process.env.SITE_INDEXING_ENABLED;
+      else process.env.SITE_INDEXING_ENABLED = previousFlag;
+      if (previousEnv === undefined) delete process.env.VERCEL_ENV;
+      else process.env.VERCEL_ENV = previousEnv;
+    }
+  });
+
   it('keeps private paths noindex even when public indexing is enabled', () => {
     expect(robotsForPath('/admin', true)).toEqual({ index: false, follow: false });
     expect(robotsForPath('/admin/settings', true)).toEqual({
@@ -65,26 +91,44 @@ describe('page metadata and pre-launch indexing safety', () => {
 });
 
 describe('public indexing release control', () => {
-  const enabled = (overrides: Record<string, string | undefined> = {}) =>
-    resolvePublicIndexingEnabled({
-      SITE_INDEXING_ENABLED: '1',
-      ...overrides,
-    } as unknown as NodeJS.ProcessEnv);
+  const resolve = (overrides: Record<string, string | undefined> = {}) =>
+    resolvePublicIndexingEnabled(overrides as unknown as NodeJS.ProcessEnv);
 
   it('is disabled without the explicit runtime flag', () => {
-    expect(resolvePublicIndexingEnabled({} as unknown as NodeJS.ProcessEnv)).toBe(false);
-    expect(
-      resolvePublicIndexingEnabled({
-        SITE_INDEXING_ENABLED: 'false',
-      } as unknown as NodeJS.ProcessEnv),
-    ).toBe(false);
+    expect(resolve({})).toBe(false);
+    expect(resolve({ VERCEL_ENV: 'production' })).toBe(false);
+    expect(resolve({ SITE_INDEXING_ENABLED: 'false', VERCEL_ENV: 'production' })).toBe(false);
   });
 
-  it('can be enabled only outside Preview/development Vercel deployments', () => {
-    expect(enabled()).toBe(true);
-    expect(enabled({ VERCEL_ENV: 'production' })).toBe(true);
-    expect(enabled({ VERCEL_ENV: 'preview' })).toBe(false);
-    expect(enabled({ VERCEL_ENV: 'development' })).toBe(false);
+  it('never enables for Preview or development', () => {
+    expect(resolve({ SITE_INDEXING_ENABLED: '1', VERCEL_ENV: 'preview' })).toBe(false);
+    expect(resolve({ SITE_INDEXING_ENABLED: '1', VERCEL_ENV: 'development' })).toBe(false);
+  });
+
+  it('fails closed when deployment environment metadata is missing or unknown', () => {
+    expect(resolve({ SITE_INDEXING_ENABLED: '1' })).toBe(false);
+    expect(resolve({ SITE_INDEXING_ENABLED: '1', VERCEL_ENV: '' })).toBe(false);
+    expect(resolve({ SITE_INDEXING_ENABLED: '1', VERCEL_ENV: 'staging' })).toBe(false);
+    expect(resolve({ SITE_INDEXING_ENABLED: '1', VERCEL_ENV: 'PRODUCTION ' })).toBe(true);
+  });
+
+  it('enables only with the explicit flag plus verified Vercel Production', () => {
+    expect(resolve({ SITE_INDEXING_ENABLED: '1', VERCEL_ENV: 'production' })).toBe(true);
+    expect(resolve({ SITE_INDEXING_ENABLED: 'true', VERCEL_ENV: 'production' })).toBe(true);
+  });
+
+  it('keeps admin noindex under every indexing decision', () => {
+    for (const indexing of [false, true]) {
+      expect(robotsForPath('/admin', indexing)).toEqual({ index: false, follow: false });
+      expect(robotsForPath('/admin/login', indexing)).toEqual({
+        index: false,
+        follow: false,
+      });
+      expect(robotsForPath('/features', indexing)).toEqual({
+        index: indexing,
+        follow: indexing,
+      });
+    }
   });
 
   it('produces a coherent pre-launch robots policy without a sitemap', () => {

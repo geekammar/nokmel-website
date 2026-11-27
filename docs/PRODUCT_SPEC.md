@@ -108,7 +108,7 @@ Live demo, demo management, media library dashboard, security & activity dashboa
 ## 13. Open questions [OPEN]
 
 - ~~Delivery of `Nokmel_Deep_Brand_Kit_v2.0.zip`~~ — **RESOLVED 2026-11-24**: supplied and verified (SHA-256 match); W1 prerequisite met.
-- Final commercial/contact/legal wording approval (W6-A02 handoff). The approved W2-V headline/tagline are present in code defaults and hosted revision 55; no new copy change is proposed in W6.
+- Final commercial/contact/legal wording approval (W6-A02 handoff). NKW-W2S-001 is confirmed resolved by the published W2-V hero revision 55. Exact proposed CMS wording for NKW-W2S-002 (planned AI/future capability tense) and NKW-W2S-003 (conditional early-access pricing) is prepared in the W6 handoff but awaits owner/lead approval; nothing was published.
 - ~~Choice of authentication library and external analytics provider~~ — **RESOLVED**: Better Auth 1.7.28 (W3.1) and Google Analytics 4 (W5).
 - ~~W2-S social-sharing candidate visual approval~~ — **RESOLVED 2026-11-27**: the owner approved `social-card-1200x630` as the code-controlled default social image (W6-A01). Explicit published CMS image selections still override it.
 - Final W6 privacy/consent/retention approval for the analytics provider and owner notifications.

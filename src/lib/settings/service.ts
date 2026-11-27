@@ -266,7 +266,12 @@ async function readGroupRevision(
   tx: Tx,
   group: 'public' | 'notification' | 'analytics',
   expected: unknown,
-): Promise<{ revision: number; telegramChatId: string | null }> {
+): Promise<{
+  revision: number;
+  telegramChatId: string | null;
+  telegramBotUsername: string | null;
+  telegramBotName: string | null;
+}> {
   const expectedRevision = assertRevision(expected);
   const rows = await tx
     .select({
@@ -274,6 +279,8 @@ async function readGroupRevision(
       notificationRevision: siteSettings.notificationRevision,
       analyticsRevision: siteSettings.analyticsRevision,
       telegramChatId: siteSettings.telegramChatId,
+      telegramBotUsername: siteSettings.telegramBotUsername,
+      telegramBotName: siteSettings.telegramBotName,
     })
     .from(siteSettings)
     .where(sql`${siteSettings.id} = ${SETTINGS_ROW_ID}`)
@@ -287,7 +294,12 @@ async function readGroupRevision(
         ? row?.notificationRevision ?? 0
         : row?.analyticsRevision ?? 0;
   if (current !== expectedRevision) throw new SettingsConflictError();
-  return { revision: expectedRevision, telegramChatId: row?.telegramChatId ?? null };
+  return {
+    revision: expectedRevision,
+    telegramChatId: row?.telegramChatId ?? null,
+    telegramBotUsername: row?.telegramBotUsername ?? null,
+    telegramBotName: row?.telegramBotName ?? null,
+  };
 }
 
 export async function savePublicSettings(
@@ -340,13 +352,32 @@ export async function saveNotificationSettings(
   try {
     return await db.transaction(async (tx) => {
       await ensureRow(tx);
-      const { revision, telegramChatId: previousChatId } = await readGroupRevision(
-        tx,
-        'notification',
-        args.expectedRevision,
-      );
+      const {
+        revision,
+        telegramChatId: previousChatId,
+        telegramBotUsername,
+        telegramBotName,
+      } = await readGroupRevision(tx, 'notification', args.expectedRevision);
       const destinationChanged =
         validation.values.telegramChatId !== previousChatId;
+      /**
+       * Enabling automatic delivery requires a recorded successful test for
+       * the currently saved destination. A numeric chat ID alone is not
+       * verification. Changing the destination clears the identity in this
+       * same transaction and therefore requires a new test before enablement.
+       * Provider token/identity rotation is an external prerequisite documented
+       * in docs/W5_INTEGRATIONS.md; existing storage cannot fingerprint the
+       * environment token without a migration.
+       */
+      if (
+        validation.values.notificationsEnabled &&
+        (destinationChanged || (!telegramBotUsername && !telegramBotName))
+      ) {
+        throw new SettingsValidationError({
+          notificationsEnabled:
+            'أرسل اختباراً ناجحاً للوجهة المحفوظة الحالية قبل تفعيل الإرسال التلقائي. تغيير الوجهة يتطلب اختباراً جديداً.',
+        });
+      }
       const updated = await tx
         .update(siteSettings)
         .set({

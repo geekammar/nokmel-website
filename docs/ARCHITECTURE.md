@@ -574,11 +574,12 @@ Hosted activation remains external: migration 0005 with temporary migrator CREAT
 
 ## W6 — Launch readiness engineering delivery [IMPLEMENTED on feature branch]
 
-Status: engineering delivery on `feature/w6-launch-readiness` from merged main
-`53157b9e79f93cea2d9cd922072e8a49d2ce393f`. No merge, Production deployment,
-hosted database mutation, DNS change, indexing/analytics/Telegram activation,
-credential rotation or session revocation. Production is not configured or
-accepted. See `docs/SECURITY.md` and `docs/W6_LAUNCH_READINESS.md`.
+Status: focused security/operational closure on `feature/w6-launch-readiness`
+from merged main `53157b9e79f93cea2d9cd922072e8a49d2ce393f` (Draft PR #12). No
+merge, Production deployment, hosted database mutation, DNS change,
+indexing/analytics/Telegram activation, credential rotation or session
+revocation. Production is not configured or accepted. See `docs/SECURITY.md`,
+`docs/W6_LAUNCH_READINESS.md` and the Drive closure report.
 
 ### Security and release controls
 
@@ -587,8 +588,9 @@ accepted. See `docs/SECURITY.md` and `docs/W6_LAUNCH_READINESS.md`.
   `Permissions-Policy`, COOP, one-year HSTS, a framing/object/base/form CSP and
   `poweredByHeader: false`. `/admin/*` additionally receives
   `X-Robots-Tag: noindex, nofollow` and `Cache-Control: no-store`.
-- Public indexing is controlled by the runtime-only `SITE_INDEXING_ENABLED`
-  flag. It is effective only outside Vercel Preview/development deployments.
+- Public indexing requires both the runtime-only `SITE_INDEXING_ENABLED` flag
+  and positive `VERCEL_ENV=production`. Preview, development, missing or unknown
+  environment metadata remain noindex; metadata is evaluated per request.
   `src/lib/launch-controls.ts` builds `robots.txt`, `sitemap.xml` and metadata
   policy from one gate; `src/lib/seo.ts` always marks `/admin` private.
 - Protected Settings shows read-only release identity from committed package
@@ -602,6 +604,10 @@ accepted. See `docs/SECURITY.md` and `docs/W6_LAUNCH_READINESS.md`.
 before sending, and `recordTelegramBotIdentity` performs a compare-and-set on
 the tested chat ID. A destination saved while the test is in flight is never
 marked verified; the UI reports a controlled `configuration_changed` result.
+Enabling automatic delivery also requires a recorded successful-test bot
+identity for the current destination; a numeric chat ID alone is refused and a
+destination change requires a new test. Token/identity rotation remains an
+external prerequisite.
 
 ### Social-sharing default
 
@@ -615,6 +621,14 @@ content was published.
 A fresh disposable PostgreSQL 18 run from migration zero verifies the complete
 11-table schema, six immutable migrations, no sequences, empty CMS/settings
 state and owner provisioning. Runtime least privilege remains verified by the
-existing synthetic-role integration test. Production isolation, narrow content
-transfer, hosted auth/recovery and identity/join checks, indexing launch and
+existing synthetic-role integration test. The focused closure adds a
+deterministic lock-connection-loss recovery test and a tested operator
+`pnpm content:transfer` utility: strict published CMS/FAQ/SEO export,
+offline validation/digest, dry run, explicit target identity, nonempty-target
+refusal, transactional import and readback. Excluded data: auth accounts,
+sessions, credentials, plans, join requests, rate-limit data, private settings
+and integration configuration. Dependency advisories were resolved with Zod
+4.6.7, Vitest 4.1.12 and narrow PostCSS/esbuild overrides; both production-only
+and full audits are clean. Production isolation, hosted auth/recovery and
+identity/join checks, indexing launch and first-release/existing-release
 rollback are documented in `docs/W6_LAUNCH_READINESS.md`.

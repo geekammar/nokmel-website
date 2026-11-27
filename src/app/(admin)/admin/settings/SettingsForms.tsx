@@ -165,6 +165,7 @@ export function SettingsForms({
     if (notificationSaving) return;
     setNotificationSaving(true);
     setNotificationBanner(null);
+    setNotificationErrors({});
     try {
       const result = await saveNotificationSettingsAction({
         expectedRevision: notificationRev,
@@ -424,6 +425,11 @@ export function SettingsForms({
         <p className="-mt-2 text-xs leading-5 text-text-secondary">
           {settings.notificationsGroup.enabledHint}
         </p>
+        {notificationErrors.notificationsEnabled ? (
+          <p role="alert" className="text-sm text-status-error">
+            {notificationErrors.notificationsEnabled}
+          </p>
+        ) : null}
 
         <Input
           id="settings-telegram-chat-id"

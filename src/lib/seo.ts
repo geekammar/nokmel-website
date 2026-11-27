@@ -13,7 +13,9 @@ import { siteUrl } from '@/lib/site';
  *
  * Public pages are `noindex, nofollow` unless the explicit, runtime-only
  * `SITE_INDEXING_ENABLED` release flag is set in a non-Preview deployment.
- * `PRE_LAUNCH` mirrors that decision for existing callers/tests. `robots.txt`
+ * Metadata is evaluated per request through `isPublicIndexingEnabled()` rather
+ * than a build-time module snapshot. `PRE_LAUNCH` remains exported for
+ * compatibility/tests but is not used to decide response policy. `robots.txt`
  * and `sitemap.xml` are generated from the same gate, so metadata, robots and
  * sitemap can never disagree.
  *
@@ -63,7 +65,7 @@ export function pageMetadata({
     title: { absolute: title },
     description,
     alternates: { canonical: path },
-    robots: robotsForPath(path, !PRE_LAUNCH),
+    robots: robotsForPath(path, isPublicIndexingEnabled()),
     openGraph: {
       title: effectiveSocialTitle,
       description: effectiveSocialDescription,

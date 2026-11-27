@@ -76,7 +76,7 @@ or integration credentials.
 | `OWNER_EMAIL` | The single Production owner identity. |
 | `JOIN_INTAKE_ENABLED` | Leave unset until owner approves Production intake plus privacy/retention. |
 | `GA4_*`, `TELEGRAM_*` | Leave unset until separately approved/activated. |
-| `SITE_INDEXING_ENABLED` | Leave unset until the final launch step (§6). |
+| `SITE_INDEXING_ENABLED` | Leave unset until the final launch step (§6); effective only with verified Vercel Production. |
 | `DATABASE_URL_DIRECT` | Never in Vercel. Operator machine only. |
 
 Preview must keep its own exact origin/secret/database configuration. Preview is
@@ -109,43 +109,52 @@ Do **not** clone the Development database. Transfer only approved public
 content after Production migrations/owner provisioning and a protected initial
 deployment.
 
-**Export only (Development, read-only)**
+**Use the repository-owned utility (`pnpm content:transfer`)**
 
-- `content_sections` rows where `published_payload IS NOT NULL`, columns:
-  `id, page_key, section_key, locale, published_payload, published_revision,
-  published_at`. Do not export `draft_payload`/`draft_revision`.
-- `faq_items` rows where `locale = 'ar'` and `published_question IS NOT NULL`,
-  columns: `id, locale, published_question, published_answer,
-  published_sort_order, published_visible, published_at`.
-- Exclude: `user`, `account`, `session`, `verification`, `rate_limit`,
-  `plans`, `join_requests`, `join_intake_rate_limits`, `site_settings`, all
-  drafts, QA artifacts and credentials.
+The utility exports only explicitly selected published CMS/FAQ/SEO rows,
+validates them offline against the registry/content/SEO schemas, verifies an
+explicit source/target identity and digest, refuses a nonempty target, and
+imports transactionally with post-import readback. It never exports accounts,
+sessions, credentials, plans, join requests, rate-limit data, settings or
+integration configuration.
 
-**Validate before import**
+```bash
+# Source URL from a silent prompt/secret store; never argv/history.
+read -rsp 'Development source URL: ' CONTENT_TRANSFER_SOURCE_URL; echo
+export CONTENT_TRANSFER_SOURCE_URL
+pnpm content:transfer export --file /secure/w6-content.json \
+  --source-identity <source-host:port/db> \
+  --page home --page features --page pricing --page join \
+  --page contact --page privacy --page terms --include-faq
+unset CONTENT_TRANSFER_SOURCE_URL
+```
 
-- Every `page_key`/`section_key`/`locale` is in the CMS registry; SEO payloads
-  use registered social-image IDs; payloads pass the existing typed schemas;
-  no unknown fields.
-- FAQ is non-empty for the homepage if a homepage FAQ publication exists.
-- Row count is bounded and matches the approved Development review. Abort on any
-  invalid row.
+Record the printed digest. Validate offline:
 
-**Import (Production, one transaction, migrator/direct role)**
+```bash
+pnpm content:transfer validate --file /secure/w6-content.json \
+  --expected-digest <sha256>
+```
 
-- Upsert only the approved published content. For `content_sections` set
-  `published_payload`, `published_revision` and `published_at`, keep
-  `draft_payload = NULL` and set `draft_revision = published_revision` so the
-  editor revision continues without creating a pending draft.
-- For `faq_items` set both `draft_*` and `published_*` columns to the approved
-  published values, `draft_deleted = false`, and preserve `published_at`.
-- Preserve publication semantics: the imported rows are already published; no
-  draft review is required. The `seo` rows preserve explicit page image/SEO
-  selections. The homepage `showcase.visible` value inside the published
-  `showcase` payload preserves the approved product visual.
-- Do not import plans. Create Production marketing plans only if separately
-  approved; do not copy the two synthetic hidden Development plans.
-- Re-enter public contact/social settings manually only after the owner verifies
-  them. Keep notification/analytics preferences disabled.
+Target import (direct migrator connection; dry run first):
+
+```bash
+read -rsp 'Production target URL: ' CONTENT_TRANSFER_TARGET_URL; echo
+export CONTENT_TRANSFER_TARGET_URL
+pnpm content:transfer import --file /secure/w6-content.json \
+  --target-identity <target-host:port/db> \
+  --expected-digest <sha256> --dry-run
+pnpm content:transfer import --file /secure/w6-content.json \
+  --target-identity <target-host:port/db> \
+  --expected-digest <sha256>
+unset CONTENT_TRANSFER_TARGET_URL
+```
+
+The import sets `draft_payload = NULL`, `draft_revision = published_revision`
+and copies published values only; FAQ draft values equal their published values
+with `draft_deleted = false`. It preserves the published `showcase.visible`
+value, explicit SEO/social-image selections, revisions and timestamps, and
+aborts on an unexpected target or post-import digest mismatch.
 
 **Verify after import**
 
@@ -156,19 +165,21 @@ deployment.
   configured; auth/session counts contain only the Production owner/session.
 
 **Rollback:** create a Production Neon branch/restore point immediately before
-import. The import transaction must abort on any validation error. To revert
-after commit, restore the branch/point-in-time snapshot; do not use unscoped
-deletes.
+import. The import transaction aborts on any validation error; after commit,
+restore the branch/point-in-time snapshot. Do not use unscoped deletes.
 
 ## 6. Indexing release control (final launch step only)
 
 Default state: no indexing. `robots.txt` disallows all, `sitemap.xml` is empty,
 public metadata is `noindex, nofollow`, and admin/login are always noindex.
 
-The release control is the runtime-only `SITE_INDEXING_ENABLED` flag
-(`1`/`true`). It is effective only when `VERCEL_ENV` is absent or
-`production`; Preview/development deployments remain noindex even if the flag
-is set.
+The release control requires **both** the runtime-only
+`SITE_INDEXING_ENABLED` flag (`1`/`true`) **and** positive
+`VERCEL_ENV=production` identification. Preview, development, missing or
+unknown environment metadata always remain noindex, even if the flag is set.
+Non-Vercel deployments are not supported by this release control; they would
+need a separate explicit environment contract. Metadata is evaluated per
+request, not from a build-time module snapshot.
 
 **Owner-authorized procedure**
 
@@ -176,8 +187,9 @@ is set.
    acceptance gates.
 2. Obtain explicit owner launch authorization (record it in the release
    evidence).
-3. Set `SITE_INDEXING_ENABLED=1` in the Vercel **Production** environment only.
-   Never set it for Preview.
+3. Set `SITE_INDEXING_ENABLED=1` in the Vercel **Production** environment only,
+   and confirm the deployment has positive `VERCEL_ENV=production`. Never set
+   the flag for Preview; even a mistaken flag there cannot enable indexing.
 4. Redeploy Production from the approved exact commit.
 5. Verify:
    - `https://nokmel.tech/robots.txt` contains `Allow: /`,
@@ -263,8 +275,13 @@ public Production.
    secret, exact origins; intake/integrations/indexing off).
 7. Import approved public CMS/FAQ/SEO content through the narrow validated
    procedure in §5; do not import plans/requests/settings/credentials.
-8. Deploy a protected initial Production build (Preview/SSO or access gate as
-   approved) with indexing/intake off; run smoke tests.
+8. Deploy the initial Production build with indexing/intake off. Verify the
+   actual Vercel access-protection capability before promising a protected
+   Production deployment: Deployment Protection commonly covers Preview, while
+   Production/custom-domain protection depends on the account plan/feature. If
+   supported protection is not available, the public marketing pages remain
+   public (noindex is not access control) and admin remains owner-auth
+   protected.
 9. Configure/verify the domain and TLS only with explicit DNS approval.
 10. Run Production smoke and raw HTTP checks; complete the acceptance matrix.
 11. Prepare rollback (prior deployment, DB branch/restore point, content
@@ -274,12 +291,30 @@ public Production.
 
 ## 9. Rollback readiness
 
-- Vercel: keep the previous READY Production deployment promotable; roll back
-  by promotion, not by force-push.
-- Database: branch/restore point before migration/content import; migrations are
-  additive and immutable; do not reverse-apply SQL manually.
-- Content: export the approved imported rows before any later edit; the admin
-  CMS keeps published values when drafts are discarded.
+**First-ever Production deployment (no previous READY Production deployment)**
+
+- Stop intake: leave/unset `JOIN_INTAKE_ENABLED` and redeploy.
+- Disable indexing: unset `SITE_INDEXING_ENABLED` and redeploy; verify
+  `Disallow: /` and noindex.
+- Remove public exposure where the approved Vercel plan actually supports
+  Production access protection; otherwise treat the marketing pages as public
+  until the launch gate. **Noindex is not access control.** Admin remains
+  protected by owner authentication.
+- Restore the Neon branch/restore point taken before migration/import. Applied
+  migrations are additive/immutable; do not manually reverse them.
+- If the deployment itself is bad, redeploy the known-good prelaunch baseline
+  commit (the W6 base `53157b9...`) or remove the failing alias/domain routing.
+  There may be no previous Production deployment to promote; do not claim one.
+- Record the safe state: intake off, indexing off, no unapproved content, no
+  external integrations.
+
+**Established Production release**
+
+- Vercel: promote the previous READY Production deployment; never force-push.
+- Database: restore the pre-change branch/restore point; migrations are
+  additive and immutable.
+- Content: restore the pre-import snapshot/branch; the admin CMS keeps
+  published values when drafts are discarded.
 - Indexing: remove the flag/redeploy; verify noindex.
 - Intake/integrations: unset the gate/token/measurement env and redeploy; the
   request rows remain readable by the owner; no notification rollback is
@@ -295,11 +330,16 @@ public Production.
 - GA4/Telegram are disabled and unconfigured; provider delivery/tracking is not
   claimed. Activation checklists are separate (`docs/W5_INTEGRATIONS.md`).
 - No field Core Web Vitals or INP measurement is claimed. Lab measurements:
-  launch state (product visual visible) mobile LCP ~828–904 ms/CLS
-  ~0.090–0.094, desktop LCP ~820–868 ms/CLS ~0.019–0.024 under a local production build (Chromium, 4× CPU,
+  launch state (product visual visible) mobile LCP ~880–1224 ms/CLS
+  ~0.090–0.092, desktop LCP ~888–1252 ms/CLS ~0.019–0.024 under a local production build (Chromium, 4× CPU,
   1.6 Mbps/150 ms, median of 3). The hidden-visual fallback state measured mobile CLS
   ~0.133 (font swap); it is not the approved launch configuration.
-- Full nonce-based CSP and dependency upgrades (Zod 4 / Vitest 4+) are deferred;
-  see `docs/SECURITY.md`.
+- Full nonce-based CSP remains deferred. Production-only and full audits report
+  no known vulnerabilities after Zod 4.6.7 / Vitest 4.1.12 upgrades and narrow
+  PostCSS/esbuild overrides; exact advisory inventory and rationale are in
+  `docs/SECURITY.md` and the Drive artifacts.
+- The content-transfer utility is tested against disposable PostgreSQL only;
+  hosted export/import remains external and must use the approved release
+  commit and explicit target identity.
 - Legal entity/address/jurisdiction/tax/contact/privacy-retention wording still
   requires owner/legal approval; nothing was invented.

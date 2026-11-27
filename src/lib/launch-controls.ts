@@ -26,13 +26,15 @@ export function resolvePublicIndexingEnabled(
   if (!raw || !ENABLING_VALUES.has(raw)) return false;
 
   /**
-   * On Vercel only a Production deployment may enable indexing. `preview` and
-   * `development` are never indexable. A non-Vercel environment has no
-   * `VERCEL_ENV`; there the explicit operator flag is sufficient.
+   * The approved hosting path is Vercel. Positive `VERCEL_ENV=production`
+   * identification is required in addition to the explicit flag. Missing,
+   * invalid, Preview, development or unknown environment metadata always
+   * keeps indexing disabled. A non-Vercel deployment is deliberately not
+   * supported by this release control; it would need a separate, explicit
+   * environment contract rather than inferring production from an absent
+   * `VERCEL_ENV`.
    */
-  const vercelEnv = env.VERCEL_ENV?.trim().toLowerCase();
-  if (vercelEnv && vercelEnv !== 'production') return false;
-  return true;
+  return env.VERCEL_ENV?.trim().toLowerCase() === 'production';
 }
 
 export function isPublicIndexingEnabled(): boolean {

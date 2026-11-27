@@ -98,6 +98,9 @@ describe('W5 settings persistence and projection', () => {
       'socialXUrl',
     ]);
 
+    await pg.pool.query(
+      "update site_settings set telegram_chat_id = '9876543210123', telegram_bot_username = 'nokmel_bot', telegram_bot_name = 'Nokmel Bot' where id = 'default'",
+    );
     const notification = await saveNotificationSettings(
       {
         expectedRevision: 0,
@@ -132,7 +135,11 @@ describe('W5 settings persistence and projection', () => {
     expect(owner.settings.analyticsRevision).toBe(1);
   });
 
-  test('notification mutation returns only masked destination and clears old verification on change', async () => {
+  test('notification mutation requires a successful test and clears verification on destination change', async () => {
+    await pg.pool.query(
+      `insert into site_settings (id, telegram_chat_id, telegram_bot_username, telegram_bot_name)
+       values ('default', '9876543210123', 'nokmel_bot', 'Nokmel Bot')`,
+    );
     const initial = await saveNotificationSettings(
       {
         expectedRevision: 0,
@@ -159,30 +166,65 @@ describe('W5 settings persistence and projection', () => {
     const priorTestAt = beforeChange.settings.lastNotificationTestAt;
     expect(priorTestAt).not.toBeNull();
 
+    // Saving a new destination with delivery disabled clears verification.
     const changed = await saveNotificationSettings(
       {
         expectedRevision: 1,
-        values: { notificationsEnabled: true, telegramChatId: '555000111222' },
+        values: { notificationsEnabled: false, telegramChatId: '555000111222' },
       },
       { db: pg.db },
     );
     expect(changed).toEqual({
       revision: 2,
-      notificationsEnabled: true,
+      notificationsEnabled: false,
       telegramChatIdMasked: '••••1222',
     });
     expect(JSON.stringify(changed)).not.toContain('555000111222');
 
-    const owner = await loadOwnerSettings({ db: pg.db });
-    expect(owner.status).toBe('ok');
-    if (owner.status !== 'ok') return;
-    expect(owner.settings.telegramChatId).toBe('555000111222');
-    expect(owner.settings.telegramBotUsername).toBeNull();
-    expect(owner.settings.telegramBotName).toBeNull();
+    const afterChange = await loadOwnerSettings({ db: pg.db });
+    expect(afterChange.status).toBe('ok');
+    if (afterChange.status !== 'ok') return;
+    expect(afterChange.settings.telegramChatId).toBe('555000111222');
+    expect(afterChange.settings.telegramBotUsername).toBeNull();
+    expect(afterChange.settings.telegramBotName).toBeNull();
     // The timestamp remains the durable 30-second test rate-limit slot, but
     // the verification identity is cleared so the UI cannot present the old
     // destination's test as verification of the new one.
-    expect(owner.settings.lastNotificationTestAt).toBe(priorTestAt);
+    expect(afterChange.settings.lastNotificationTestAt).toBe(priorTestAt);
+
+    // Enabling with only a numeric destination and no recorded successful test
+    // is refused server-side and changes nothing.
+    await expect(
+      saveNotificationSettings(
+        {
+          expectedRevision: 2,
+          values: { notificationsEnabled: true, telegramChatId: '555000111222' },
+        },
+        { db: pg.db },
+      ),
+    ).rejects.toBeInstanceOf(SettingsValidationError);
+    const stillDisabled = await loadOwnerSettings({ db: pg.db });
+    expect(stillDisabled.status).toBe('ok');
+    if (stillDisabled.status !== 'ok') return;
+    expect(stillDisabled.settings.notificationsEnabled).toBe(false);
+    expect(stillDisabled.settings.notificationRevision).toBe(2);
+
+    // A recorded successful test for the new destination permits enablement.
+    await pg.pool.query(
+      "update site_settings set telegram_bot_username = 'nokmel_bot', telegram_bot_name = 'Nokmel Bot' where id = 'default'",
+    );
+    const enabled = await saveNotificationSettings(
+      {
+        expectedRevision: 2,
+        values: { notificationsEnabled: true, telegramChatId: '555000111222' },
+      },
+      { db: pg.db },
+    );
+    expect(enabled).toEqual({
+      revision: 3,
+      notificationsEnabled: true,
+      telegramChatIdMasked: '••••1222',
+    });
 
     const publicResult = await loadPublicSettings({ db: pg.db });
     expect(JSON.stringify(publicResult)).not.toContain('555000111222');

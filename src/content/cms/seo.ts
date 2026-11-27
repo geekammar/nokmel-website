@@ -73,12 +73,12 @@ const optionalStoredImage = z.preprocess(
 export const seoStoredSchema = z
   .object({
     title: z
-      .string({ required_error: REQUIRED_TEXT })
+      .string({ error: REQUIRED_TEXT })
       .trim()
       .min(1, REQUIRED_TEXT)
       .max(CMS_SEO_LIMITS.title, TOO_LONG),
     description: z
-      .string({ required_error: REQUIRED_TEXT })
+      .string({ error: REQUIRED_TEXT })
       .trim()
       .min(1, REQUIRED_TEXT)
       .max(CMS_SEO_LIMITS.description, TOO_LONG),
@@ -91,12 +91,12 @@ export const seoStoredSchema = z
 export const seoFormSchema = z
   .object({
     title: z
-      .string({ required_error: REQUIRED_TEXT })
+      .string({ error: REQUIRED_TEXT })
       .trim()
       .min(1, REQUIRED_TEXT)
       .max(CMS_SEO_LIMITS.title, TOO_LONG),
     description: z
-      .string({ required_error: REQUIRED_TEXT })
+      .string({ error: REQUIRED_TEXT })
       .trim()
       .min(1, REQUIRED_TEXT)
       .max(CMS_SEO_LIMITS.description, TOO_LONG),

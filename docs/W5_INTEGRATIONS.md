@@ -182,8 +182,12 @@ Server environment (scoped Preview only):
    the saved destination and configured bot token, calls `getMe`, and sends a
    synthetic non-PII message to the fixed destination. It is limited to one test
    per 30 seconds by a durable database slot.
-4. Testing never enables automatic delivery as a side effect. Only after the
-   test succeeds, enable automatic notifications and save.
+4. Testing never enables automatic delivery as a side effect. The server only
+   permits enabling after a successful test has recorded the bot identity for
+   the currently saved destination. A numeric chat ID alone is not verification;
+   an enable attempt returns a controlled validation error and changes nothing.
+   Changing the destination clears the recorded identity and requires a new
+   test.
 5. Changing the destination clears the cached bot identity and prior
    verification presentation, so a previous test is never presented as
    verification of the new destination. Send a new test before relying on it.
@@ -192,7 +196,13 @@ Server environment (scoped Preview only):
    and records identity with a compare-and-set on the tested chat ID. A
    concurrent change yields a controlled `configuration_changed` message and
    requires a new test.
-6. If the token/destination is missing or invalid, test/enablement remains
+6. **Token/identity rotation prerequisite:** the existing settings storage
+   records the tested bot username/name but cannot fingerprint the environment
+   `TELEGRAM_BOT_TOKEN` without a schema migration. If the bot token is rotated
+   or points to a different bot, disable automatic notifications, send a new
+   test with the new token, then re-enable. Do not assume the previous
+   verification still applies after a token change.
+7. If the token/destination is missing or invalid, test/enablement remains
    safely unavailable; request intake is unaffected.
 
 ### 2.3 Delivery behavior and limits

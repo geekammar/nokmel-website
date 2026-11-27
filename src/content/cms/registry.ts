@@ -646,7 +646,7 @@ export function defaultSectionPayload(
 
 function textSchema(field: TextFieldDescriptor): z.ZodString {
   return z
-    .string({ required_error: REQUIRED_TEXT })
+    .string({ error: REQUIRED_TEXT })
     .trim()
     .min(1, REQUIRED_TEXT)
     .max(field.maxLength, TOO_LONG);
@@ -674,10 +674,10 @@ function fieldSchema(field: FieldDescriptor): z.ZodTypeAny {
         .length(field.length, INVALID_COUNT);
     case 'stringList':
       return z
-        .array(z.string({ required_error: REQUIRED_TEXT }).trim().min(1, REQUIRED_TEXT).max(field.maxLength, TOO_LONG))
+        .array(z.string({ error: REQUIRED_TEXT }).trim().min(1, REQUIRED_TEXT).max(field.maxLength, TOO_LONG))
         .length(field.length, INVALID_COUNT);
     case 'boolean':
-      return z.boolean({ required_error: REQUIRED_TEXT });
+      return z.boolean({ error: REQUIRED_TEXT });
   }
 }
 
