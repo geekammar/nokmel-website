@@ -14,6 +14,7 @@ import {
   composePageContent,
   defaultSectionPayloads,
   extractPageValues,
+  extractSectionValues,
   getSectionDefinition,
   pageEditableSchema,
   type CmsPageContent,
@@ -57,6 +58,64 @@ describe('CMS content registry', () => {
     expect(home.hero.headline).toBe('متجرك في المحادثة. وبزنسك في مكان واحد.');
     expect(home.hero.primaryCta.href).toBe('/join');
     expect(home.faq.items).toHaveLength(DEFAULT_FAQ_ITEMS.length);
+  });
+
+  it('states that the visible showcase is unavailable while keeping the preference', () => {
+    const section = getSectionDefinition('home', 'showcase');
+    expect(section.description).toContain('غير متاح');
+    const visible = section.fields.find((field) => field.key === 'visible');
+    expect(visible?.kind).toBe('boolean');
+    if (visible?.kind === 'boolean') {
+      expect(visible.help).toContain('غير متاح');
+      expect(visible.help).toContain('لا يعرض قسماً بديلاً');
+    }
+  });
+
+  it('hides the homepage showcase by default', () => {
+    expect(defaultContent('home').showcase.visible).toBe(false);
+    const payloads = defaultSectionPayloads('home');
+    expect((payloads.showcase as { visible: boolean }).visible).toBe(false);
+  });
+
+  it('normalizes legacy showcase payloads without a visibility field to hidden', () => {
+    const payloads = defaultSectionPayloads('home');
+    const legacyShowcase = structuredClone(payloads.showcase);
+    delete (legacyShowcase as Record<string, unknown>).visible;
+    payloads.showcase = legacyShowcase;
+
+    expect(extractSectionValues('home', 'showcase', legacyShowcase)).toMatchObject({
+      visible: false,
+      title: defaultContent('home').showcase.title,
+    });
+
+    const content = composePageContent('home', payloads, DEFAULT_FAQ_FOR_RENDER);
+    expect(content.showcase.visible).toBe(false);
+    expect(content.showcase.title).toBe(defaultContent('home').showcase.title);
+    expect(content.showcase.steps).toHaveLength(3);
+    expect(content.showcase.primaryCta.href).toBe('/join');
+  });
+
+  it('round-trips an explicit showcase visibility without losing stored content', () => {
+    const values = extractPageValues('home', defaultContent('home'));
+    (values.showcase as Record<string, unknown>).visible = true;
+    const payloads = buildSectionPayloads('home', values);
+    expect((payloads.showcase as { visible: boolean }).visible).toBe(true);
+
+    const content = composePageContent('home', payloads, DEFAULT_FAQ_FOR_RENDER);
+    expect(content.showcase.visible).toBe(true);
+    expect(content.showcase.title).toBe(defaultContent('home').showcase.title);
+    expect(content.showcase.body).toBe(defaultContent('home').showcase.body);
+    expect(content.showcase.steps).toEqual(defaultContent('home').showcase.steps);
+    expect(content.showcase.caption).toBe(defaultContent('home').showcase.caption);
+    expect(content.showcase.primaryCta).toEqual(defaultContent('home').showcase.primaryCta);
+  });
+
+  it('rejects a non-boolean stored showcase visibility', () => {
+    const payloads = defaultSectionPayloads('home');
+    (payloads.showcase as Record<string, unknown>).visible = 'yes';
+    expect(() =>
+      composePageContent('home', payloads, DEFAULT_FAQ_FOR_RENDER),
+    ).toThrow();
   });
 
   it('keeps registry sections aligned with default payload sections', () => {

@@ -204,6 +204,73 @@ describe('FAQ publication review final order (NKW-W32-005)', () => {
   });
 });
 
+describe('showcase visibility publication review', () => {
+  it('reports hidden to visible and visible to hidden changes clearly', () => {
+    const hiddenPayloads = defaultSectionPayloads('home');
+    const visiblePayloads = structuredClone(hiddenPayloads);
+    visiblePayloads.showcase.visible = true;
+    const hiddenContent = composePageContent(
+      'home',
+      hiddenPayloads,
+      DEFAULT_FAQ_FOR_RENDER,
+    );
+    const visibleContent = composePageContent(
+      'home',
+      visiblePayloads,
+      DEFAULT_FAQ_FOR_RENDER,
+    );
+    const base = {
+      pageKey: 'home' as const,
+      draftFaq: DEFAULT_FAQ_ITEMS.map((item) => ({ ...item })),
+      publishedFaq: DEFAULT_FAQ_ITEMS.map((item) => ({ ...item })),
+      seo: null,
+      revision: 2,
+      publishedRevision: 1,
+      lastPublishedAt: null,
+      publishedSource: 'published' as const,
+    };
+
+    const show = buildPublicationReview({
+      ...base,
+      draftContent: visibleContent,
+      publishedContent: hiddenContent,
+    });
+    expect(show.sections).toEqual([
+      {
+        key: 'showcase',
+        label: 'العرض المفاهيمي',
+        fields: [
+          {
+            path: 'showcase.visible',
+            label: 'إظهار عرض تجربة المنتج',
+            before: 'مخفي',
+            after: 'ظاهر',
+          },
+        ],
+      },
+    ]);
+    expect(show.hasChanges).toBe(true);
+
+    const hide = buildPublicationReview({
+      ...base,
+      draftContent: hiddenContent,
+      publishedContent: visibleContent,
+    });
+    expect(hide.sections[0]?.fields[0]).toMatchObject({
+      before: 'ظاهر',
+      after: 'مخفي',
+    });
+
+    const unchanged = buildPublicationReview({
+      ...base,
+      draftContent: hiddenContent,
+      publishedContent: hiddenContent,
+    });
+    expect(unchanged.sections).toEqual([]);
+    expect(unchanged.hasChanges).toBe(false);
+  });
+});
+
 describe('SEO publication review', () => {
   const content = composePageContent(
     'home',

@@ -562,6 +562,42 @@ export function ContentEditor({
         );
       }
 
+      if (field.kind === 'boolean') {
+        const id = `cms-field-${path.join('-')}`;
+        const helpId = `${id}-help`;
+        const checked = container[field.key] === true;
+        return (
+          <div key={key} data-testid={`${id}-field`} className="flex flex-col gap-1">
+            <label className="flex min-h-control cursor-pointer items-start gap-3 rounded-card border border-border-subtle bg-surface p-4 text-sm">
+              <input
+                id={id}
+                type="checkbox"
+                checked={checked}
+                onChange={(event) => updatePath(path, event.target.checked)}
+                data-field={key}
+                data-testid={id}
+                aria-describedby={field.help ? helpId : undefined}
+                aria-invalid={fieldErrors[key] ? true : undefined}
+                className="mt-0.5 h-5 w-5 shrink-0 rounded border-border-interactive"
+              />
+              <span>
+                <span className="block font-semibold text-text-primary">{field.label}</span>
+                {field.help ? (
+                  <span id={helpId} className="mt-1 block text-xs leading-5 text-text-secondary">
+                    {field.help}
+                  </span>
+                ) : null}
+              </span>
+            </label>
+            {fieldErrors[key] ? (
+              <p role="alert" className="text-sm text-status-error">
+                {fieldErrors[key]}
+              </p>
+            ) : null}
+          </div>
+        );
+      }
+
       if (field.kind === 'group') {
         const child =
           container[field.key] && typeof container[field.key] === 'object'

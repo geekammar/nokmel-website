@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { capabilityItemSchema, ctaLinkSchema, textItemSchema } from '../schema';
+import { capabilityItemSchema, ctaLinkSchema } from '../schema';
 
 export const featuresContentSchema = z.object({
   hero: z.object({

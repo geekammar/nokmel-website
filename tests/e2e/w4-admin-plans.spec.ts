@@ -175,6 +175,11 @@ test.describe('owner marketing-plan workflow', () => {
       await page.fill('#plan-field-name', updatedName);
       await page.fill('#plan-field-monthlyPrice', '249.00');
       await page.fill('#plan-field-features-0', 'ميزة محدثة للعرض');
+
+      await expect(page.getByTestId('plan-publish')).toBeDisabled();
+      await expect(page.getByTestId('plan-hide')).toBeDisabled();
+      await expect(page.getByTestId('plan-dirty')).toContainText('احفظ المسودة أولاً');
+
       await page.getByTestId('plan-save').click();
       await expect(page.getByTestId('plan-banner')).toContainText(SAVE_SUCCESS);
       await expect(page.getByTestId('plan-unpublished-changes')).toBeVisible();

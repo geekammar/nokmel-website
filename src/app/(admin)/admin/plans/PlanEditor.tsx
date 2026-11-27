@@ -1157,7 +1157,8 @@ export function PlanEditor({
             <button
               type="button"
               onClick={requestPublish}
-              disabled={busy}
+              disabled={busy || dirty}
+              aria-describedby={dirty ? 'plan-dirty-note' : undefined}
               className={secondaryButton}
               data-testid="plan-publish"
             >
@@ -1168,7 +1169,8 @@ export function PlanEditor({
             <button
               type="button"
               onClick={requestHide}
-              disabled={busy}
+              disabled={busy || dirty}
+              aria-describedby={dirty ? 'plan-dirty-note' : undefined}
               className={secondaryButton}
               data-testid="plan-hide"
             >
@@ -1177,8 +1179,12 @@ export function PlanEditor({
           ) : null}
         </div>
         {dirty ? (
-          <p className="text-sm font-semibold text-status-warning" data-testid="plan-dirty">
-            لديك تغييرات غير محفوظة
+          <p
+            id="plan-dirty-note"
+            className="text-sm font-semibold text-status-warning"
+            data-testid="plan-dirty"
+          >
+            {adminPlansUi.status.saveBeforePublish}
           </p>
         ) : null}
       </div>

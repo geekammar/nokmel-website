@@ -71,11 +71,11 @@ export function JoinView({
       <PageHero title={content.hero.title} lead={content.hero.lead} />
 
       <Section spacing="compact">
-        <Container className="flex max-w-2xl flex-col gap-6">
+        <Container className="flex max-w-3xl flex-col gap-6">
           <p
             role="note"
             data-testid="join-intake-notice"
-            className={`rounded-card border-s-4 bg-surface p-4 ${
+            className={`rounded-card border border-s-4 bg-surface p-4 text-sm leading-relaxed ${
               enabled ? 'border-status-info' : 'border-status-warning'
             }`}
           >
@@ -97,7 +97,7 @@ export function JoinView({
               requestedPlanUnavailable={intake.requestedPlanUnavailable === true}
             />
           ) : (
-            <Card className="flex flex-col gap-5" data-testid="join-form">
+            <Card className="flex flex-col gap-5 shadow-sm" data-testid="join-form">
               <h2 className="text-xl font-bold sm:text-2xl">{content.formTitle}</h2>
 
               <div

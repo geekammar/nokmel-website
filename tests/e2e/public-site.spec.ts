@@ -1,4 +1,23 @@
 import { expect, test } from '@playwright/test';
+import {
+  assertDestructiveTestTargetIsStillSafe,
+  openDisposableTestPool,
+} from '../../src/lib/db/disposable-test-database';
+
+const databaseFixtureEnabled = Boolean(
+  process.env.E2E_OWNER_PASSWORD && process.env.DATABASE_URL,
+);
+
+test.beforeAll(async () => {
+  if (!databaseFixtureEnabled) return;
+  const { target, pool } = openDisposableTestPool(process.env.DATABASE_URL, { max: 1 });
+  try {
+    assertDestructiveTestTargetIsStillSafe(target);
+    await pool.query('truncate table content_sections, faq_items');
+  } finally {
+    await pool.end();
+  }
+});
 
 const CTA = 'اطلب الانضمام';
 const base = 'http://127.0.0.1:3100';
@@ -79,7 +98,7 @@ test.describe('responsive layout across representative widths', () => {
 test.describe('screenshots (mobile + desktop, key routes)', () => {
   for (const vp of [
     { name: '390', width: 390, height: 844 },
-    { name: '1920', width: 1920, height: 1080 },
+    { name: '1440', width: 1440, height: 900 },
   ]) {
     for (const route of keyRoutes) {
       test(`full-page screenshot ${route} @ ${vp.name}px`, async ({ page }) => {
@@ -237,51 +256,64 @@ test.describe('homepage structure', () => {
     const headline = await page.locator('h1').first().innerText();
     expect(headline).toContain('متجرك في المحادثة');
 
-    const order = await page.evaluate(() => {
-      const sections = [...document.querySelectorAll('main > section')];
-      return sections.map((section) => {
-        const h2 = section.querySelector('h2')?.textContent?.trim() ?? '';
-        return { top: Math.round(section.getBoundingClientRect().top + window.scrollY), h2 };
-      });
-    });
-    const h2s = order.map((s) => s.h2);
+    const h2s = await page.locator('main h2').allInnerTexts();
     const indexOf = (prefix: string) => h2s.findIndex((text) => text.startsWith(prefix));
-    const titleShowcase = 'الطلبات من المحادثة';
     const titleProblems = 'قبل نكمّل';
     const titleCaps = 'ماذا يقدم';
     const titleSteps = 'كيف يعمل';
     const titlePricing = 'الانضمام المبكر';
     const titleFaq = 'أسئلة شائعة';
     const titleCta = 'جاهز تخلّي';
-    expect(indexOf(titleShowcase)).toBeGreaterThan(-1);
-    expect(order[indexOf(titleShowcase)].top).toBeGreaterThan(0);
+    for (const title of [
+      titleProblems,
+      titleCaps,
+      titleSteps,
+      titlePricing,
+      titleFaq,
+      titleCta,
+    ]) {
+      expect(indexOf(title)).toBeGreaterThanOrEqual(0);
+    }
     for (const [first, second] of [
-      [titleShowcase, titleProblems],
       [titleProblems, titleCaps],
       [titleCaps, titleSteps],
       [titleSteps, titlePricing],
       [titlePricing, titleFaq],
       [titleFaq, titleCta],
     ] as const) {
-      expect(indexOf(first)).toBeGreaterThanOrEqual(0);
       expect(indexOf(second)).toBeGreaterThan(indexOf(first));
     }
+    await expect(page.locator('#product-showcase')).toHaveCount(0);
   });
 
-  test('dark showcase illustration is the concept workflow, not a skeleton', async ({ page }) => {
+  test('showcase is unavailable without an empty container or broken anchor', async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
-    const showcase = page.locator('section[data-theme="dark"]').first();
-    const panel = showcase.locator('[data-theme="light-panel"]');
-    await expect(panel).toBeVisible();
-    await expect(panel.getByRole('note')).toContainText('تصوّر مفاهيمي');
-    const bubbles = showcase.locator('[data-testid="illustration-bubble"]');
-    await expect(bubbles).toHaveCount(0);
-    const workflowItems = panel.getByRole('listitem');
-    await expect(workflowItems).toHaveCount(3);
+    await expect(page.locator('#product-showcase')).toHaveCount(0);
+    await expect(page.locator('[data-testid="product-showcase"]')).toHaveCount(0);
+    await expect(page.locator('a[href="#product-showcase"]')).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'شوف كيف يعمل' })).toHaveAttribute(
+      'href',
+      '#how-it-works',
+    );
+    await expect(page.locator('#how-it-works')).toBeVisible();
+    expect(await page.content()).not.toContain('عرض تفاعلي موجّه ببيانات اصطناعية');
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({
+      path: 'test-results/screenshots/w2s-home-no-showcase-390.png',
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.screenshot({
+      path: 'test-results/screenshots/w2s-home-no-showcase-1440.png',
+      fullPage: true,
+    });
   });
 
-  test('dark showcase text keeps AA contrast including badges', async ({ page }) => {
+  test('dark sections keep AA contrast including badges', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
     const ratios = await page.evaluate(() => {
@@ -396,6 +428,24 @@ test.describe('accessibility basics', () => {
       .locator('#how-it-works')
       .evaluate((el) => el.getBoundingClientRect().top);
     expect(targetTop).toBeGreaterThanOrEqual(headerBottom - 1);
+  });
+});
+
+test.describe('removed interactive showcase audit', () => {
+  test('no public route renders or links to the rejected showcase', async ({ request }) => {
+    for (const route of publicRoutes) {
+      const response = await request.get(route);
+      expect(response.status()).toBe(200);
+      const body = await response.text();
+      expect(body, `showcase markup on ${route}`).not.toContain('product-showcase');
+      expect(body, `showcase action on ${route}`).not.toContain('showcase-action');
+      expect(body, `showcase customer panel on ${route}`).not.toContain(
+        'showcase-customer-panel',
+      );
+      expect(body, `showcase merchant panel on ${route}`).not.toContain(
+        'showcase-merchant-panel',
+      );
+    }
   });
 });
 

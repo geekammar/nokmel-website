@@ -152,6 +152,20 @@ function collectFieldChanges(
       continue;
     }
 
+    if (field.kind === 'boolean') {
+      const before = published[field.key] === true;
+      const after = draft[field.key] === true;
+      if (before !== after) {
+        changes.push({
+          path: [...pathBase, field.key].join('.'),
+          label: joinLabel(labelPrefix, field.label),
+          before: before ? (field.trueLabel ?? 'نعم') : (field.falseLabel ?? 'لا'),
+          after: after ? (field.trueLabel ?? 'نعم') : (field.falseLabel ?? 'لا'),
+        });
+      }
+      continue;
+    }
+
     if (field.kind === 'group') {
       changes.push(
         ...collectFieldChanges(

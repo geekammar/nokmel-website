@@ -33,16 +33,16 @@ export function PlanCard({
   return (
     <article
       data-testid={`plan-card-${plan.slug}`}
-      className={`flex h-full flex-col rounded-card border bg-surface p-6 ${
+      className={`flex h-full flex-col rounded-card border bg-surface p-5 sm:p-6 ${
         plan.featured
-          ? 'border-action-secondary ring-2 ring-action-secondary'
+          ? 'border-action-secondary ring-1 ring-action-secondary'
           : 'border-border-subtle'
       }`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <Heading className="text-xl font-bold text-text-primary">{plan.name}</Heading>
         {plan.featured ? (
-          <span className="rounded-control border border-border-subtle bg-background px-3 py-1 text-xs font-semibold text-action-secondary">
+          <span className="rounded-control border border-border-subtle bg-page px-3 py-1 text-xs font-semibold text-action-secondary">
             {publicPlansUi.featured}
           </span>
         ) : null}
@@ -54,7 +54,7 @@ export function PlanCard({
       {hasActivePromotion && offer.label && endsAt ? (
         <div
           data-testid={`plan-promotion-${plan.slug}`}
-          className="mt-4 rounded-card border border-status-info bg-background p-3 text-sm"
+          className="mt-4 rounded-card border-s-4 border-status-info bg-page p-3 text-sm"
         >
           <p className="font-semibold text-text-primary">
             {publicPlansUi.promotionLabel} «{offer.label}»
@@ -69,7 +69,7 @@ export function PlanCard({
         </div>
       ) : null}
 
-      <div className="mt-5 rounded-card bg-background p-4">
+      <div className="mt-5 rounded-card bg-page p-4">
         {hasAnyPrice ? (
           <dl className="flex flex-col gap-3 text-sm">
             {offer.monthly.baseMinor !== null ? (

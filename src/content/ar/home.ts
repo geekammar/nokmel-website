@@ -12,6 +12,7 @@ export const homeContentSchema = z.object({
     secondaryCta: ctaLinkSchema,
   }),
   showcase: z.object({
+    visible: z.boolean().default(false),
     title: z.string().min(1),
     body: z.string().min(1),
     steps: z.array(
@@ -73,6 +74,7 @@ export const home: HomeContent = homeContentSchema.parse({
     secondaryCta: { label: 'شوف كيف يعمل', href: '#how-it-works' },
   },
   showcase: {
+    visible: false,
     title: 'الطلبات من المحادثة، والمتابعة من مكان واحد.',
     body: 'هكذا نتخيل استخدام نكمّل في يومك التجاري: الطلب يبدأ في محادثة تيليجرام، يتحول إلى طلب منظّم، وتتابع كل طلباتك من مكان واحد.',
     steps: [

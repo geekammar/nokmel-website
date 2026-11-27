@@ -16,10 +16,10 @@ export function LegalPageView({
       <PageHero title={content.page.title} lead={content.page.intro} />
 
       <Section spacing="compact">
-        <Container className="flex max-w-3xl flex-col gap-8">
+        <Container className="flex max-w-2xl flex-col gap-7">
           <p
             role="note"
-            className="rounded-card border-s-4 border-status-warning bg-surface p-4 font-semibold"
+            className="rounded-card border-s-4 border-status-warning bg-surface p-4 text-sm font-semibold"
           >
             <span className="block">{content.draftStatus.label}</span>
             <span className="mt-1 block font-normal leading-relaxed text-text-secondary">
@@ -39,7 +39,7 @@ export function LegalPageView({
             </p>
           ) : null}
           {content.page.sections.map((section) => (
-            <section key={section.heading} className="flex flex-col gap-2">
+            <section key={section.heading} className="flex flex-col gap-2 border-t border-border-subtle pt-6 first:border-t-0 first:pt-0">
               <h2 className="text-xl font-bold">{section.heading}</h2>
               <p className="leading-relaxed text-text-secondary">{section.body}</p>
             </section>

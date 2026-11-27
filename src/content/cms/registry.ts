@@ -100,11 +100,21 @@ type StringListFieldDescriptor = {
   maxLength: number;
 };
 
+type BooleanFieldDescriptor = {
+  kind: 'boolean';
+  key: string;
+  label: string;
+  help?: string;
+  trueLabel?: string;
+  falseLabel?: string;
+};
+
 export type FieldDescriptor =
   | TextFieldDescriptor
   | GroupFieldDescriptor
   | ListFieldDescriptor
-  | StringListFieldDescriptor;
+  | StringListFieldDescriptor
+  | BooleanFieldDescriptor;
 
 export type SectionDefinition = {
   key: string;
@@ -191,6 +201,12 @@ const stringList = (
   maxLength,
 });
 
+const booleanField = (
+  key: string,
+  label: string,
+  options: { help?: string; trueLabel?: string; falseLabel?: string } = {},
+): BooleanFieldDescriptor => ({ kind: 'boolean', key, label, ...options });
+
 const ctaLabel = (key: string, label: string): TextFieldDescriptor =>
   text(key, label, CMS_TEXT_LIMITS.ctaLabel);
 
@@ -218,8 +234,15 @@ export const CMS_PAGES: readonly PageDefinition[] = [
       {
         key: 'showcase',
         label: 'العرض المفاهيمي',
-        description: 'وصف مفاهيمي لمسار المنتج. لا يمثل واجهة نهائية.',
+        description:
+          'محتوى عرض تجربة المنتج محفوظ للمرحلة القادمة. العرض المرئي غير متاح حالياً ولا يعرض قسماً بديلاً في الصفحة الرئيسية.',
         fields: [
+          booleanField('visible', 'إظهار عرض تجربة المنتج', {
+            help:
+              'يحفظ هذا الخيار تفضيل الظهور للمرحلة القادمة. العرض المرئي غير متاح حالياً، ولا يعرض قسماً بديلاً في الصفحة الرئيسية.',
+            trueLabel: 'ظاهر',
+            falseLabel: 'مخفي',
+          }),
           text('title', 'عنوان العرض', CMS_TEXT_LIMITS.medium),
           text('body', 'وصف العرض', CMS_TEXT_LIMITS.long, { multiline: true }),
           list('steps', 'الخطوات المفاهيمية', itemLabel('الخطوة'), 3, [
@@ -653,6 +676,8 @@ function fieldSchema(field: FieldDescriptor): z.ZodTypeAny {
       return z
         .array(z.string({ required_error: REQUIRED_TEXT }).trim().min(1, REQUIRED_TEXT).max(field.maxLength, TOO_LONG))
         .length(field.length, INVALID_COUNT);
+    case 'boolean':
+      return z.boolean({ required_error: REQUIRED_TEXT });
   }
 }
 
@@ -710,6 +735,12 @@ function readField(field: FieldDescriptor, source: unknown, path: string): unkno
         }
         return entry;
       });
+    case 'boolean':
+      if (value === undefined || value === null) return false;
+      if (typeof value !== 'boolean') {
+        throw new CmsValidationError(`بنية محتوى غير صالحة: ${path}`);
+      }
+      return value;
     case 'list':
       if (!Array.isArray(value) || value.length !== field.length) {
         throw new CmsValidationError(`بنية محتوى غير صالحة: ${path}`);
@@ -750,6 +781,12 @@ function writeField(field: FieldDescriptor, target: SectionPayload, values: unkn
     }
     case 'stringList':
       target[field.key] = [...(record[field.key] as string[])];
+      return;
+    case 'boolean':
+      if (typeof record[field.key] !== 'boolean') {
+        throw new CmsValidationError('بنية محتوى غير صالحة.');
+      }
+      target[field.key] = record[field.key];
       return;
     case 'list': {
       if (!Array.isArray(current) || current.length < field.length) {

@@ -14,6 +14,7 @@ Workstreams W0–W6. Each workstream ends with an external review gate before th
 | W4 | Pricing & Join Requests | Plans & Pricing admin (marketing data only), public join form **submission + join-request storage/management** (moved here from earlier W3 wording) | No billing integration; requests captured with plan/status |
 | W4.1 | Scheduled Promotional Pricing | One optional scheduled marketing discount per plan (percentage/fixed, monthly/yearly/both), draft/published lifecycle, owner preview, shared effective-offer resolver/version, stale-offer recovery, expanded historical offer snapshot | No billing effect; real PostgreSQL + browser coverage; hosted activation/acceptance external |
 | W5 | Analytics & Settings | Business Overview from authoritative join requests plus optional Google Analytics 4 aggregates; owner Telegram notifications; typed website settings; NKW-W41-001 correction | Database metrics match accepted requests; unavailable analytics is honest; settings persist with owner-only privacy boundaries |
+| W2-S | Marketing Design & Interactive Product Showcase | Premium RTL-first refinement of the seven public routes, focused brand-only homepage, removal of the owner-rejected interactive showcase while preserving CMS content/visibility compatibility, improved footer, social-sharing candidate and focused NKW-W5 corrections; no migration or new route | Design and accessibility acceptance; verified capability boundary; exact-HEAD CI green; Draft PR only |
 | W6 | Launch Acceptance | End-to-end acceptance, accessibility pass, performance pass, launch checklist | Owner approval; deployment only with explicit approval |
 
 W3.1 status (2026-11-25): merged via PR #4; accepted for continued
@@ -57,9 +58,13 @@ table-content hashes confirmed plans/CMS/FAQ/auth/sessions unchanged.
 NKW-W4-006 is closed and FAQ Q6 preserved. Hosted Production activation and W6
 launch gates remain external.
 
-W5 status (2026-11-26): implemented on
-`feature/w5-analytics-notifications-settings` from merged W4.1 `main`
-(`d50f7d555859b5f0ee4dc5b7075127f9e02eafde`). Additive migration
+W5 status (2026-11-26): **merged and accepted** via PR #9. Accepted HEAD
+`5fceb8e97036dfc9c2aa6ec33a03921442257295`; merge commit
+`4f32b94ac6943f61e96f58014672d25eaa37968e`. The owner-supplied independent
+acceptance record reports 20/20 PASS and the authorized QA cleanup completed;
+all three CI jobs passed on the accepted HEAD (run `45883572257`). W5 was
+implemented on `feature/w5-analytics-notifications-settings` from merged W4.1
+`main` (`d50f7d555859b5f0ee4dc5b7075127f9e02eafde`). Additive migration
 `0005_w5-settings-notifications` adds typed `site_settings` and durable
 per-request notification state, with no analytics-events table. The database
 Overview, GA4 adapter/reversible consent gate, optional owner Telegram
@@ -71,9 +76,26 @@ event-specific key-event conversion (or truthful unavailable state) and masked
 private-settings readback without a schema change. Local unit 274/274,
 PostgreSQL 187/187 and Playwright 117/117 pass; exact CI is checked on the
 final HEAD. Hosted migration 0005, runtime grant, Preview configuration,
-GA4/Telegram external activation and independent acceptance remain external.
+GA4/Telegram external activation remains external; the owner-supplied independent acceptance record reports 20/20 PASS.
 NKW-W41-002 stays deferred to physical Android evaluation in W6. Production
 readiness is not claimed.
+
+W2-S status (2026-11-26): **implemented** on
+`feature/w2s-marketing-design-showcase` from merged W5 `main`
+(`4f32b94ac6943f61e96f58014672d25eaa37968e`). Premium marketing refinement of
+the seven public routes, a focused brand-only homepage, an improved footer, a
+1200 × 630 social-sharing candidate and the NKW-W5-001/NKW-W5-002 corrections.
+The owner rejected the interactive product showcase; the component and its
+targeted tests were removed, and the homepage renders no replacement visual.
+The existing showcase CMS content and hidden-by-default `showcase.visible`
+preference remain JSONB-compatible, with legacy normalization, draft/preview/
+review/publication and stale-write protection preserved; the admin UI states
+that the visible showcase is currently unavailable. Future direction is a
+static composition of verified Telegram shopping and merchant dashboard
+screenshots, with optimized WebP/AVIF and optional motion after approval; it is
+not implemented or a launch blocker. No migration, new route, showcase backend,
+real commerce mutation or external provider activation. Draft PR only;
+independent design acceptance remains external.
 
 ## Standing rules
 

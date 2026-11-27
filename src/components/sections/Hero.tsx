@@ -13,14 +13,15 @@ export function PageHero({
   note?: string;
 }) {
   return (
-    <Section className="!pt-14 sm:!pt-20 lg:!pt-24">
+    <Section className="!pt-12 sm:!pt-16 lg:!pt-20" spacing="compact">
       <Container className="flex max-w-3xl flex-col items-start gap-5">
-        <h1 className="text-3xl font-bold leading-tight sm:text-4xl">{title}</h1>
-        <p className="text-lg leading-relaxed text-text-secondary sm:text-xl">{lead}</p>
+        <span aria-hidden="true" className="h-0.5 w-10 bg-action-secondary" />
+        <h1 className="text-4xl font-bold leading-[1.18] sm:text-5xl">{title}</h1>
+        <p className="max-w-2xl text-lg leading-relaxed text-text-secondary sm:text-xl">{lead}</p>
         {note ? (
           <p
             role="note"
-            className="rounded-card border-s-4 border-status-info bg-surface p-4 leading-relaxed text-text-secondary"
+            className="rounded-card border-s-4 border-status-info bg-surface p-4 text-sm leading-relaxed text-text-secondary sm:text-base"
           >
             {note}
           </p>
@@ -42,8 +43,9 @@ export function CtaBand({
   secondary?: CtaLink;
 }) {
   return (
-    <Section tone="dark">
+    <Section tone="dark" spacing="compact">
       <Container className="flex flex-col items-start gap-5">
+        <span aria-hidden="true" className="h-0.5 w-10 bg-brand-highlight" />
         <h2 className="max-w-2xl text-2xl font-bold sm:text-3xl">{title}</h2>
         <p className="max-w-2xl leading-relaxed text-text-secondary">{body}</p>
         <div className="flex flex-wrap items-center gap-4">

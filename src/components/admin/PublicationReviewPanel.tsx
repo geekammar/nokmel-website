@@ -115,6 +115,13 @@ export function PublicationReviewPanel({
                   )}
                 </span>
               </summary>
+              {section.key === 'showcase' &&
+              section.fields.some((change) => change.path === 'showcase.visible') ? (
+                <p className="border-t border-border-subtle p-4 text-xs leading-5 text-status-warning">
+                  العرض المرئي غير متاح حالياً؛ يحفظ النشر تفضيل الظهور فقط ولا يعرض
+                  قسماً بديلاً في الصفحة الرئيسية.
+                </p>
+              ) : null}
               <ul className="flex list-none flex-col gap-3 border-t border-border-subtle p-4">
                 {section.fields.map((change) => (
                   <li key={change.path} className="text-sm">
