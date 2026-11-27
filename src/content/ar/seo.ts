@@ -13,7 +13,7 @@ export type SeoPageDefaults = {
 
 export const SEO_PAGE_DEFAULTS: Record<CmsPageKey, SeoPageDefaults> = {
   home: {
-    title: 'نكمّل — متجرك في المحادثة. وبزنسك في مكان واحد.',
+    title: 'نكمّل — متجرك في المحادثة. وإدارة طلباتك في مكان واحد.',
     description: home.hero.subheadline,
   },
   features: {

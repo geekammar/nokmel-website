@@ -136,11 +136,11 @@ describe('homepage showcase visibility', () => {
     expect(review.sections).toEqual([
       {
         key: 'showcase',
-        label: 'العرض المفاهيمي',
+        label: 'العرض البصري للمنتج',
         fields: [
           {
             path: 'showcase.visible',
-            label: 'إظهار عرض تجربة المنتج',
+            label: 'إظهار العرض البصري للمنتج',
             before: 'مخفي',
             after: 'ظاهر',
           },

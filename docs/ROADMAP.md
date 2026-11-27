@@ -15,6 +15,7 @@ Workstreams W0–W6. Each workstream ends with an external review gate before th
 | W4.1 | Scheduled Promotional Pricing | One optional scheduled marketing discount per plan (percentage/fixed, monthly/yearly/both), draft/published lifecycle, owner preview, shared effective-offer resolver/version, stale-offer recovery, expanded historical offer snapshot | No billing effect; real PostgreSQL + browser coverage; hosted activation/acceptance external |
 | W5 | Analytics & Settings | Business Overview from authoritative join requests plus optional Google Analytics 4 aggregates; owner Telegram notifications; typed website settings; NKW-W41-001 correction | Database metrics match accepted requests; unavailable analytics is honest; settings persist with owner-only privacy boundaries |
 | W2-S | Marketing Design & Interactive Product Showcase | Premium RTL-first refinement of the seven public routes, focused brand-only homepage, removal of the owner-rejected interactive showcase while preserving CMS content/visibility compatibility, improved footer, social-sharing candidate and focused NKW-W5 corrections; no migration or new route | Design and accessibility acceptance; verified capability boundary; exact-HEAD CI green; Draft PR only |
+| W2-V | Product-led Visual Design & Mobile-first Homepage | Static owner-controlled Telegram customer-shopping / merchant order-management composition in the hero, four CMS-backed benefits, separate three-step onboarding and early-access callout, Egyptian demo-market formatter boundary, local optimized assets, motion/performance constraints; no migration or new route | Visual and technical acceptance by the external lead; capability evidence; reference widths without overflow; exact-HEAD CI green; Draft PR only |
 | W6 | Launch Acceptance | End-to-end acceptance, accessibility pass, performance pass, launch checklist | Owner approval; deployment only with explicit approval |
 
 W3.1 status (2026-11-25): merged via PR #4; accepted for continued
@@ -96,6 +97,17 @@ screenshots, with optimized WebP/AVIF and optional motion after approval; it is
 not implemented or a launch blocker. No migration, new route, showcase backend,
 real commerce mutation or external provider activation. Draft PR only;
 independent design acceptance remains external.
+
+W2-V status (2026-11-27): **implemented** on
+`feature/w2v-product-led-visual-design` from merged W2-S `main`
+(`f1aeb5c04ee6660d149d492bf2bb5c2d7f3704d7`). The homepage now uses a
+mobile-first product hero with a static, noninteractive Telegram/merchant
+composition controlled by the existing CMS `showcase.visible`, four
+CMS-backed benefits, a separate three-step onboarding flow and early-access
+callout, the preserved FAQ/final CTA/footer, and a shared Egypt demo-market
+money formatter boundary. No migration, new route, hosted CMS publication,
+deployment or external activation. Visual approval and hosted activation are
+external.
 
 ## Standing rules
 

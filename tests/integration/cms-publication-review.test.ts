@@ -33,7 +33,7 @@ afterAll(async () => {
   await pg.stop();
 });
 
-const DEFAULT_HEADLINE = 'متجرك في المحادثة. وبزنسك في مكان واحد.';
+const DEFAULT_HEADLINE = 'متجرك في المحادثة. وإدارة طلباتك في مكان واحد.';
 
 type FaqInput = { id?: string; question: string; answer: string; visible: boolean };
 

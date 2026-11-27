@@ -11,7 +11,8 @@ const SAVE_SUCCESS = 'تم حفظ المسودة. لم يتغيّر المحتو
 const PUBLISH_SUCCESS = 'تم نشر المحتوى وأصبحت النسخة الجديدة هي المعروضة للزوار.';
 const DISCARD_SUCCESS = 'تم تجاهل المسودة غير المنشورة. النسخة المنشورة لم تتغيّر.';
 const SHOWCASE_TITLE = 'الطلبات من المحادثة، والمتابعة من مكان واحد.';
-const UNAVAILABLE_NOTE = 'العرض المرئي غير متاح حالياً';
+const VISUAL_LABEL = 'إظهار العرض البصري للمنتج';
+const VISUAL_SECTION = 'العرض البصري للمنتج';
 
 test.skip(!enabled, 'Showcase visibility e2e requires the disposable CMS database fixture');
 
@@ -33,14 +34,78 @@ async function signIn(page: Page): Promise<void> {
   await page.waitForURL(/\/admin$/);
 }
 
-async function expectNoPublicShowcase(page: Page): Promise<void> {
-  await expect(page.locator('#product-showcase')).toHaveCount(0);
-  await expect(page.locator('[data-testid="product-showcase"]')).toHaveCount(0);
-  await expect(page.locator('a[href="#product-showcase"]')).toHaveCount(0);
+async function expectNoPublicVisual(page: Page): Promise<void> {
+  await expect(page.locator('[data-testid="product-visual"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="merchant-order-card"]')).toHaveCount(0);
+  await expect(page.locator('img[src*="hoodie"]')).toHaveCount(0);
+  await expect(page.getByTestId('product-hero')).toHaveAttribute(
+    'data-layout',
+    'text-only',
+  );
   await expect(
-    page.getByRole('link', { name: 'شوف كيف يعمل' }),
-  ).toHaveAttribute('href', '#how-it-works');
+    page.getByRole('link', { name: 'استكشف المميزات' }),
+  ).toHaveAttribute('href', '/features');
   await expect(page.locator('#how-it-works')).toBeVisible();
+}
+
+async function expectPublicVisual(page: Page): Promise<void> {
+  await expect(page.getByTestId('product-hero')).toHaveAttribute(
+    'data-layout',
+    'two-column',
+  );
+  const visual = page.getByTestId('product-visual');
+  await expect(visual).toBeVisible();
+  await expect(page.getByTestId('merchant-order-card')).toBeVisible();
+  await expect(visual).toContainText('هودي أساسي');
+  await expect(visual).toContainText('NW-1042');
+  await expect(visual).toContainText('الدفع عند الاستلام');
+  await expect(visual).toContainText('جديد');
+  await expect(visual).toContainText('قبول الطلب');
+}
+
+async function expectSharedDemoValues(page: Page): Promise<void> {
+  const visual = page.getByTestId('product-visual');
+  for (const field of [
+    'product-name',
+    'quantity',
+    'order-reference',
+  ] as const) {
+    const values = await visual.locator(`[data-demo-field="${field}"]`).allInnerTexts();
+    expect(values, field).toHaveLength(2);
+    expect(new Set(values).size, field).toBe(1);
+  }
+  const unitPrice = await visual
+    .locator('[data-demo-field="unit-price"]')
+    .innerText();
+  const total = await visual.locator('[data-demo-field="total"]').innerText();
+  expect(unitPrice).toBe(total);
+  expect(unitPrice).toContain('650');
+  expect(unitPrice).toContain('ج.م');
+  expect(unitPrice).not.toContain('ر.س');
+  expect(unitPrice).not.toContain('SAR');
+
+  const interactive = visual.locator(
+    'button, a, input, select, textarea, [tabindex], [role="button"]',
+  );
+  await expect(interactive).toHaveCount(0);
+}
+
+async function settleVisualMotion(page: Page): Promise<void> {
+  await page.getByTestId('product-visual').evaluate(async (element) => {
+    await Promise.all(
+      element
+        .getAnimations({ subtree: true })
+        .map((animation) => animation.finished.catch(() => undefined)),
+    );
+  });
+}
+
+async function expectNoHorizontalOverflow(page: Page, width: number): Promise<void> {
+  await page.setViewportSize({ width, height: 900 });
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow, `overflow at ${width}px`).toBeLessThanOrEqual(1);
 }
 
 test.beforeAll(async () => {
@@ -53,7 +118,7 @@ test.afterAll(async () => {
   await resetCmsData();
 });
 
-test('owner controls the stored showcase preference without rendering an unavailable section', async ({
+test('owner controls the static product visual with draft isolation and publication', async ({
   browser,
   page,
 }) => {
@@ -65,66 +130,121 @@ test('owner controls the stored showcase preference without rendering an unavail
   const control = page.locator('[data-field="showcase.visible"]');
   const controlField = page.getByTestId('cms-field-showcase-visible-field');
   await expect(control).not.toBeChecked();
-  await expect(controlField).toContainText('إظهار عرض تجربة المنتج');
-  await expect(controlField).toContainText(UNAVAILABLE_NOTE);
-  await expect(controlField).toContainText('لا يعرض قسماً بديلاً');
-  await expect(page.getByText(UNAVAILABLE_NOTE).first()).toBeVisible();
+  await expect(controlField).toContainText(VISUAL_LABEL);
+  await expect(controlField).toContainText('بيانات توضيحية');
+  await expect(controlField).toContainText('لا يظهر أي عمود فارغ');
   await controlField.scrollIntoViewIfNeeded();
   await page.setViewportSize({ width: 390, height: 900 });
   await controlField.screenshot({
-    path: 'test-results/screenshots/w2s-showcase-visibility-control-390.png',
+    path: 'test-results/screenshots/w2v-owner-visibility-control-390.png',
   });
   await page.setViewportSize({ width: 1440, height: 900 });
   await controlField.screenshot({
-    path: 'test-results/screenshots/w2s-showcase-visibility-control-1440.png',
+    path: 'test-results/screenshots/w2v-owner-visibility-control-1440.png',
   });
 
   const anonymous = await browser.newContext();
   try {
     const visitor = await anonymous.newPage();
     await visitor.goto('/');
-    await expectNoPublicShowcase(visitor);
+    await expectNoPublicVisual(visitor);
+    await visitor.setViewportSize({ width: 390, height: 844 });
+    await visitor.screenshot({
+      path: 'test-results/screenshots/w2v-home-hidden-390.png',
+      fullPage: true,
+    });
+    await visitor.setViewportSize({ width: 1440, height: 900 });
+    await visitor.screenshot({
+      path: 'test-results/screenshots/w2v-home-hidden-1440.png',
+      fullPage: true,
+    });
 
     await control.check();
     await page.getByTestId('save-draft').click();
     await expect(page.getByText(SAVE_SUCCESS)).toBeVisible();
     await visitor.goto('/');
-    await expectNoPublicShowcase(visitor);
+    await expectNoPublicVisual(visitor);
 
     const preview = await page.context().newPage();
     await preview.goto('/admin/content/home/preview');
     await expect(preview.getByTestId('preview-banner')).toBeVisible();
-    await expectNoPublicShowcase(preview);
+    await expectPublicVisual(preview);
     await preview.close();
 
     await page.getByTestId('publish-content').click();
     await expect(page.getByTestId('publication-review')).toBeVisible();
     await expect(page.getByTestId('review-section-summary')).toContainText(
-      'العرض المفاهيمي',
+      VISUAL_SECTION,
     );
-    await expect(page.getByTestId('publication-review')).toContainText(
-      'إظهار عرض تجربة المنتج',
-    );
+    await expect(page.getByTestId('publication-review')).toContainText(VISUAL_LABEL);
     await expect(page.getByTestId('publication-review')).toContainText('مخفي');
     await expect(page.getByTestId('publication-review')).toContainText('ظاهر');
     await expect(page.getByTestId('publication-review')).toContainText(
-      'العرض المرئي غير متاح حالياً',
+      'لا يعرض العرض تحكماً تفاعلياً أو بيانات إنتاجية',
     );
     await page.getByTestId('review-confirm-publish').click();
     await expect(page.getByText(PUBLISH_SUCCESS)).toBeVisible();
 
     await visitor.setViewportSize({ width: 390, height: 844 });
     await visitor.goto('/');
-    await expectNoPublicShowcase(visitor);
+    await expectPublicVisual(visitor);
+    await expectSharedDemoValues(visitor);
+    await settleVisualMotion(visitor);
     await visitor.screenshot({
-      path: 'test-results/screenshots/w2s-showcase-preference-visible-home-390.png',
+      path: 'test-results/screenshots/w2v-home-visual-390-full.png',
       fullPage: true,
     });
+    await visitor.getByTestId('product-visual').screenshot({
+      path: 'test-results/screenshots/w2v-product-visual-390.png',
+    });
+
+    for (const width of [320, 360, 390, 430, 768, 1024, 1440]) {
+      await expectNoHorizontalOverflow(visitor, width);
+      await expect(visitor.getByTestId('product-visual')).toBeVisible();
+    }
+
+    for (const width of [320, 430]) {
+      await visitor.setViewportSize({ width, height: 900 });
+      await visitor.goto('/');
+      await expectPublicVisual(visitor);
+      await settleVisualMotion(visitor);
+      await visitor.getByTestId('product-hero-section').screenshot({
+        path: `test-results/screenshots/w2v-hero-${width}.png`,
+      });
+    }
+
+    await visitor.setViewportSize({ width: 768, height: 1024 });
+    await visitor.goto('/');
+    await expectPublicVisual(visitor);
+    await settleVisualMotion(visitor);
+    await visitor.screenshot({
+      path: 'test-results/screenshots/w2v-home-visual-768.png',
+      fullPage: true,
+    });
+
     await visitor.setViewportSize({ width: 1440, height: 900 });
+    await visitor.goto('/');
+    await expectPublicVisual(visitor);
+    await settleVisualMotion(visitor);
+    await visitor.getByTestId('product-hero-section').screenshot({
+      path: 'test-results/screenshots/w2v-hero-1440.png',
+    });
     await visitor.screenshot({
-      path: 'test-results/screenshots/w2s-showcase-preference-visible-home-1440.png',
+      path: 'test-results/screenshots/w2v-home-visual-1440-full.png',
       fullPage: true,
     });
+
+    await visitor.emulateMedia({ reducedMotion: 'reduce' });
+    await visitor.reload();
+    const reducedStageAnimation = await visitor
+      .getByTestId('product-visual-stage')
+      .evaluate((element) => getComputedStyle(element).animationName);
+    const reducedCardAnimation = await visitor
+      .getByTestId('merchant-order-card')
+      .evaluate((element) => getComputedStyle(element).animationName);
+    expect(reducedStageAnimation).toBe('none');
+    expect(reducedCardAnimation).toBe('none');
+    await visitor.emulateMedia({ reducedMotion: 'no-preference' });
 
     await page.setViewportSize({ width: 390, height: 900 });
     await page.reload();
@@ -132,12 +252,12 @@ test('owner controls the stored showcase preference without rendering an unavail
     await page.getByTestId('save-draft').click();
     await expect(page.getByText(SAVE_SUCCESS)).toBeVisible();
     await visitor.goto('/');
-    await expectNoPublicShowcase(visitor);
+    await expectPublicVisual(visitor);
 
     const hiddenPreview = await page.context().newPage();
     await hiddenPreview.goto('/admin/content/home/preview');
     await expect(hiddenPreview.getByTestId('preview-banner')).toBeVisible();
-    await expectNoPublicShowcase(hiddenPreview);
+    await expectNoPublicVisual(hiddenPreview);
     await hiddenPreview.close();
 
     await page.getByTestId('publish-content').click();
@@ -147,7 +267,7 @@ test('owner controls the stored showcase preference without rendering an unavail
     await page.getByTestId('review-confirm-publish').click();
     await expect(page.getByText(PUBLISH_SUCCESS)).toBeVisible();
     await visitor.goto('/');
-    await expectNoPublicShowcase(visitor);
+    await expectNoPublicVisual(visitor);
 
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.reload();
@@ -162,7 +282,7 @@ test('owner controls the stored showcase preference without rendering an unavail
     await restoredPreview.setViewportSize({ width: 1440, height: 900 });
     await restoredPreview.goto('/admin/content/home/preview');
     await expect(restoredPreview.getByTestId('preview-banner')).toBeVisible();
-    await expectNoPublicShowcase(restoredPreview);
+    await expectPublicVisual(restoredPreview);
     await restoredPreview.close();
 
     await page.getByTestId('discard-draft').click();
@@ -170,7 +290,7 @@ test('owner controls the stored showcase preference without rendering an unavail
     await page.getByTestId('confirm-discard').click();
     await expect(page.getByText(DISCARD_SUCCESS)).toBeVisible();
     await visitor.goto('/');
-    await expectNoPublicShowcase(visitor);
+    await expectNoPublicVisual(visitor);
   } finally {
     await anonymous.close();
   }

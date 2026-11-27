@@ -55,19 +55,20 @@ describe('CMS content registry', () => {
       expect(content).toBeTruthy();
     }
     const home = defaultContent('home');
-    expect(home.hero.headline).toBe('متجرك في المحادثة. وبزنسك في مكان واحد.');
+    expect(home.hero.headline).toBe('متجرك في المحادثة. وإدارة طلباتك في مكان واحد.');
     expect(home.hero.primaryCta.href).toBe('/join');
     expect(home.faq.items).toHaveLength(DEFAULT_FAQ_ITEMS.length);
   });
 
-  it('states that the visible showcase is unavailable while keeping the preference', () => {
+  it('describes the implemented static product visual and keeps the visibility preference', () => {
     const section = getSectionDefinition('home', 'showcase');
-    expect(section.description).toContain('غير متاح');
+    expect(section.description).toContain('التركيب البصري الثابت');
+    expect(section.description).toContain('لا يظهر عمود فارغ');
     const visible = section.fields.find((field) => field.key === 'visible');
     expect(visible?.kind).toBe('boolean');
     if (visible?.kind === 'boolean') {
-      expect(visible.help).toContain('غير متاح');
-      expect(visible.help).toContain('لا يعرض قسماً بديلاً');
+      expect(visible.help).toContain('بيانات توضيحية');
+      expect(visible.help).toContain('لا يظهر أي عمود فارغ');
     }
   });
 
@@ -136,7 +137,7 @@ describe('CMS content registry', () => {
       secondaryCta: { href: string; label: string };
     };
     expect(hero.primaryCta.href).toBe('/join');
-    expect(hero.secondaryCta.href).toBe('#how-it-works');
+    expect(hero.secondaryCta.href).toBe('/features');
 
     const capabilities = payloads.capabilities as {
       items: { status: string; groupTitle: string }[];
@@ -267,7 +268,7 @@ describe('published content fallback without CMS configuration', () => {
     try {
       const { getPublishedPageContent } = await import('@/lib/cms/service');
       const content = await getPublishedPageContent('home', 'ar');
-      expect(content.hero.headline).toBe('متجرك في المحادثة. وبزنسك في مكان واحد.');
+      expect(content.hero.headline).toBe('متجرك في المحادثة. وإدارة طلباتك في مكان واحد.');
       expect(content.faq.items).toHaveLength(DEFAULT_FAQ_ITEMS.length);
     } finally {
       if (previous === undefined) delete process.env.DATABASE_URL;

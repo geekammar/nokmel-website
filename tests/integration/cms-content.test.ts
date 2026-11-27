@@ -71,7 +71,7 @@ describe('CMS migration and persistence', () => {
 
   test('uses approved default content when no published row exists', async () => {
     const content = await getPublishedPageContent('home', 'ar', { db: pg.db });
-    expect(content.hero.headline).toBe('متجرك في المحادثة. وبزنسك في مكان واحد.');
+    expect(content.hero.headline).toBe('متجرك في المحادثة. وإدارة طلباتك في مكان واحد.');
     expect(content.faq.items).toHaveLength(DEFAULT_FAQ_ITEMS.length);
   });
 
@@ -393,7 +393,7 @@ describe('public fallback safety', () => {
     );
 
     const publicContent = await getPublishedPageContent('home', 'ar', { db: pg.db });
-    expect(publicContent.hero.headline).toBe('متجرك في المحادثة. وبزنسك في مكان واحد.');
+    expect(publicContent.hero.headline).toBe('متجرك في المحادثة. وإدارة طلباتك في مكان واحد.');
     expect(publicContent.hero.headline).not.toContain('سرية');
   });
 
@@ -404,7 +404,7 @@ describe('public fallback safety', () => {
       },
     } as unknown as Db;
     const content = await getPublishedPageContent('home', 'ar', { db: broken });
-    expect(content.hero.headline).toBe('متجرك في المحادثة. وبزنسك في مكان واحد.');
+    expect(content.hero.headline).toBe('متجرك في المحادثة. وإدارة طلباتك في مكان واحد.');
   });
 
   test('builds per-page content for every approved route', async () => {

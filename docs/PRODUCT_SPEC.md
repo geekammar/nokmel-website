@@ -26,7 +26,7 @@ Pages:
 
 - Primary CTA: **Request to Join (اطلب الانضمام)** — highly visible throughout, especially on mobile.
 - No demo or demo page.
-- The owner rejected the interactive product showcase design/implementation; it has been removed from the public homepage and no replacement visual is rendered yet. The homepage keeps the approved brand-only hero. Existing showcase CMS content and the `showcase.visible` preference remain stored and JSONB-compatible, default hidden, with draft/preview/review/publication behavior preserved; the admin UI states that the visible showcase is currently unavailable. The preferred future direction is a lightweight static composition using verified Telegram shopping and merchant dashboard screenshots, consistent synthetic data, mobile-first, optimized WebP/AVIF initially and optional subtle motion after approval (reduced-motion/pause if motion is added). It is not approved scope or a launch blocker. No generic media library or page builder is approved.
+- The owner rejected the interactive product showcase design/implementation; it has been removed from the public homepage. W2-V implements its approved replacement as a lightweight, static, product-led composition integrated into the hero: a simplified Telegram customer-shopping frame and a compact Nokmel merchant order-management frame using one shared Egyptian demo order, local AVIF/WebP imagery, no client state and no fake commerce operations. Existing showcase CMS content and the `showcase.visible` preference remain stored and JSONB-compatible, default hidden, with draft/preview/review/publication behavior preserved; the admin UI now describes the implemented static visual. The visual is illustrative, not a live production screenshot, and is not a Nokmel subscription price. No generic media library or page builder is approved.
 
 ## 4. Admin scope [APPROVED]
 
@@ -53,7 +53,7 @@ Lightweight CMS with predefined components only. No generic website builder.
 
 - Only accepted reference: `Nokmel_Deep_Brand_Kit_v2.0.zip`. **[VERIFIED 2026-11-24 in the execution environment — archive SHA-256 `7c04840fc335daff52048f27b13ff3ac1e0159a3dc0d9299fbe8bf55b6931ff9`, independently confirmed by the external reviewer; see DESIGN_SYSTEM.md]**
 - Do not use Brand Kit v1.0; do not recreate the logo, substitute fonts, or invent tokens.
-- Working marketing headline (subject to owner approval) [PROPOSAL]: متجرك في المحادثة. وبزنسك في مكان واحد.
+- Working marketing headline (subject to owner approval) [PROPOSAL]: متجرك في المحادثة. وإدارة طلباتك في مكان واحد.
 - Working brand tagline [PROPOSAL]: خلي بزنسك يكمل.
 
 ## 7. Design direction [APPROVED]
@@ -74,6 +74,7 @@ Live demo, demo management, media library dashboard, security & activity dashboa
 - W4.1: one optional scheduled promotional discount per plan, shared effective-offer resolver/version, stale-offer recovery at activation/expiration, and expanded historical offer snapshots. Merged via PR #8 (accepted HEAD `7d33ab734cc84cb51f17d67aa972390559c71e86`, merge commit `d50f7d555859b5f0ee4dc5b7075127f9e02eafde`); independent live acceptance 18/18, 0 FAIL/PARTIAL/BLOCKED. W4.1 is accepted for continued development.
 - W5: business overview, external website analytics, optional owner Telegram notifications and website settings. Implemented on `feature/w5-analytics-notifications-settings` with additive migration `0005_w5-settings-notifications`; hosted integration activation remains external. The owner-supplied independent acceptance record reports 20/20 PASS. W5 does not add billing, CRM, marketing automation or a first-party analytics pipeline.
 - W2-S: premium marketing design refinement on the seven public routes, removal of the owner-rejected interactive showcase, preserved CMS content/visibility compatibility, brand-only current homepage and a documented static screenshot-composition direction. Implemented on `feature/w2s-marketing-design-showcase`; no migration, new route, showcase backend or external activation. Independent design acceptance, replacement-visual approval and any copy/SEO publication remain external.
+- W2-V: product-led visual design and mobile-first homepage from merged W2-S `main` (`f1aeb5c04ee6660d149d492bf2bb5c2d7f3704d7`). A server-rendered static Telegram/merchant composition controlled by the existing `showcase.visible`, four CMS-backed benefits, the preserved three-step onboarding flow, a separate early-access callout, preserved FAQ/final CTA/footer, an Egypt demo-market price formatter boundary and local optimized assets. Implemented on `feature/w2v-product-led-visual-design`; no migration, new route, hosted CMS mutation or deployment. Owner visual approval and hosted CMS activation remain external.
 - W6: launch acceptance by owner; no deployment without explicit approval.
 
 ## 10. W5 metric definitions and data-source boundaries [APPROVED for W5 implementation]
