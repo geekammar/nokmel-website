@@ -419,7 +419,10 @@ export async function exportPublishedContent(args: {
   const now = args.now ?? new Date();
 
   const exported = await withClient(target.url, target.database, target.tls, async (client) => {
-    await client.query('begin transaction read only');
+    // One coherent published snapshot for sections + FAQ/SEO. The source
+    // should still be frozen during export so the recorded digest matches the
+    // approved manifest.
+    await client.query('begin transaction isolation level repeatable read read only');
     try {
       const sections = await client.query(
         `select id, page_key, section_key, locale, published_payload,

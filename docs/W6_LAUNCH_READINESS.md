@@ -111,10 +111,13 @@ deployment.
 
 **Use the repository-owned utility (`pnpm content:transfer`)**
 
-The utility exports only explicitly selected published CMS/FAQ/SEO rows,
-validates them offline against the registry/content/SEO schemas, verifies an
-explicit source/target identity and digest, refuses a nonempty target, and
-imports transactionally with post-import readback. It never exports accounts,
+The utility exports only explicitly selected published CMS/FAQ/SEO rows in a
+read-only **Repeatable Read** transaction (one coherent snapshot), validates
+them offline against the registry/content/SEO schemas, verifies an explicit
+source/target identity and digest, refuses a nonempty target, and imports
+transactionally with post-import readback. Freeze publication during the
+export/approval window so the recorded manifest/digest remains the approved
+content. It never exports accounts,
 sessions, credentials, plans, join requests, rate-limit data, settings or
 integration configuration.
 
