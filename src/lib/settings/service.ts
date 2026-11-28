@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { ConfigError } from '@/lib/config-error';
 import { getDb } from '@/lib/db';
 import { siteSettings } from '@/lib/db/schema';
@@ -266,7 +266,12 @@ async function readGroupRevision(
   tx: Tx,
   group: 'public' | 'notification' | 'analytics',
   expected: unknown,
-): Promise<{ revision: number; telegramChatId: string | null }> {
+): Promise<{
+  revision: number;
+  telegramChatId: string | null;
+  telegramBotUsername: string | null;
+  telegramBotName: string | null;
+}> {
   const expectedRevision = assertRevision(expected);
   const rows = await tx
     .select({
@@ -274,6 +279,8 @@ async function readGroupRevision(
       notificationRevision: siteSettings.notificationRevision,
       analyticsRevision: siteSettings.analyticsRevision,
       telegramChatId: siteSettings.telegramChatId,
+      telegramBotUsername: siteSettings.telegramBotUsername,
+      telegramBotName: siteSettings.telegramBotName,
     })
     .from(siteSettings)
     .where(sql`${siteSettings.id} = ${SETTINGS_ROW_ID}`)
@@ -287,7 +294,12 @@ async function readGroupRevision(
         ? row?.notificationRevision ?? 0
         : row?.analyticsRevision ?? 0;
   if (current !== expectedRevision) throw new SettingsConflictError();
-  return { revision: expectedRevision, telegramChatId: row?.telegramChatId ?? null };
+  return {
+    revision: expectedRevision,
+    telegramChatId: row?.telegramChatId ?? null,
+    telegramBotUsername: row?.telegramBotUsername ?? null,
+    telegramBotName: row?.telegramBotName ?? null,
+  };
 }
 
 export async function savePublicSettings(
@@ -340,13 +352,32 @@ export async function saveNotificationSettings(
   try {
     return await db.transaction(async (tx) => {
       await ensureRow(tx);
-      const { revision, telegramChatId: previousChatId } = await readGroupRevision(
-        tx,
-        'notification',
-        args.expectedRevision,
-      );
+      const {
+        revision,
+        telegramChatId: previousChatId,
+        telegramBotUsername,
+        telegramBotName,
+      } = await readGroupRevision(tx, 'notification', args.expectedRevision);
       const destinationChanged =
         validation.values.telegramChatId !== previousChatId;
+      /**
+       * Enabling automatic delivery requires a recorded successful test for
+       * the currently saved destination. A numeric chat ID alone is not
+       * verification. Changing the destination clears the identity in this
+       * same transaction and therefore requires a new test before enablement.
+       * Provider token/identity rotation is an external prerequisite documented
+       * in docs/W5_INTEGRATIONS.md; existing storage cannot fingerprint the
+       * environment token without a migration.
+       */
+      if (
+        validation.values.notificationsEnabled &&
+        (destinationChanged || (!telegramBotUsername && !telegramBotName))
+      ) {
+        throw new SettingsValidationError({
+          notificationsEnabled:
+            'أرسل اختباراً ناجحاً للوجهة المحفوظة الحالية قبل تفعيل الإرسال التلقائي. تغيير الوجهة يتطلب اختباراً جديداً.',
+        });
+      }
       const updated = await tx
         .update(siteSettings)
         .set({
@@ -443,20 +474,37 @@ export async function claimNotificationTestSlot(
 
 export async function recordTelegramBotIdentity(
   identity: { username: string | null; name: string | null },
-  options: SettingsServiceOptions = {},
-): Promise<void> {
+  options: SettingsServiceOptions & { expectedChatId?: string | null } = {},
+): Promise<boolean> {
   const db = resolveDb(options);
   try {
-    await db
+    /**
+     * Bind the verification record to the destination that was actually
+     * tested. If the owner saves a different destination while the test is in
+     * flight, this compare-and-set affects zero rows and the new destination
+     * is never presented as verified.
+     */
+    const conditions = [eq(siteSettings.id, SETTINGS_ROW_ID)];
+    if (options.expectedChatId !== undefined) {
+      conditions.push(
+        options.expectedChatId === null
+          ? isNull(siteSettings.telegramChatId)
+          : eq(siteSettings.telegramChatId, options.expectedChatId),
+      );
+    }
+    const rows = await db
       .update(siteSettings)
       .set({
         telegramBotUsername: identity.username?.slice(0, 64) ?? null,
         telegramBotName: identity.name?.slice(0, 128) ?? null,
         updatedAt: new Date(),
       })
-      .where(sql`${siteSettings.id} = ${SETTINGS_ROW_ID}`);
+      .where(and(...conditions))
+      .returning({ id: siteSettings.id });
+    return rows.length > 0;
   } catch (error) {
     logFailure('bot-identity-save', error);
+    throw new SettingsStorageError();
   }
 }
 

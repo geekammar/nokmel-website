@@ -134,6 +134,21 @@ test('owner saves a destination, tests while automatic delivery is disabled, the
     telegram_chat_id: '9876543210123',
   });
 
+  // A numeric destination alone is not verification: enabling before a
+  // successful test is refused server-side and changes nothing.
+  await page.getByTestId('settings-notifications-enabled').check();
+  await page.getByTestId('settings-notifications-save').click();
+  await expect(
+    page.getByText('أرسل اختباراً ناجحاً للوجهة المحفوظة الحالية قبل تفعيل الإرسال التلقائي', {
+      exact: false,
+    }),
+  ).toBeVisible();
+  expect(await notificationSettings()).toEqual({
+    notifications_enabled: false,
+    telegram_chat_id: '9876543210123',
+  });
+  await page.getByTestId('settings-notifications-enabled').uncheck();
+
   await page.getByTestId('settings-notifications-test').click();
   await expect(
     page.getByText('نجح الاختبار ووصلت الرسالة التجريبية إلى الوجهة المحفوظة.', {

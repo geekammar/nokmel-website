@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { JoinStorageError } from '@/lib/join/errors';
+import { deriveJoinBucketKey } from '@/lib/join/request-context';
 
 const mocks = vi.hoisted(() => ({
   createJoinRequest: vi.fn(),
@@ -189,6 +190,28 @@ describe('join intake route', () => {
     expect(emailBody.fieldErrors.email).toBeTruthy();
     expect(JSON.stringify(emailBody)).not.toContain('not-an-email');
     expect(mocks.createJoinRequest).not.toHaveBeenCalled();
+  });
+
+  test('enforces the body limit while streaming when Content-Length is absent', async () => {
+    const huge = JSON.stringify({ ...validBody(), businessActivity: 'x'.repeat(20 * 1024) });
+    const response = await POST(request(huge, { contentLength: undefined }));
+    expect(response.status).toBe(413);
+    expect((await response.json()).code).toBe('payload_too_large');
+    expect(mocks.consumeJoinRateLimit).not.toHaveBeenCalled();
+    expect(mocks.createJoinRequest).not.toHaveBeenCalled();
+  });
+
+  test('multi-value forwarded headers resolve to the shared bucket, not a spoofable IP', async () => {
+    await POST(request(validBody(), { ip: '1.2.3.4, 5.6.7.8' }));
+    const secret = process.env.BETTER_AUTH_SECRET;
+    if (!secret) throw new Error('synthetic secret missing');
+    expect(mocks.consumeJoinRateLimit.mock.calls[0][0].bucketKey).toBe(
+      deriveJoinBucketKey('unknown', secret),
+    );
+    await POST(request(validBody(), { ip: '203.0.113.50' }));
+    expect(mocks.consumeJoinRateLimit.mock.calls[1][0].bucketKey).toBe(
+      deriveJoinBucketKey('203.0.113.50', secret),
+    );
   });
 
   test('returns controlled rate-limit response with Retry-After', async () => {

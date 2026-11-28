@@ -341,7 +341,7 @@ test.describe('public metadata on all seven routes', () => {
       );
       await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
         'content',
-        'https://nokmel.tech/brand/logos/nokmel-mark-transparent-1024.png',
+        'https://nokmel.tech/brand/social/nokmel-social-card-1200x630.png',
       );
       await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute(
         'content',

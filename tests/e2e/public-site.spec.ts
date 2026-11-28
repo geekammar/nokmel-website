@@ -497,9 +497,37 @@ test.describe('production runtime smoke (packaged build via next start)', () => 
   test('pre-launch robots policy is served', async ({ request }) => {
     const response = await request.get('/robots.txt');
     expect(response.status()).toBe(200);
+    const body = (await response.text()).toLowerCase();
+    expect(body).toContain('user-agent: *');
+    expect(body).toContain('disallow: /');
+  });
+
+  test('pre-launch sitemap exposes no indexable URLs', async ({ request }) => {
+    const response = await request.get('/sitemap.xml');
+    expect(response.status()).toBe(200);
     const body = await response.text();
-    expect(body).toContain('User-agent: *');
-    expect(body).toContain('Disallow: /');
+    expect(body).not.toContain('<loc>');
+  });
+
+  test('baseline security response headers are served', async ({ request }) => {
+    const publicResponse = await request.get('/');
+    expect(publicResponse.headers()['x-content-type-options']).toBe('nosniff');
+    expect(publicResponse.headers()['x-frame-options']).toBe('DENY');
+    expect(publicResponse.headers()['referrer-policy']).toBe(
+      'strict-origin-when-cross-origin',
+    );
+    expect(publicResponse.headers()['permissions-policy']).toContain('camera=()');
+    expect(publicResponse.headers()['content-security-policy']).toContain(
+      "frame-ancestors 'none'",
+    );
+    expect(publicResponse.headers()['strict-transport-security']).toContain(
+      'max-age=',
+    );
+    expect(publicResponse.headers()['x-powered-by']).toBeUndefined();
+
+    const adminLogin = await request.get('/admin/login');
+    expect(adminLogin.headers()['x-robots-tag']).toBe('noindex, nofollow');
+    expect(adminLogin.headers()['cache-control']).toContain('no-store');
   });
 });
 

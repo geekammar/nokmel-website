@@ -137,7 +137,7 @@ describe('SEO fallback and inheritance', () => {
       expect(effective.socialDescription).toBe(effective.description);
       expect(effective.socialTitleInherited).toBe(true);
       expect(effective.socialDescriptionInherited).toBe(true);
-      expect(effective.socialImageId).toBe('mark-transparent-1024');
+      expect(effective.socialImageId).toBe('social-card-1200x630');
     }
   });
 
@@ -204,6 +204,13 @@ describe('public metadata from validated SEO', () => {
       expect(metadata.alternates?.canonical).toBe(page.path);
       expect(metadata.robots).toEqual(PRE_LAUNCH ? { index: false, follow: false } : { index: true, follow: true });
       expect(metadata.openGraph?.url).toBe(`${siteUrl}${page.path === '/' ? '' : page.path}`);
+      expect(metadata.openGraph?.images).toEqual([
+        expect.objectContaining({
+          url: `${siteUrl}/brand/social/nokmel-social-card-1200x630.png`,
+          width: 1200,
+          height: 630,
+        }),
+      ]);
       expect(JSON.stringify(metadata)).not.toContain('vercel');
     }
   });

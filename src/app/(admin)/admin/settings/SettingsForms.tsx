@@ -165,6 +165,7 @@ export function SettingsForms({
     if (notificationSaving) return;
     setNotificationSaving(true);
     setNotificationBanner(null);
+    setNotificationErrors({});
     try {
       const result = await saveNotificationSettingsAction({
         expectedRevision: notificationRev,
@@ -220,11 +221,13 @@ export function SettingsForms({
       const message =
         outcome.code === 'rate_limited'
           ? adminSettingsUi.notificationsGroup.testRateLimited
-          : outcome.code === 'not_configured' || outcome.code === 'invalid_configuration'
-            ? adminSettingsUi.notificationsGroup.testNotConfigured
-            : outcome.code === 'storage'
-              ? adminSettingsUi.notificationsGroup.testStorage
-              : adminSettingsUi.notificationsGroup.testFailed;
+          : outcome.code === 'configuration_changed'
+            ? adminSettingsUi.notificationsGroup.testConfigurationChanged
+            : outcome.code === 'not_configured' || outcome.code === 'invalid_configuration'
+              ? adminSettingsUi.notificationsGroup.testNotConfigured
+              : outcome.code === 'storage'
+                ? adminSettingsUi.notificationsGroup.testStorage
+                : adminSettingsUi.notificationsGroup.testFailed;
       setNotificationBanner({ kind: 'error', text: message });
     } catch {
       setNotificationBanner({
@@ -422,6 +425,11 @@ export function SettingsForms({
         <p className="-mt-2 text-xs leading-5 text-text-secondary">
           {settings.notificationsGroup.enabledHint}
         </p>
+        {notificationErrors.notificationsEnabled ? (
+          <p role="alert" className="text-sm text-status-error">
+            {notificationErrors.notificationsEnabled}
+          </p>
+        ) : null}
 
         <Input
           id="settings-telegram-chat-id"

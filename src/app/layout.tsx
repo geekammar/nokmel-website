@@ -5,6 +5,10 @@ import './globals.css';
 import { THEME_COLOR_LIGHT } from '@/lib/viewport-theme';
 import { site, siteUrl } from '@/lib/site';
 import { home } from '@/content/ar/home';
+import {
+  DEFAULT_SOCIAL_IMAGE_ID,
+  getSocialImage,
+} from '@/content/cms/social-images';
 
 const plexSansArabic = localFont({
   src: [
@@ -43,14 +47,19 @@ const geist = localFont({
 });
 
 const alexandria = localFont({
+  /**
+   * The wordmark is Arabic-only; the English wordmark uses Geist. Loading only
+   * the Arabic subset removes ~60 KB from the preload group without changing
+   * any rendered glyph.
+   */
   src: [
     { path: '../../node_modules/@fontsource-variable/alexandria/files/alexandria-arabic-wght-normal.woff2' },
-    { path: '../../node_modules/@fontsource-variable/alexandria/files/alexandria-latin-wght-normal.woff2' },
-    { path: '../../node_modules/@fontsource-variable/alexandria/files/alexandria-latin-ext-wght-normal.woff2' },
   ],
   variable: '--font-alexandria',
   display: 'swap',
 });
+
+const defaultSocialImage = getSocialImage(DEFAULT_SOCIAL_IMAGE_ID);
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -67,10 +76,10 @@ export const metadata: Metadata = {
     type: 'website',
     images: [
       {
-        url: '/brand/logos/nokmel-mark-transparent-1024.png',
-        width: 1024,
-        height: 785,
-        alt: 'Nokmel Completion Mark',
+        url: defaultSocialImage.path,
+        width: defaultSocialImage.width,
+        height: defaultSocialImage.height,
+        alt: defaultSocialImage.alt,
       },
     ],
   },

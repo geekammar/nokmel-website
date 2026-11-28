@@ -17,7 +17,11 @@ export type SocialImageAsset = {
   alt: string;
 };
 
-export const DEFAULT_SOCIAL_IMAGE_ID: SocialImageId = 'mark-transparent-1024';
+/**
+ * Owner-approved default social-sharing image (W6-A01, 2026-11-27).
+ * Pages with an explicit published SEO image selection continue to override it.
+ */
+export const DEFAULT_SOCIAL_IMAGE_ID: SocialImageId = 'social-card-1200x630';
 
 export const SOCIAL_IMAGES: readonly SocialImageAsset[] = [
   {

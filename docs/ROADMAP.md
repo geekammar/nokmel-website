@@ -14,8 +14,8 @@ Workstreams W0–W6. Each workstream ends with an external review gate before th
 | W4 | Pricing & Join Requests | Plans & Pricing admin (marketing data only), public join form **submission + join-request storage/management** (moved here from earlier W3 wording) | No billing integration; requests captured with plan/status |
 | W4.1 | Scheduled Promotional Pricing | One optional scheduled marketing discount per plan (percentage/fixed, monthly/yearly/both), draft/published lifecycle, owner preview, shared effective-offer resolver/version, stale-offer recovery, expanded historical offer snapshot | No billing effect; real PostgreSQL + browser coverage; hosted activation/acceptance external |
 | W5 | Analytics & Settings | Business Overview from authoritative join requests plus optional Google Analytics 4 aggregates; owner Telegram notifications; typed website settings; NKW-W41-001 correction | Database metrics match accepted requests; unavailable analytics is honest; settings persist with owner-only privacy boundaries |
-| W2-S | Marketing Design & Interactive Product Showcase | Premium RTL-first refinement of the seven public routes, focused brand-only homepage, removal of the owner-rejected interactive showcase while preserving CMS content/visibility compatibility, improved footer, social-sharing candidate and focused NKW-W5 corrections; no migration or new route | Design and accessibility acceptance; verified capability boundary; exact-HEAD CI green; Draft PR only |
-| W2-V | Product-led Visual Design & Mobile-first Homepage | Static owner-controlled Telegram customer-shopping / merchant order-management composition in the hero, four CMS-backed benefits, separate three-step onboarding and early-access callout, Egyptian demo-market formatter boundary, local optimized assets, motion/performance constraints; no migration or new route | Visual and technical acceptance by the external lead; capability evidence; reference widths without overflow; exact-HEAD CI green; Draft PR only |
+| W2-S | Marketing Design & Interactive Product Showcase | Premium RTL-first refinement of the seven public routes, removal of the owner-rejected interactive showcase while preserving CMS content/visibility compatibility, improved footer, social-sharing asset and focused NKW-W5 corrections; no migration or new route | Merged/accepted via PR #10; design acceptance recorded |
+| W2-V | Product-led Visual Design & Mobile-first Homepage | Static owner-controlled Telegram customer-shopping / merchant order-management composition in the hero, four CMS-backed benefits, separate three-step onboarding and early-access callout, Egyptian demo-market formatter boundary, local optimized assets, motion/performance constraints; no migration or new route | Merged/accepted via PR #11; external lead visual/technical acceptance; owner physical Android visual 7/7 |
 | W6 | Launch Acceptance | End-to-end acceptance, accessibility pass, performance pass, launch checklist | Owner approval; deployment only with explicit approval |
 
 W3.1 status (2026-11-25): merged via PR #4; accepted for continued
@@ -81,40 +81,40 @@ GA4/Telegram external activation remains external; the owner-supplied independen
 NKW-W41-002 stays deferred to physical Android evaluation in W6. Production
 readiness is not claimed.
 
-W2-S status (2026-11-26): **implemented** on
-`feature/w2s-marketing-design-showcase` from merged W5 `main`
-(`4f32b94ac6943f61e96f58014672d25eaa37968e`). Premium marketing refinement of
-the seven public routes, a focused brand-only homepage, an improved footer, a
-1200 × 630 social-sharing candidate and the NKW-W5-001/NKW-W5-002 corrections.
-The owner rejected the interactive product showcase; the component and its
-targeted tests were removed, and the homepage renders no replacement visual.
-The existing showcase CMS content and hidden-by-default `showcase.visible`
-preference remain JSONB-compatible, with legacy normalization, draft/preview/
-review/publication and stale-write protection preserved; the admin UI states
-that the visible showcase is currently unavailable. Future direction is a
-static composition of verified Telegram shopping and merchant dashboard
-screenshots, with optimized WebP/AVIF and optional motion after approval; it is
-not implemented or a launch blocker. No migration, new route, showcase backend,
-real commerce mutation or external provider activation. Draft PR only;
-independent design acceptance remains external.
+W2-S status (2026-11-27): **merged and accepted** via PR #10 (merge
+`f1aeb5c04ee6660d149d492bf2bb5c2d7f3704d7`, accepted HEAD
+`dd71987cce35e3cf1981e42f87b638e3bcdbbdc3`). Premium marketing refinement of
+the seven public routes, removal of the owner-rejected interactive showcase,
+preserved CMS content/visibility compatibility and the NKW-W5-001/NKW-W5-002
+corrections. The 1200 × 630 social asset was later approved as the default in
+W6. No migration, new route, showcase backend or external provider activation.
+W2-V superseded the showcase-free homepage.
 
-W2-V status (2026-11-27): **focused visual polish implemented** on
-`feature/w2v-product-led-visual-design` from merged W2-S `main`
-(`f1aeb5c04ee6660d149d492bf2bb5c2d7f3704d7`). The homepage uses a
-mobile-first product hero with a static, noninteractive Telegram/merchant
-composition controlled by the existing CMS `showcase.visible`, four
-CMS-backed benefits, a separate three-step onboarding flow and early-access
-callout, the preserved FAQ/final CTA/footer, and a shared Egypt demo-market
-money formatter boundary. The focused polish rebalances the desktop headline,
-enriches the merchant/Telegram previews, replaces the product image with a
-navy studio-style original rendering, adds a market-fixture rejection guard,
-centers captions and simplifies narrow-width composition. A further mobile
-visual-balance refinement makes both phone frames equal across 320–1440px,
-adds shared status/home chrome, an authentic verified `/start`/welcome chat
-with a decorative composer, a populated merchant order view, a clear left
-connector and equal caption baselines. No migration, new route, hosted CMS
-publication, deployment or external activation. Visual approval and hosted
-activation are external.
+W2-V status (2026-11-27): **merged and accepted** via PR #11. Merge commit
+`53157b9e79f93cea2d9cd922072e8a49d2ce393f`; accepted W2-V HEAD
+`b88704b604ff253b7ac63e4bf5b20e4bf7f24f73`; accepted CI run `46042089986`.
+The external lead accepted the final visual implementation. The Muse record at
+`b31e6e8` reported 14 PASS, 1 PARTIAL (unavailable live mobile viewport
+emulation), 0 FAIL; the mobile visual-balance refinement at `b88704b` followed,
+and owner physical Android visual acceptance was 7/7 on 2026-11-27. Hosted
+Development homepage revision 55 has the product visual enabled with no pending
+CMS drafts. No migration, new route, hosted CMS mutation or deployment by the
+implementation agent. Physical visual acceptance is not full Production
+functional acceptance.
+
+W6 status (2026-11-27): **focused security & operational closure on
+`feature/w6-launch-readiness`** (Draft PR #12) from main
+`53157b9e79f93cea2d9cd922072e8a49d2ce393f`. R01 dependency advisories resolved
+with a clean production/full audit (Zod 4.6.7, Vitest 4.1.12, narrow
+PostCSS/esbuild overrides); R02 deterministic recovery-lock failure test; R03
+server-side Telegram test-before-enable; R04 fail-closed indexing requiring
+Vercel Production identification with HTTP matrix evidence; R05 tested
+repository content-transfer utility; R06 corrected production runbook; R07
+W2-S wording handoff; R08 approved design/routes/sections/migrations preserved.
+No merge, Production deployment, hosted database mutation, DNS change,
+indexing/analytics/Telegram activation or credential/session action. Production
+remains unconfigured/unaccepted; owner-authorized launch gate unmet. See
+`docs/SECURITY.md`, `docs/W6_LAUNCH_READINESS.md` and the Drive closure report.
 
 ## Standing rules
 

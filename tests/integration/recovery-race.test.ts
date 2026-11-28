@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
+import { Pool, type PoolClient } from 'pg';
 import { verifyPassword } from 'better-auth/crypto';
 import {
   applyMigrations,
@@ -103,6 +104,63 @@ async function waitForWaitingAdvisoryLock(timeoutMs = 5000): Promise<void> {
   throw new Error('Recovery did not wait on the owner credential advisory lock');
 }
 
+async function waitForBackendGone(pid: number, timeoutMs = 5000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const { rows } = await pg.pool.query(
+      'select count(*)::int as count from pg_stat_activity where pid = $1',
+      [pid],
+    );
+    if (rows[0].count === 0) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error('Lock backend did not terminate');
+}
+
+/**
+ * Simulates loss of the dedicated advisory-lock connection at commit time.
+ * Better Auth runs on the normal runtime pool, so its session write can still
+ * complete; the guard transaction commit then fails and the route must not
+ * return the auth response (including Set-Cookie).
+ */
+function lockPoolThatLosesConnectionOnCommit(): Pool {
+  const realPool = new Pool({
+    connectionString: pg.target.connectionString,
+    ssl: false,
+    max: 1,
+  });
+  realPool.on('error', () => undefined);
+  const wrapper = {
+    async connect(): Promise<PoolClient> {
+      const client = await realPool.connect();
+      client.on('error', () => undefined);
+      let lockPid: number | null = null;
+      const wrapped = {
+        async query(...args: unknown[]) {
+          const first = args[0];
+          const sqlText = typeof first === 'string' ? first.trim().toLowerCase() : '';
+          if (sqlText === 'begin') {
+            const { rows } = await client.query('select pg_backend_pid() as pid');
+            lockPid = rows[0].pid as number;
+          }
+          if (sqlText === 'commit') {
+            if (lockPid === null) throw new Error('lock pid was not captured');
+            await pg.pool.query('select pg_terminate_backend($1)', [lockPid]);
+            await waitForBackendGone(lockPid);
+          }
+          return client.query(first as string, args.slice(1));
+        },
+        release(destroy?: boolean | Error) {
+          return client.release(destroy as boolean | undefined);
+        },
+      };
+      return wrapped as unknown as PoolClient;
+    },
+    end: () => realPool.end(),
+  };
+  return wrapper as unknown as Pool;
+}
+
 beforeAll(async () => {
   await applyMigrations(pg);
 });
@@ -147,6 +205,42 @@ describe('password recovery race (NKW-W31-REC-01)', () => {
       cookie,
     });
     expect(await sessionResponse.json()).not.toBeNull();
+  });
+
+  test('lock-connection loss during sign-in cannot return a usable session cookie', async () => {
+    const auth = createTestAuth(pg.db);
+    const lockPool = lockPoolThatLosesConnectionOnCommit();
+    let delivered: Response | null = null;
+    try {
+      await expect(
+        handleOwnerAuthRequest(signInRequest(TEST_OWNER_PASSWORD), auth, lockPool).then(
+          (response) => {
+            delivered = response;
+            return response;
+          },
+        ),
+      ).rejects.toThrow();
+      expect(delivered).toBeNull();
+      // Better Auth may have committed its session before the guard commit
+      // failed. It is an orphan: no cookie was delivered and recovery removes it.
+      expect(await sessionCount()).toBeLessThanOrEqual(1);
+
+      const recovery = await resetOwnerPassword({
+        db: pg.db,
+        email: TEST_OWNER_EMAIL,
+        password: NEW_PASSWORD,
+      });
+      expect(recovery.outcome).toBe('password-reset');
+      expect(await sessionCount()).toBe(0);
+
+      const oldPassword = await auth.handler(signInRequest(TEST_OWNER_PASSWORD));
+      expect(oldPassword.status).not.toBe(200);
+      const newPassword = await auth.handler(signInRequest(NEW_PASSWORD));
+      expect(newPassword.status).toBe(200);
+      await newPassword.text();
+    } finally {
+      await lockPool.end();
+    }
   });
 
   test('a pre-existing session is revoked by password recovery', async () => {

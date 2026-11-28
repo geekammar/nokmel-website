@@ -5,7 +5,8 @@ Telegram notifications. These are **external operator actions**. The coding
 agent did not create Google Cloud/GA4/Telegram resources, obtain credentials,
 configure Vercel, or apply hosted migrations.
 
-Both integrations are disabled by default. The business Overview and all owner
+Both integrations are disabled by default and remain disabled/unconfigured in
+the W6 launch baseline; nothing below is claimed as activated. The business Overview and all owner
 request management continue to work when either integration is unconfigured,
 disabled, failing or out of quota.
 
@@ -181,12 +182,27 @@ Server environment (scoped Preview only):
    the saved destination and configured bot token, calls `getMe`, and sends a
    synthetic non-PII message to the fixed destination. It is limited to one test
    per 30 seconds by a durable database slot.
-4. Testing never enables automatic delivery as a side effect. Only after the
-   test succeeds, enable automatic notifications and save.
-5. Changing the destination clears the cached bot identity and last test
-   timestamp, so a previous verification is never presented as verification of
-   the new destination. Send a new test before relying on it.
-6. If the token/destination is missing or invalid, test/enablement remains
+4. Testing never enables automatic delivery as a side effect. The server only
+   permits enabling after a successful test has recorded the bot identity for
+   the currently saved destination. A numeric chat ID alone is not verification;
+   an enable attempt returns a controlled validation error and changes nothing.
+   Changing the destination clears the recorded identity and requires a new
+   test.
+5. Changing the destination clears the cached bot identity and prior
+   verification presentation, so a previous test is never presented as
+   verification of the new destination. Send a new test before relying on it.
+   W6 corrected a race where a destination saved during an in-flight test could
+   be recorded as verified: the test now re-reads the destination before sending
+   and records identity with a compare-and-set on the tested chat ID. A
+   concurrent change yields a controlled `configuration_changed` message and
+   requires a new test.
+6. **Token/identity rotation prerequisite:** the existing settings storage
+   records the tested bot username/name but cannot fingerprint the environment
+   `TELEGRAM_BOT_TOKEN` without a schema migration. If the bot token is rotated
+   or points to a different bot, disable automatic notifications, send a new
+   test with the new token, then re-enable. Do not assume the previous
+   verification still applies after a token change.
+7. If the token/destination is missing or invalid, test/enablement remains
    safely unavailable; request intake is unaffected.
 
 ### 2.3 Delivery behavior and limits
@@ -221,7 +237,8 @@ Server environment (scoped Preview only):
 ## 3. Activation checklist (external)
 
 - [ ] W5 migration 0005 applied to hosted Development with temporary migrator
-      database-level CREATE, then revoked.
+      database-level CREATE, then revoked (external record: applied on
+      Development; Production remains a separate launch step).
 - [ ] `GRANT SELECT, INSERT, UPDATE, DELETE ON public.site_settings TO
       nokmel_runtime;` applied; runtime still has no DDL/TRUNCATE.
 - [ ] Scoped Preview environment variables set (never Production).
@@ -240,7 +257,8 @@ Server environment (scoped Preview only):
       saved; explicit test message received while automatic delivery was
       disabled; only then automatic delivery enabled.
 - [ ] Changing the Telegram destination clears verification and requires a new
-      test.
+      test, including a concurrent destination change during a test (W6
+      `configuration_changed` correction).
 - [ ] Owner analytics/notification preferences enabled only after W6 privacy
       approval and successful verification.
 - [ ] Independent acceptance of Overview, Settings, GA4 states and Telegram
